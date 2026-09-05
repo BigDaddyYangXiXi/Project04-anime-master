@@ -86,7 +86,7 @@
         <button wx:if="{{canConfirmAgreement}}" class="primary-block" disabled="{{actionPending}}" bindtap="confirmAgreement">确认以上合作信息</button>
         <view wx:if="{{agreementConfirmed}}" class="payment-panel">
           <view><text>合作信息已确认</text><text>{{paymentHint}}</text></view><text>￥{{totalPrice}}</text>
-          <button class="primary-block {{paymentStatus === 'VERIFYING' || paying ? 'blocked' : ''}}" disabled="{{paymentStatus === 'VERIFYING' || paying}}" bindtap="startPayment">{{paying ? '正在调起微信支付…' : paymentStatus === 'VERIFYING' ? '等待支付结果确认' : '微信支付 ￥' + totalPrice}}</button>
+          <button class="primary-block {{paymentStatus === 'PAID' || paymentStatus === 'VERIFYING' || paying ? 'blocked' : ''}}" disabled="{{paymentStatus === 'PAID' || paymentStatus === 'VERIFYING' || paying}}" bindtap="startPayment">{{paying ? '正在核对付款…' : paymentStatus === 'PAID' ? '付款已确认' : paymentStatus === 'VERIFYING' ? '等待支付结果确认' : '微信支付 ￥' + totalPrice}}</button>
         </view>
       </view>
 

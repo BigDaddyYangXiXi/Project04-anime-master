@@ -130,7 +130,8 @@ Page({
       canConfirmAgreement: order.stage === "BUYER_FINAL_CONFIRM" && issues.length === 0 && !agreementConfirmed,
       agreementConfirmed, paymentStatus: order.paymentStatus || "UNPAID", totalPrice,
       buyerIdentity: presentation.buyerIdentity(order), providerIdentity: presentation.providerIdentity(order), schedule,
-      paymentHint: order.paymentStatus === "VERIFYING" ? "支付结果确认中，请稍后下拉刷新" : "确认合作信息后即可调用微信支付"
+      paymentHint: order.paymentStatus === "PAID" ? "付款已确认，等待订单进入履约"
+        : order.paymentStatus === "VERIFYING" ? "支付结果确认中，请稍后下拉刷新" : "确认合作信息后可继续付款"
     });
   },
 
@@ -160,6 +161,7 @@ Page({
   },
   startPayment() {
     if (this.auditStage || !this.data.agreementConfirmed || this.data.paying || this.data.paymentStatus === "VERIFYING") return;
+    if (this.cloudMode) return this.startCloudPayment();
     this.setData({ paying: true });
     paymentGateway.requestOrderPayment(this.data.order).then(() => {
       store.updateOrder(this.orderId, { paymentStatus: "VERIFYING" }); this.setData({ paying: false }); this.loadOrder();
@@ -171,6 +173,41 @@ Page({
       store.updateOrder(this.orderId, { paymentStatus: "FAILED" }); this.loadOrder();
       wx.showToast({ title: "支付未完成，请重试", icon: "none" });
     });
+  },
+  async startCloudPayment() {
+    this.setData({ paying: true });
+    let cashierReturned = false;
+    try {
+      const order = await cloudOrders.getOrder(this.orderId);
+      this.renderOrder(order);
+      if (order.viewerRole !== "BUYER" || order.stage !== "BUYER_FINAL_CONFIRM"
+        || !order.buyerAgreementConfirmedAt || agreementIssues(order).length
+        || !["UNPAID", "FAILED"].includes(order.paymentStatus)) return;
+      let paymentError;
+      try {
+        await paymentGateway.requestOrderPayment(order);
+      } catch (error) {
+        if (error && error.code === "PAYMENT_NOT_CONFIGURED") {
+          wx.showModal({ title: "支付服务尚未接通", content: "暂时无法付款，合作信息已保留。支付服务开通后可继续。", showCancel: false });
+          return;
+        }
+        paymentError = error;
+      }
+      cashierReturned = true;
+      const latest = await cloudOrders.getOrder(this.orderId);
+      this.renderOrder(latest);
+      if (latest.paymentStatus !== "PAID" && latest.paymentStatus !== "VERIFYING") {
+        this.setData({ paymentHint: paymentError && paymentError.code === "PAYMENT_CANCELLED"
+          ? "已退出收银台；尚未确认付款，可下拉刷新核对"
+          : "尚未确认付款结果，请稍后下拉刷新核对" });
+      }
+    } catch (error) {
+      this.setData({ paymentHint: cashierReturned
+        ? "暂时无法核对付款结果，请下拉刷新；不要重复付款"
+        : "暂时无法读取最新订单，请下拉刷新后重试" });
+    } finally {
+      this.setData({ paying: false });
+    }
   },
   retryBooking() { wx.navigateTo({ url: `/pages/booking/index?providerId=${this.data.order.providerId}&repeatOrderId=${this.orderId}` }); },
   retryLoad() { this.loadOrder(); },

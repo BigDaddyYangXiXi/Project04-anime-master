@@ -1,6 +1,8 @@
 # 动漫高手微信小程序工程
 
-本工程源自 `prototype/app/full-prototype-v063.tsx`，现已接入真实 CloudBase 后端。本地目标版本为 `0.7.0-native.8`，小程序 AppID 为 `wx57412ad07a806b70`；Web 原型保留独立历史。当前证据和未完成事项见 [工程基线与任务台账](../product-records/development-baseline.md)。
+本工程源自 `prototype/app/full-prototype-v063.tsx`，现已接入真实 CloudBase 后端。本地目标版本为 `0.7.0-native.9`，小程序 AppID 为 `wx57412ad07a806b70`；Web 原型保留独立历史。当前证据和未完成事项见 [工程基线与任务台账](../product-records/development-baseline.md)。
+
+`.9` 修复生产付款回调写本地订单、旧参数及付款资格重检和云函数确认错误透传。148 项本地测试通过，真实支付仍待商户与服务端接入，完整页／真机待验；见 [付款边界日志](../product-records/worklog-2026-09-05-payment-boundary.md)。
 
 `.8` 修复跨日锁档、服务方四项确认提交与服务端校验、需求方执行前合作确认，以及云端改价时确认草稿丢失。客户端与 order-api 须配套更新；当前只完成本地回归，未上传或部署。发布与运行证据见 [本轮工作日志](../product-records/worklog-2026-09-05-rule-gates.md)。
 
