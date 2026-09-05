@@ -1,0 +1,19 @@
+<app-top-nav title="个人信息" workspace="{{role}}" show-back="{{true}}"/>
+<view wx:if="{{loading}}" class="empty-page"><text class="empty-page-title">正在读取个人资料</text></view>
+<view wx:elif="{{loadError && !draft.nickname}}" class="empty-page"><text class="empty-page-title">{{loadError}}</text></view>
+<view wx:else class="account-shell">
+  <view class="profile-card">
+    <button class="avatar-picker" open-type="chooseAvatar" disabled="{{saving}}" bindchooseavatar="chooseAvatar">
+      <image wx:if="{{draft.avatar}}" class="avatar-preview" src="{{draft.avatar}}" mode="aspectFill"/>
+      <view wx:else class="avatar-preview avatar-fallback">{{initial}}</view>
+      <text>更换头像</text>
+    </button>
+    <text class="privacy-note">头像和昵称会用于当前身份的公开展示与订单识别。</text>
+  </view>
+  <view class="form-card">
+    <view class="field-title"><text>昵称</text><text>{{draft.nickname.length}} / 20</text></view>
+    <input type="nickname" class="nickname-input" value="{{draft.nickname}}" maxlength="20" bindinput="updateNickname" placeholder="请输入昵称"/>
+  </view>
+  <view class="save-button {{!canSave ? 'blocked' : ''}}" role="button" aria-disabled="{{!canSave}}" bindtap="save">{{saving ? '保存中' : '保存修改'}}</view>
+  <text wx:if="{{loadError}}" class="privacy-note">{{loadError}}</text>
+</view>

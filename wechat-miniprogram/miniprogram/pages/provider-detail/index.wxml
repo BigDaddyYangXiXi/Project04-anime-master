@@ -1,0 +1,41 @@
+<app-top-nav class="app-navigation" title="服务者详情" workspace="{{navWorkspace}}" show-back="{{true}}"/>
+<view wx:if="{{provider}}" class="profile-shell">
+  <view class="profile-hero">
+    <view class="identity-row">
+      <image wx:if="{{provider.avatar}}" class="avatar-large avatar-image" src="{{provider.avatar}}" mode="aspectFill"/><view wx:else class="avatar-large">{{provider.initial}}</view>
+      <view class="identity-copy"><view class="identity-heading"><text>{{provider.name}}</text><text>平台实名</text></view><text>{{provider.handle}}</text><text>{{provider.career}} · 常驻地 {{provider.city}}</text></view>
+    </view>
+    <text class="history-label">个人历史数据</text>
+    <view class="trust-row"><view><text>{{provider.orders}}</text><text>次合作完成</text></view><view><text>{{provider.ratingText}}</text><text>综合评分</text></view><view><text>{{provider.replyText}}</text><text>平均回复</text></view></view>
+    <text class="profile-bio">{{provider.bio}}</text>
+    <view class="tag-row"><text wx:for="{{provider.tags}}" wx:key="*this">{{item}}</text></view>
+  </view>
+
+  <view class="section-card information-card"><view class="section-title compact-title"><view><text>预约前须知</text><text>预约前请确认服务边界</text></view></view><text class="body-copy">{{provider.notice}}</text><image wx:if="{{noticeImage}}" class="notice-image" src="{{noticeImage}}" mode="aspectFill"/></view>
+
+  <view class="section-card service-section">
+    <view class="section-title"><view><text>可预约服务</text><text>资料与价格由服务方橱窗发布</text></view><text>{{provider.services.length}} 项</text></view>
+    <view class="service-list">
+      <view wx:for="{{provider.services}}" wx:key="id" class="service-row {{item.selected ? 'selected' : ''}} {{item.availableInCity === false ? 'unavailable' : ''}}">
+        <view class="service-main"><text>{{item.name}}</text><text>{{item.description}}</text><view class="service-meta"><text>{{item.priceText}}</text><text>{{item.locationText}}</text></view></view>
+        <view class="service-actions">
+          <view class="service-select" role="checkbox" aria-checked="{{item.selected}}" data-id="{{item.id}}" bindtap="toggleService"><view class="service-check-mark {{item.selected ? 'checked' : ''}}" aria-hidden="true"></view><text>{{item.availableInCity === false ? '不可约' : item.selected ? '已选择' : '选择'}}</text></view>
+          <view class="service-expand" role="button" aria-expanded="{{item.expanded}}" data-id="{{item.id}}" bindtap="toggleExpand"><text>{{item.expanded ? '收起' : '查看详情'}}</text><view class="service-chevron {{item.expanded ? 'expanded' : ''}}" aria-hidden="true"></view></view>
+        </view>
+        <image wx:if="{{item.coverWork && item.coverWork.coverImage}}" class="service-cover" src="{{item.coverWork.coverImage}}" mode="aspectFill" lazy-load="{{true}}"/>
+        <view wx:if="{{item.expanded}}" class="service-detail"><text>{{item.description}} 具体范围、时长与现场边界将在预约沟通中确认。</text><text wx:if="{{item.galleryWorks.length}}" class="gallery-label">关联作品证据</text><view wx:if="{{item.galleryWorks.length}}" class="service-gallery"><button wx:for="{{item.galleryWorks}}" wx:for-item="work" wx:key="id" data-id="{{work.id}}" bindtap="openWork"><image wx:if="{{work.coverImage}}" src="{{work.coverImage}}" mode="aspectFill" lazy-load="{{true}}"/><text>{{work.title}}</text></button></view><text wx:else class="service-empty">服务方尚未关联公开作品。</text></view>
+      </view>
+    </view>
+  </view>
+
+  <view class="section-card rating-card"><view class="section-title"><view><text>服务评价</text><text>{{reviewCount}} 条完成订单评价</text></view><text class="rating-score">{{provider.ratingText}}</text></view><text class="rating-stars">★★★★★</text></view>
+
+  <view class="section-card schedule-card"><view class="section-title"><view><text>公开档期</text><text>与服务方日历同步</text></view><button class="schedule-link" bindtap="openSchedule">查看完整月历</button></view><availability-strip days="{{availabilityDays}}"/></view>
+
+  <view class="section-card"><view class="section-title"><view><text>公开作品</text><text>点击作品查看完整图集</text></view><text>{{provider.works.length}} 件</text></view><view class="work-grid"><work-card wx:for="{{provider.works}}" wx:key="id" work="{{item}}" source="B02" workspace="{{navWorkspace}}" preview="{{storefrontDraftPreview ? 'storefront' : ''}}"/></view></view>
+
+  <view wx:if="{{storefrontDraftPreview}}" class="preview-publish-action"><button class="primary-button" disabled="{{publishing || previewPublished}}" bindtap="confirmPublish">{{previewPublished ? '已发布' : publishing ? '正在发布' : '确认并发布'}}</button></view>
+  <view wx:elif="{{!providerPreview}}" class="sticky-action"><view><text>已选 {{selectedServiceIds.length}} 项</text><text>￥{{selectedTotal}}</text></view><button disabled="{{!selectedServiceIds.length}}" bindtap="startBooking">发起预约</button></view>
+</view>
+<view wx:else class="empty-page"><text class="empty-page-title">没有找到服务者</text></view>
+<main-bottom-nav/>

@@ -1,0 +1,18 @@
+<app-top-nav class="app-navigation" title="公开档期" workspace="{{navWorkspace}}" show-back="{{true}}"/>
+<view wx:if="{{loading}}" class="empty-page"><text class="empty-page-title">正在读取服务者档期</text></view>
+<view wx:elif="{{provider}}" class="schedule-shell">
+  <view class="page-intro"><text>{{provider.name}} · {{provider.career}}</text><text>{{monthTitle}}</text><text>与服务方日历使用同一月历：公开可约可以选择，满客不可选择，未公开仍可发起预约等待确认。</text></view>
+  <view class="calendar-card">
+    <view class="week-row"><text wx:for="{{weekdays}}" wx:key="*this">{{item}}</text></view>
+    <view class="calendar-grid">
+      <button wx:for="{{days}}" wx:key="key" disabled="{{!item.selectable}}" class="{{!item.valid ? 'placeholder' : item.past ? 'past' : item.state}} {{item.selected ? 'selected' : ''}}" data-day="{{item.value}}" data-date="{{item.date}}" bindtap="chooseDate">
+        <text>{{item.value}}</text><text wx:if="{{item.valid && !item.past}}">{{item.label}}</text>
+      </button>
+    </view>
+    <view class="calendar-legend"><view><view class="calendar-dot open"></view><text>公开可约</text></view><view><view class="calendar-dot full"></view><text>满客</text></view><view><view class="calendar-dot unknown"></view><text>未公开</text></view></view>
+  </view>
+  <view class="selection-note"><text>当前选择</text><text>{{selectedText}}</text></view>
+  <button class="primary-block" disabled="{{!selectedDay || selectedFull}}" bindtap="startBooking">{{bookingText}}</button>
+</view>
+<view wx:else class="empty-page"><text class="empty-page-title">{{loadError || '没有找到服务者档期'}}</text></view>
+<main-bottom-nav/>

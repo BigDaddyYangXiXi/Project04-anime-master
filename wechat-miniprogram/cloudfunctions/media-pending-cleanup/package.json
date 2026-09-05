@@ -1,0 +1,12 @@
+{
+  "name": "anime-master-media-pending-cleanup",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test cleanup-core.test.js ready-orphan-core.test.js cleanup-run-core.test.js"
+  },
+  "dependencies": {
+    "@cloudbase/node-sdk": "3.18.3"
+  }
+}

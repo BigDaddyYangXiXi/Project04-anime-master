@@ -1,0 +1,7 @@
+<app-top-nav title="{{title}}" workspace="{{navWorkspace}}" show-back="{{true}}"/>
+<view class="assets-shell">
+  <view wx:if="{{loading}}" class="empty-state"><text>正在读取内容资产</text></view>
+  <view wx:elif="{{loadError}}" class="empty-state"><text>{{loadError}}</text></view>
+  <view wx:elif="{{items.length}}" class="asset-rows"><button wx:for="{{items}}" wx:key="id" data-id="{{item.id}}" data-kind="{{item.kind}}" bindtap="openItem"><view><text>{{item.title}}</text><text>{{item.subtitle}}</text></view><text>{{item.meta}}</text><view class="chevron"></view></button></view>
+  <view wx:else class="empty-state"><view class="empty-mark" aria-hidden="true"><view class="empty-ring"></view></view><text>{{empty}}</text><text>浏览公开作品和服务者后，可在这里集中查看。</text></view>
+</view>

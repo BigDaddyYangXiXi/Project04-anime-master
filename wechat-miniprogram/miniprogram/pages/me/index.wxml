@@ -1,0 +1,52 @@
+<app-top-nav class="app-navigation" title="我的" show-back="{{false}}" show-role-switch="{{true}}" role-text="{{role === 'provider' ? '服务方' : '需求方'}}" bindroleswitch="switchIdentity"/>
+<view class="me-shell">
+  <view wx:if="{{dashboardLoading}}" class="empty-state"><text>正在读取个人中心</text></view>
+  <view wx:if="{{dashboardError}}" class="empty-state"><text>{{dashboardError}}</text></view>
+  <view class="profile-card">
+    <view class="profile-head" role="button" bindtap="editAccount" aria-label="修改头像和昵称">
+      <view class="avatar-wrap">
+        <image wx:if="{{account.avatar}}" class="avatar" src="{{account.avatar}}" mode="aspectFill"/><view wx:else class="avatar avatar-fallback">{{initial}}</view>
+        <view class="avatar-wink" aria-hidden="true"></view>
+      </view>
+      <view class="profile-copy">
+        <view class="profile-name-row"><text class="profile-name">{{account.nickname}}</text><text class="identity-chip">{{role === 'provider' ? '服务方' : '需求方'}}</text></view>
+        <text>{{role === 'provider' ? '公开橱窗身份 · 资料对需求方可见' : '个人合作身份 · 收藏与项目在此归集'}}</text>
+      </view>
+      <view class="profile-edit"><text>编辑</text><view class="chevron"></view></view>
+    </view>
+    <view class="profile-business">
+      <view class="profile-business-head"><text>{{role === 'provider' ? '经营数据' : '合作数据'}}</text><text wx:if="{{role === 'provider'}}">{{storefrontStatusText}}</text></view>
+      <view class="stats-grid {{role === 'provider' ? 'provider-stats' : 'buyer-stats'}}"><view wx:for="{{role === 'provider' ? providerStats : buyerStats}}" wx:key="label"><text>{{item.value}}</text><text>{{item.label}}</text></view></view>
+      <text class="data-note">“—”表示后端数据尚未同步。</text>
+      <view wx:if="{{role === 'provider'}}" class="funds-entry" role="button" bindtap="openFunds"><text class="action-mark">¥</text><view><text>资金管理</text><text>充值、提现、交易记录、账单与支付安全</text></view><view class="chevron"></view></view>
+    </view>
+  </view>
+
+  <block wx:if="{{role === 'provider'}}">
+    <view class="hero-card">
+      <image class="hero-logo" src="/assets/brand/peach-slime-main-768.jpg" mode="aspectFill" aria-hidden="true"/>
+      <view class="hero-copy"><text class="hero-title">把作品与服务保持在最佳状态</text><text class="hero-desc">这里发布的内容会同步到需求方看到的作品详情和个人橱窗。</text></view>
+      <view class="primary-actions">
+        <view class="main-action storefront-action" role="button" bindtap="editStorefront"><text class="action-mark">店</text><view class="action-copy"><text>编辑橱窗</text><text>资料、服务与须知</text></view></view>
+        <view class="main-action work-action selected-action" role="button" bindtap="uploadWork"><view class="upload-mark"><view></view><view></view></view><view class="action-copy"><text>上传作品</text><text>编辑作品详情</text></view></view>
+      </view>
+      <button class="preview-button" bindtap="previewStorefront"><view><text>橱窗预览</text><text>{{previewMeta}}</text></view><view class="chevron"></view></button>
+    </view>
+  </block>
+
+  <block wx:else>
+    <view class="hero-card buyer-hero">
+      <image class="hero-logo" src="/assets/brand/peach-slime-main-768.jpg" mode="aspectFill" aria-hidden="true"/>
+      <view class="hero-copy"><text class="hero-title">从收藏灵感到项目落地</text><text class="hero-desc">订单与项目各自流转，个人资产统一在这里查找。</text></view>
+      <view class="primary-actions">
+        <view class="main-action selected-action" role="button" bindtap="openBuyerOrders"><text class="action-mark">单</text><view class="action-copy"><text>查看订单</text><text>跟进预约与执行</text></view></view>
+        <view class="main-action" role="button" bindtap="openBuyerProjects"><text class="action-mark">项</text><view class="action-copy"><text>我的项目</text><text>整理角色与订单</text></view></view>
+      </view>
+    </view>
+  </block>
+
+  <view class="section-card asset-card">
+    <view class="section-head"><view><text>我的内容资产</text><text>供需身份共用，切换身份不会丢失</text></view></view>
+    <view class="asset-list"><button wx:for="{{assets}}" wx:key="key" data-type="{{item.key}}" bindtap="openAssets"><view><text>{{item.label}}</text><text>{{item.value}}</text></view><view class="chevron"></view></button></view>
+  </view>
+</view>

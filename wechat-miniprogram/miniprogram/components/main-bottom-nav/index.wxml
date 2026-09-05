@@ -1,0 +1,15 @@
+<view class="main-bottom-nav" role="navigation" aria-label="主导航">
+  <button
+    wx:for="{{items}}"
+    wx:key="key"
+    class="nav-item {{active === item.key ? 'active' : ''}}"
+    data-url="{{item.url}}"
+    bindtap="openRoot"
+    hover-class="nav-item-pressed"
+    aria-label="{{item.text}}"
+    aria-current="{{active === item.key ? 'page' : 'false'}}"
+  >
+    <view class="nav-art"><image src="{{item.icon}}" mode="aspectFit" aria-hidden="true"/></view>
+    <text>{{item.text}}</text>
+  </button>
+</view>

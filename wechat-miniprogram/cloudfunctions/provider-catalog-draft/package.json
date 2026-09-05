@@ -1,0 +1,12 @@
+{
+  "name": "anime-master-provider-catalog-draft",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test draft-core.test.js publication-core.test.js"
+  },
+  "dependencies": {
+    "@cloudbase/node-sdk": "3.18.3"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "服务者详情",
+  "usingComponents": {
+    "work-card": "../../components/work-card/index",
+    "availability-strip": "../../components/availability-strip/index"
+  }
+}

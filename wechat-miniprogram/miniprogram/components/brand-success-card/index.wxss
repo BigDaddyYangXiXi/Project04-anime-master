@@ -1,0 +1,14 @@
+.brand-success-card { border: 1rpx solid #f0ddd7; border-radius: 36rpx; background: #fffdfb; overflow: hidden; }
+.mascot-stage { position: relative; height: 286rpx; overflow: hidden; background: #ffded0; }
+.mascot-image { width: 100%; height: 100%; }
+.stage-label { position: absolute; top: 22rpx; left: 24rpx; padding: 8rpx 16rpx; border: 2rpx solid rgba(255,255,255,.92); border-radius: 999rpx; color: #9b3d46; background: rgba(255,249,240,.9); font-size: 20rpx; font-weight: 800; line-height: 30rpx; }
+.success-content { padding: 30rpx 30rpx 32rpx; text-align: center; }
+.success-content text { display: block; }
+.success-title { color: #2b2523; font-size: 34rpx; font-weight: 800; line-height: 46rpx; }
+.success-copy { margin-top: 10rpx; color: #6f625d; font-size: 24rpx; line-height: 38rpx; }
+.success-score { margin-top: 18rpx; color: #ee9c2e; font-size: 42rpx; line-height: 52rpx; letter-spacing: 5rpx; }
+.success-detail { margin-top: 12rpx; color: #5d504b; font-size: 23rpx; line-height: 36rpx; }
+.success-reply { margin-top: 22rpx; padding: 20rpx 22rpx; border: 1rpx solid #f1dfd9; border-radius: 20rpx; background: #fff7f2; text-align: left; }
+.success-reply text:first-child { color: #c6536b; font-size: 20rpx; font-weight: 800; line-height: 30rpx; }
+.success-reply text:last-child { margin-top: 6rpx; color: #5d504b; font-size: 22rpx; line-height: 35rpx; }
+.success-action { display: flex; width: 100%; min-height: 88rpx; margin-top: 24rpx; align-items: center; justify-content: center; border: 2rpx solid rgba(255,255,255,.92); border-radius: 28rpx; color: #fff; background: linear-gradient(135deg,#f0787e,#ee8f88 52%,#e77c90); box-shadow: none; font-size: 26rpx; font-weight: 800; line-height: 40rpx; }

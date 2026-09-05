@@ -1,0 +1,1 @@
+<view class="rating-stars" aria-label="客户评分 {{ratingText}}"><text class="stars">★★★★★</text><text>{{ratingText}}</text></view>

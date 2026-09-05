@@ -1,0 +1,15 @@
+<app-top-nav class="app-navigation" title="评价管理" workspace="provider" show-back="{{true}}"/>
+<view class="reviews-shell">
+  <view class="rating-overview"><text>{{rating}}</text><text>综合评分／5</text><text>{{reviews.length ? '★★★★★ · ' + reviews.length + ' 条完成订单评价' : '暂无完成订单评价'}}</text><text>{{ratingBoundary}}</text></view>
+  <view wx:if="{{loading}}" class="empty-state"><text>正在读取订单评价</text></view>
+  <view wx:elif="{{loadError}}" class="empty-state"><text>{{loadError}}</text><button bindtap="retryLoad">重新加载</button></view>
+  <view wx:for="{{reviews}}" wx:key="id" class="review-card">
+    <view class="review-head"><view class="avatar">{{item.buyer[0]}}</view><view><text>{{item.buyer}} · {{item.rating}} 星</text><text>{{item.id}} · {{item.service}}</text></view></view>
+    <text class="review-copy">{{item.reviewText || '需求方未填写补充文字。'}}</text>
+    <view wx:if="{{item.reviewReply}}" class="public-reply"><text>服务方公开回复</text><text>{{item.reviewReply}}</text></view>
+    <view wx:else class="reply-editor"><text>公开回复</text><textarea value="{{drafts[item.id]}}" data-id="{{item.id}}" maxlength="200" placeholder="感谢认可，也欢迎下次继续合作" bindinput="update"/><text>{{drafts[item.id] ? drafts[item.id].length : 0}}/200 · 发布后同步到需求方评价页且不可修改</text><view wx:if="{{!drafts[item.id]}}" class="required-note"><view class="required-dot"></view><text>填写回复内容后才能发布</text></view><button class="{{!drafts[item.id] ? 'blocked' : ''}}" disabled="{{pendingId === item.id}}" aria-disabled="{{!drafts[item.id]}}" data-id="{{item.id}}" bindtap="reply">{{pendingId === item.id ? '正在发布' : '发布公开回复'}}</button></view>
+  </view>
+  <view wx:if="{{!loading && !loadError && !reviews.length}}" class="empty-state"><text>暂无完成订单评价</text><text>需求方完成验收并提交五星评价后，会在这里形成只读记录。</text></view>
+  <text wx:if="{{message}}" class="message">{{message}}</text>
+</view>
+<main-bottom-nav/>

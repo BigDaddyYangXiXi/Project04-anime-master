@@ -1,0 +1,12 @@
+const assert = require("node:assert/strict"); const fs = require("node:fs"); const path = require("node:path"); const automator = require("miniprogram-automator");
+async function waitUntil(page, predicate, timeout = 15000) { const started = Date.now(); while (Date.now() - started < timeout) { const data = await page.data(); if (predicate(data)) return data; await page.waitFor(250); } throw new Error("me dashboard timeout"); }
+async function main() { const miniProgram = await automator.connect({ wsEndpoint: process.env.WECHAT_AUTO_WS || "ws://127.0.0.1:9422" }); const outputDir = path.resolve(__dirname, "..", ".artifacts", "cloud-me-dashboard"); const errors = []; miniProgram.on("exception", (error) => errors.push(String(error))); try {
+  await miniProgram.callWxMethod("setStorageSync", "animeMasterRole", "buyer"); const page = await miniProgram.reLaunch("/pages/me/index"); const data = await waitUntil(page, (value) => !value.dashboardLoading && value.account);
+  assert.equal(data.dashboardError, ""); assert.equal(data.account.nickname, "微信用户"); assert.deepEqual(data.buyerStats.map((item) => item.value), [0, 0, 0]); assert.deepEqual(data.assets.map((item) => item.value), [0, 0, 0]);
+  fs.mkdirSync(outputDir, { recursive: true }); await miniProgram.screenshot({ path: path.join(outputDir, "01-buyer-empty.png") });
+  const assets = await miniProgram.reLaunch("/pages/me-assets/index?type=liked"); const assetsData = await waitUntil(assets, (value) => !value.loading); assert.equal(assetsData.loadError, ""); assert.deepEqual(assetsData.items, []); await miniProgram.screenshot({ path: path.join(outputDir, "02-liked-empty.png") });
+  await miniProgram.callWxMethod("setStorageSync", "animeMasterRole", "provider"); const providerPage = await miniProgram.reLaunch("/pages/me/index"); const providerData = await waitUntil(providerPage, (value) => !value.dashboardLoading && value.account);
+  assert.equal(providerData.dashboardError, ""); assert.deepEqual(providerData.providerStats.map((item) => item.value), [0, 0, 0, 0, 0]); await miniProgram.screenshot({ path: path.join(outputDir, "03-provider-received-counts.png") });
+  assert.deepEqual(errors, []); console.log("Cloud me dashboard runtime audit passed: account, order calculations and saved-item counts are server-derived");
+} finally { await miniProgram.callWxMethod("setStorageSync", "animeMasterRole", "buyer").catch(() => null); miniProgram.disconnect(); } }
+main().catch((error) => { console.error(error); process.exit(1); });

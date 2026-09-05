@@ -1,0 +1,13 @@
+{
+  "name": "anime-master-account-bootstrap",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test identity-core.test.js phone-core.test.js wx-phone-adapter.test.js"
+  },
+  "dependencies": {
+    "@cloudbase/node-sdk": "3.18.3",
+    "wx-server-sdk": "4.0.2"
+  }
+}

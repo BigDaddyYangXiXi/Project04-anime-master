@@ -1,0 +1,74 @@
+<app-top-nav class="app-navigation" title="预约请求" workspace="provider" show-back="{{true}}"/>
+<view wx:if="{{loading}}" class="empty-state"><text>正在读取订单</text><text>请稍候，不会重复执行任何操作。</text></view>
+<view class="request-shell" wx:elif="{{order}}">
+  <block wx:if="{{isRequest}}">
+    <view class="page-intro evaluation-intro"><text class="status-dot">待你评估</text><text class="page-title">是否愿意开始沟通？</text><text class="page-copy">需求方正在等待你的判断；确认有意向后才会向你展示联系方式。</text></view>
+    <view class="content-card request-summary">
+      <view class="summary-meta"><text>预约请求</text><text>{{order.id}}</text></view>
+      <text class="summary-title">{{order.service}}</text>
+      <view class="summary-identity"><text>需求方</text><text>{{buyerIdentity.nickname}} · {{buyerIdentity.uid}}</text></view>
+      <view class="summary-schedule"><text>{{order.city}}</text><text wx:if="{{order.deliveryText}}">{{order.deliveryText}}</text><view><text wx:for="{{schedule.lines}}" wx:key="label">{{item.label}} · {{item.text}}</text></view></view>
+      <view class="demand-focus"><text>需求方最明确的要求</text><text>{{order.requirement}}</text></view>
+      <view class="reference-strip"><view><text>参考资料</text><text>{{order.reference}}</text></view><image wx:if="{{order.referenceImage}}" src="{{order.referenceImage}}" mode="aspectFill"/></view>
+    </view>
+    <view class="content-card decision-card form-stack">
+      <view class="decision-heading"><view><text>处理这次请求</text><text>选择后会立即同步给需求方</text></view><text>三选一</text></view>
+      <label class="reason-field">补充说明<textarea value="{{note}}" placeholder="要求补充时必填；婉拒时建议说明原因" bindinput="updateNote"/></label>
+      <view class="request-actions"><button class="primary-block" disabled="{{actionPending}}" bindtap="interested">有意向，开始沟通</button><button class="secondary-block" disabled="{{actionPending}}" bindtap="supplement">请需求方补充信息</button><button class="danger-block" disabled="{{actionPending}}" bindtap="decline">暂不接受这次预约</button></view>
+    </view>
+  </block>
+
+  <block wx:elif="{{isContacting}}">
+    <view class="page-intro contact-intro"><text class="status-dot ready">沟通进行中</text><text class="page-title">主动联系 {{buyerIdentity.nickname}}</text><text class="page-copy">{{buyerIdentity.uid}} · 需求方正在等待你联系；完成沟通后，请在本页提交明确结果。</text></view>
+    <view class="content-card contact-card">
+      <view class="contact-heading"><view><text>{{buyerIdentity.nickname}} · {{buyerIdentity.uid}}</text><text>联系人称呼：{{order.contact.name}}；优先使用任一联系方式</text></view><text>你主动联系</text></view>
+      <view class="contact-method"><view><text>微信</text><text>{{order.contact.wechat || '未填写'}}</text></view><button class="contact-action" hover-class="contact-action-pressed" disabled="{{!order.contact.wechat}}" data-value="{{order.contact.wechat}}" bindtap="copyContact" aria-label="复制需求方微信号">复制</button></view>
+      <view class="contact-method phone-method"><view><text>手机号</text><text>{{order.contact.phone || '未填写'}}</text></view><view class="contact-tools"><button class="contact-action" hover-class="contact-action-pressed" disabled="{{!order.contact.phone}}" data-value="{{order.contact.phone}}" bindtap="copyContact" aria-label="复制需求方手机号">复制</button><button class="contact-action" hover-class="contact-action-pressed" disabled="{{!order.contact.phone}}" bindtap="callBuyer" aria-label="拨打需求方手机号">拨打</button></view></view>
+      <view class="contact-note"><view class="note-dot"></view><text>首次成功复制微信或手机号会将需求方进度更新为“完成预约沟通”；你的页面仍停留在此处继续填写结果。</text></view>
+    </view>
+    <view class="content-card completion-card form-stack">
+      <view class="completion-intro">
+        <view class="completion-meta"><text>沟通结果 · 合作条件</text><text class="{{readyConfirm ? 'ready' : ''}}">{{readyConfirm ? '可以提交' : '已确认 ' + confirmedCount + '/4'}}</text></view>
+        <text class="completion-title">逐项落定这次合作</text>
+        <text class="completion-lead">把已谈妥的内容一项项确认，避免双方理解不一致。</text>
+      </view>
+      <view class="completion-list">
+        <button class="confirm-line schedule-confirm-line {{timePlaceConfirmed ? 'active' : ''}}" hover-class="form-control-pressed" aria-pressed="{{timePlaceConfirmed}}" data-key="timePlaceConfirmed" bindtap="toggleConfirm"><view class="confirmation-index"><text>1</text></view><view class="confirmation-copy"><text>地点与时间确认</text><text>{{order.city}} · {{schedule.mode}}</text><text wx:for="{{schedule.lines}}" wx:key="label" class="schedule-line">{{item.label}}　{{item.text}}</text></view><view class="confirmation-state {{timePlaceConfirmed ? 'done' : ''}}"><view wx:if="{{timePlaceConfirmed}}" class="confirm-mark"></view><text>{{timePlaceConfirmed ? '已确认' : '待确认'}}</text></view></button>
+        <button class="confirm-line {{serviceScopeConfirmed ? 'active' : ''}}" hover-class="form-control-pressed" aria-pressed="{{serviceScopeConfirmed}}" data-key="serviceScopeConfirmed" bindtap="toggleConfirm"><view class="confirmation-index"><text>2</text></view><view class="confirmation-copy"><text>服务内容确认</text><text>{{order.service}}</text></view><view class="confirmation-state {{serviceScopeConfirmed ? 'done' : ''}}"><view wx:if="{{serviceScopeConfirmed}}" class="confirm-mark"></view><text>{{serviceScopeConfirmed ? '已确认' : '待确认'}}</text></view></button>
+        <view class="nda-choice"><view class="confirmation-label"><view class="confirmation-index"><text>3</text></view><view class="confirmation-copy"><text>保密需求确认</text><text>明确本次合作是否需要 NDA</text></view><view class="confirmation-state {{ndaChoice ? 'done' : ''}}"><view wx:if="{{ndaChoice}}" class="confirm-mark"></view><text>{{ndaChoice ? '已选择' : '待选择'}}</text></view></view><view class="nda-segments"><button class="{{ndaChoice === 'no' ? 'active' : ''}}" hover-class="form-control-pressed" aria-pressed="{{ndaChoice === 'no'}}" data-value="no" bindtap="chooseNda">无需 NDA</button><button class="{{ndaChoice === 'yes' ? 'active' : ''}}" hover-class="form-control-pressed" aria-pressed="{{ndaChoice === 'yes'}}" data-value="yes" bindtap="chooseNda">需 NDA</button></view></view>
+        <view class="amount-choice">
+          <button class="confirm-line amount-confirm {{amountConfirmed ? 'active' : ''}}" hover-class="form-control-pressed" aria-pressed="{{amountConfirmed}}" data-key="amountConfirmed" bindtap="toggleConfirm"><view class="confirmation-index"><text>4</text></view><view class="confirmation-copy"><text>合作金额确认</text><text>{{amountHint}}</text></view><view class="confirmation-state {{amountConfirmed ? 'done' : ''}}"><view wx:if="{{amountConfirmed}}" class="confirm-mark"></view><text>{{amountConfirmed ? '已确认' : '待确认'}}</text></view></button>
+          <view class="amount-editor"><view class="quote-panel" wx:for="{{quoteItems}}" wx:key="id"><view class="quote-heading"><text>{{item.name}}</text><text>当前 ￥{{item.finalPrice}}</text></view><input type="number" disabled="{{order.priceEdited || actionPending}}" value="{{item.finalPrice}}" data-index="{{index}}" bindinput="updateQuoteItem"/><text class="field-help">参考价 ￥{{item.displayPrice}} · 可调整 ￥{{item.minPrice}}—￥{{item.maxPrice}}</text></view><text wx:if="{{priceError}}" class="field-error">{{priceError}}</text><button wx:if="{{!order.priceEdited && quoteChanged}}" class="secondary-block quote-action" disabled="{{!priceCanSave || actionPending}}" bindtap="savePrice">锁定新报价 · 合计 ￥{{price}}</button><text wx:elif="{{!order.priceEdited}}" class="quote-current-note">当前报价可直接用于本次合作</text><text wx:else class="quote-locked">新报价已锁定 · 合计 ￥{{order.finalPrice}}</text></view>
+        </view>
+      </view>
+      <button class="primary-block {{!readyConfirm ? 'blocked' : ''}}" disabled="{{actionPending}}" aria-disabled="{{!readyConfirm}}" bindtap="finishCommunication">合作确立，提交确认</button>
+      <button class="danger-block communication-failed" disabled="{{actionPending}}" bindtap="failCommunication">合作不确立</button>
+    </view>
+  </block>
+
+  <block wx:elif="{{isNda}}">
+    <view class="content-card nda-card"><text>{{statusLabel}}</text><text>保密协议和双方签署状态在独立页面处理，订单仍保持同一条记录。</text><button class="primary-block" bindtap="goNda">进入保密协议签署</button></view>
+  </block>
+
+  <block wx:elif="{{isWaitingBuyerConfirm}}">
+    <view class="content-card nda-card"><text>合作条件已提交</text><text>需求方正在核对双方信息并完成支付。支付经服务端确认后，订单才会进入执行制作。</text></view>
+  </block>
+
+  <block wx:elif="{{isProduction}}">
+    <view class="page-intro"><text class="status-dot ready">{{statusLabel}}</text><text class="page-title">{{order.service}}</text><text class="page-copy">双方已同步进度 {{order.progress}}%</text></view>
+    <view class="progress-card"><view class="section-title"><text>当前执行进度</text><text>{{order.progress}}%</text></view><progress percent="{{order.progress}}" stroke-width="8" activeColor="#ff6f71" backgroundColor="#f2e7e4"/></view>
+    <view class="content-card form-stack"><view class="section-title"><text>更新执行进度</text><text>{{progress}}%</text></view><slider min="0" max="99" value="{{progress}}" bindchange="commitProgress" activeColor="#ff6f71" backgroundColor="#f2e7e4" block-color="#c6536b"/><text class="field-help">松开滑块后更新本页草稿；点击保存后需求方才会看到新进度。正式提交交付后自动变为 100%。</text><button class="secondary-block" disabled="{{!progressChanged || actionPending}}" bindtap="saveProgress">{{actionPending ? '正在同步' : '保存进度'}}</button></view>
+    <view class="content-card form-stack">
+      <label>{{onsite ? '现场完成说明' : '本次交付说明'}}<textarea value="{{delivery}}" placeholder="{{order.stage === 'REVISION_REQUESTED' ? '需求方反馈：' + (order.revisionNote || '请按反馈完成修改') : onsite ? '填写现场完成情况' : '填写本次交付说明'}}" bindinput="updateDelivery"/></label>
+      <label wx:if="{{!onsite}}">选择本次交付文件<button class="upload-button" disabled="{{actionPending}}" bindtap="chooseDeliveryFiles">选择文件</button><text class="field-help">支持图片、PDF、ZIP、TXT；每个文件不超过 20 MB，最多 5 个。</text></label>
+      <view wx:if="{{deliveryFiles.length}}" class="file-list"><text wx:for="{{deliveryFiles}}" wx:key="name">{{item.name}}</text></view>
+      <view wx:if="{{deliveryIssues.length}}" class="required-summary"><view class="required-heading"><view class="required-dot"></view><text>还需完成</text></view><text wx:for="{{deliveryIssues}}" wx:key="*this">{{item}}</text></view>
+      <button class="primary-block {{!deliveryReady ? 'blocked' : ''}}" disabled="{{actionPending}}" aria-disabled="{{!deliveryReady}}" bindtap="submitDelivery">{{actionPending ? '正在提交' : order.stage === 'REVISION_REQUESTED' ? (onsite ? '重新提交现场完成确认' : '重新提交验收') : (onsite ? '确认现场服务完成' : '提交交付物等待验收')}}</button>
+    </view>
+  </block>
+
+  <view wx:elif="{{isPending}}" class="content-card result-card"><text>{{statusLabel}}</text><text>{{onsite ? '现场完成情况已提交，等待需求方确认服务完成并结算。' : '交付物已提交，等待需求方验收或提出修改。'}}</text></view>
+  <view wx:elif="{{isTerminal}}" class="content-card result-card"><text>{{statusLabel}}</text><text>订单 {{order.id}} · {{order.buyer}} · ￥{{order.finalPrice}}</text><text wx:if="{{order.rating > 0}}" class="review-line">{{ratingStars}} · {{order.reviewText}}</text></view>
+</view>
+<view wx:else class="empty-state"><text>{{loadError || '没有找到订单'}}</text><button wx:if="{{loadError}}" class="empty-retry" bindtap="retryLoad">重新加载</button></view>
+<main-bottom-nav/>

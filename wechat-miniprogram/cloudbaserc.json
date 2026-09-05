@@ -1,0 +1,105 @@
+{
+  "$schema": "https://static.cloudbase.net/cli/cloudbaserc.schema.json",
+  "envId": "quest-band-d1gem4bxt3fa17720",
+  "functionRoot": "cloudfunctions",
+  "functions": [
+    {
+      "name": "auth-probe",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 3,
+      "description": "Anime Master 小程序可信身份上下文验收函数"
+    },
+    {
+      "name": "account-bootstrap",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 15,
+      "description": "Anime Master 微信身份账号初始化函数"
+    },
+    {
+      "name": "account-api",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 15,
+      "description": "Anime Master 账号本人昵称与头像版本化读写函数"
+    },
+    {
+      "name": "catalog-read",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 15,
+      "description": "Anime Master 已发布商家、服务和作品目录读取函数"
+    },
+    {
+      "name": "provider-catalog-draft",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 15,
+      "description": "Anime Master 服务者本人目录草稿读取和保存函数"
+    },
+    {
+      "name": "media-upload",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 15,
+      "description": "Anime Master 服务端签发、校验和取消媒体上传函数"
+    },
+    {
+      "name": "order-api",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 15,
+      "description": "Anime Master 原子订单聚合、幂等与阶段门禁函数"
+    },
+    {
+      "name": "project-api",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 15,
+      "description": "Anime Master 买方项目资料、订单关联与版本门禁函数"
+    },
+    {
+      "name": "availability-api",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 15,
+      "description": "Anime Master 服务方公开档期、订单锁定日与版本门禁函数"
+    },
+    {
+      "name": "saved-items-api",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 15,
+      "description": "Anime Master 账号本人关注服务者与喜欢作品幂等读写函数"
+    },
+    {
+      "name": "media-security-submit",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 15,
+      "description": "Anime Master 微信媒体内容安全异步审核提交函数"
+    },
+    {
+      "name": "media-pending-cleanup",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 30,
+      "description": "Anime Master 过期 PENDING 与两阶段 READY 孤儿媒体定时清理函数",
+      "triggers": [
+        {
+          "name": "hourly-media-pending-cleanup",
+          "type": "timer",
+          "config": "0 15 * * * * *"
+        }
+      ]
+    },
+    {
+      "name": "wechat-message-callback",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 5,
+      "description": "Anime Master 微信消息推送握手、验签、解密和内容安全回调函数"
+    }
+  ]
+}

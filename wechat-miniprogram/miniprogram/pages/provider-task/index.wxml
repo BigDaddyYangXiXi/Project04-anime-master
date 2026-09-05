@@ -1,0 +1,18 @@
+<app-top-nav class="app-navigation" title="NDA 与服务任务" workspace="provider" show-back="{{true}}"/>
+<view wx:if="{{loading}}" class="empty-state">正在读取保密订单</view>
+<view class="task-shell" wx:elif="{{order}}">
+  <view class="page-intro"><text>保密订单</text><text>项目保密协议</text><text>{{buyerIdentity.nickname}} · {{buyerIdentity.uid}}</text><view class="where-when"><text>{{order.city}}</text><view><text wx:for="{{schedule.lines}}" wx:key="label">{{item.label}} · {{item.text}}</text></view></view></view>
+  <view class="content-card nda-card">
+    <text class="card-title">双方签署状态</text>
+    <text class="card-copy">需求方已签署后，服务方才能签署；双方完成后，仍需需求方确认合作信息并支付。</text>
+    <view class="summary-row"><text>需求方 · {{order.buyer}}</text><text>{{order.buyerNdaSigned ? '已签署' : '待签署'}}</text></view>
+    <view class="summary-row"><text>服务方 · {{order.provider}}</text><text>{{order.providerNdaSigned ? '已签署' : '待签署'}}</text></view>
+    <view class="boundary-note"><text>原型边界</text><text>这里只验证签署顺序与订单状态回填，不生成具有法律效力的电子签章。</text></view>
+    <view wx:if="{{order.stage === 'NDA_PROVIDER_PENDING' && signIssues.length}}" class="required-summary"><view class="required-heading"><view class="required-dot"></view><text>签署前还需完成</text></view><text wx:for="{{signIssues}}" wx:key="*this">{{item}}</text></view>
+    <button wx:if="{{canSign}}" class="primary-block" disabled="{{actionPending}}" bindtap="sign">签署 NDA</button>
+    <view wx:if="{{waitingBuyer}}" class="wait-state">等待需求方先完成签署</view>
+    <view wx:if="{{finalConfirm}}" class="success-state">双方已签署，等待需求方确认合作并完成支付</view>
+  </view>
+</view>
+<view wx:else class="empty-state"><text>{{loadError || '没有找到保密订单'}}</text><button wx:if="{{loadError}}" class="empty-retry" bindtap="retryLoad">重新加载</button></view>
+<main-bottom-nav/>

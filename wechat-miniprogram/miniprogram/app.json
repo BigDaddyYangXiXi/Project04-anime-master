@@ -1,0 +1,63 @@
+{
+  "pages": [
+    "pages/auth/index",
+    "pages/discover/index",
+    "pages/search-results/index",
+    "pages/work-detail/index",
+    "pages/provider-detail/index",
+    "pages/provider-schedule/index",
+    "pages/booking/index",
+    "pages/booking-status/index",
+    "pages/order-detail/index",
+    "pages/provider-home/index",
+    "pages/provider-request/index",
+    "pages/provider-profile/index",
+    "pages/provider-calendar/index",
+    "pages/provider-task/index",
+    "pages/orders/index",
+    "pages/projects/index",
+    "pages/project-detail/index",
+    "pages/brief/index",
+    "pages/fulfillment/index",
+    "pages/review/index",
+    "pages/provider-orders/index",
+    "pages/provider-reviews/index",
+    "pages/me/index",
+    "pages/account-profile/index",
+    "pages/me-assets/index",
+    "pages/funds/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "动漫高手",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black",
+    "navigationStyle": "custom",
+    "backgroundColor": "#f6f3f0",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#9b8d9a",
+    "selectedColor": "#ff6f71",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/discover/index", "text": "找高手", "iconPath": "assets/nav/market-tab.png", "selectedIconPath": "assets/nav/market-tab.png" },
+      { "pagePath": "pages/orders/index", "text": "订单", "iconPath": "assets/nav/order-tab.png", "selectedIconPath": "assets/nav/order-tab.png" },
+      { "pagePath": "pages/projects/index", "text": "项目", "iconPath": "assets/nav/project-tab.png", "selectedIconPath": "assets/nav/project-tab.png" },
+      { "pagePath": "pages/me/index", "text": "我的", "iconPath": "assets/nav/profile-tab.png", "selectedIconPath": "assets/nav/profile-tab.png" }
+    ]
+  },
+  "usingComponents": {
+    "main-bottom-nav": "/components/main-bottom-nav/index",
+    "app-top-nav": "/components/app-top-nav/index"
+  },
+  "permission": {
+    "scope.userFuzzyLocation": {
+      "desc": "用于优先展示当前城市可合作的服务方和作品"
+    }
+  },
+  "requiredPrivateInfos": ["getFuzzyLocation"],
+  "sitemapLocation": "sitemap.json",
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents"
+}

@@ -1,0 +1,10 @@
+<view class="brand-success-card">
+  <view class="mascot-stage"><image class="mascot-image" src="/assets/brand/peach-slime-main-768.jpg" mode="aspectFill"/><text class="stage-label">{{eyebrow}}</text></view>
+  <view class="success-content">
+    <text class="success-title">{{title}}</text><text class="success-copy">{{copy}}</text>
+    <text wx:if="{{scoreText}}" class="success-score">{{scoreText}}</text>
+    <text wx:if="{{detailText}}" class="success-detail">{{detailText}}</text>
+    <view wx:if="{{replyText}}" class="success-reply"><text>服务方回复</text><text>{{replyText}}</text></view>
+    <button wx:if="{{actionText}}" class="success-action" bindtap="act">{{actionText}}</button>
+  </view>
+</view>

@@ -1,0 +1,22 @@
+const assert = require("assert");
+let definition = null;
+let navigatedTo = "";
+global.wx = { getStorageSync() { return undefined; }, setStorageSync() {}, navigateTo({ url }) { navigatedTo = url; } };
+global.Page = (value) => { definition = value; };
+const helpers = require("../miniprogram/pages/orders/index.js");
+function create(options = {}) { const page = { data: JSON.parse(JSON.stringify(definition.data)) }; Object.keys(definition).forEach((key) => { if (key !== "data" && typeof definition[key] === "function") page[key] = definition[key].bind(page); }); page.setData = (patch, callback) => { Object.assign(page.data, patch); if (callback) callback(); }; page.onLoad(Object.assign({ audit: "1" }, options)); page.onShow(); return page; }
+const page = create();
+assert.deepStrictEqual(page.data.tabs.map((item) => item.id), ["booking", "execution", "history"]);
+assert.strictEqual(page.data.orders.length, 1);
+assert.strictEqual(page.data.orders[0].counterpart.nickname, "南烛");
+assert.strictEqual(page.data.orders[0].counterpart.uid, "@nanzhu_makeup");
+page.choose({ currentTarget: { dataset: { group: "execution" } } });
+assert.strictEqual(page.data.orders.length, 2);
+page.open({ currentTarget: { dataset: { id: page.data.orders[0].id } } });
+assert.ok(navigatedTo.startsWith("/pages/order-detail/index?id="));
+page.choose({ currentTarget: { dataset: { group: "history" } } });
+assert.strictEqual(page.data.orders.length, 1);
+assert.strictEqual(helpers.destinationFor("DELIVERY_PENDING"), "fulfillment");
+assert.strictEqual(helpers.destinationFor("COMPLETED"), "order-detail");
+assert.strictEqual(create({ audit: "1", empty: "1" }).data.orders.length, 0);
+process.stdout.write("B05 root three-tab list audit: 11 assertions passed\n");

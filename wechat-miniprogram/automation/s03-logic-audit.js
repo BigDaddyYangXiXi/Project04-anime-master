@@ -1,0 +1,35 @@
+const assert = require("assert");
+const storage = new Map();
+let pageDefinition = null;
+global.wx = { getStorageSync(key) { return storage.get(key); }, setStorageSync(key, value) { storage.set(key, value); } };
+global.Page = (definition) => { pageDefinition = definition; };
+storage.set("animeMasterRole", "provider");
+require("../miniprogram/pages/projects/index.js");
+function create(options = {}) {
+  const page = { data: JSON.parse(JSON.stringify(pageDefinition.data)) };
+  Object.keys(pageDefinition).forEach((key) => { if (key !== "data" && typeof pageDefinition[key] === "function") page[key] = pageDefinition[key].bind(page); });
+  page.setData = (patch, callback) => { Object.assign(page.data, patch); if (callback) callback(); };
+  page.onLoad(Object.assign({ audit: "1" }, options)); page.onShow(); return page;
+}
+const page = create();
+assert.deepStrictEqual(page.data.originalDays, [16,18,20,22,25,27]);
+assert.deepStrictEqual(page.data.lockedDays, [19,20,21,22,24]);
+assert.strictEqual(page.data.days.length, 42);
+assert.strictEqual(page.data.days.find((day) => day.value === 31).valid, true);
+assert.strictEqual(page.data.days.find((day) => day.value === 20).locked, true);
+assert.strictEqual(page.data.days.find((day) => day.value === 20).open, true);
+assert.strictEqual(page.data.changed, false);
+page.toggle({ currentTarget: { dataset: { day: 20 } } });
+assert.deepStrictEqual(page.data.draftDays, [16,18,20,22,25,27]);
+page.toggle({ currentTarget: { dataset: { day: 17 } } });
+assert.strictEqual(page.data.changed, true);
+assert.strictEqual(page.data.draftDays.includes(17), true);
+page.reset();
+assert.strictEqual(page.data.changed, false);
+page.toggle({ currentTarget: { dataset: { day: 17 } } }); page.save();
+assert.deepStrictEqual(storage.get("anime-master-v063-available-days"), [16,17,18,20,22,25,27]);
+assert.strictEqual(page.data.changed, false);
+assert.strictEqual(page.data.message, "公开档期已保存并同步需求方详情");
+const changed = create({ audit: "1", changed: "1" });
+assert.strictEqual(changed.data.changed, false);
+process.stdout.write("S03 logic audit: 14 assertions passed\n");

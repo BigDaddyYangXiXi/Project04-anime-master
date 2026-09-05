@@ -1,0 +1,21 @@
+const assert = require("assert");
+let definition = null;
+let url = "";
+global.wx = { getStorageSync(key) { return key === "animeMasterRole" ? "provider" : undefined; }, setStorageSync() {}, removeStorageSync() {}, navigateTo(value) { url = value.url; } };
+global.Page = (value) => { definition = value; };
+const helpers = require("../miniprogram/pages/orders/index.js");
+function create(options = {}) { const page = { data: JSON.parse(JSON.stringify(definition.data)) }; Object.keys(definition).forEach((key) => { if (key !== "data" && typeof definition[key] === "function") page[key] = definition[key].bind(page); }); page.setData = (patch, callback) => { Object.assign(page.data, patch); if (callback) callback(); }; page.onLoad(Object.assign({ audit: "1" }, options)); page.onShow(); return page; }
+const page = create();
+assert.deepStrictEqual(page.data.tabs.map((item) => item.id), ["booking", "execution", "history"]);
+assert.strictEqual(page.data.orders.length, 3);
+assert.strictEqual(page.data.orders[0].counterpart.nickname, "阿遥");
+assert.strictEqual(page.data.orders[0].counterpart.uid, "buyer-ayao");
+page.choose({ currentTarget: { dataset: { group: "execution" } } });
+assert.strictEqual(page.data.orders.length, 5);
+page.choose({ currentTarget: { dataset: { group: "history" } } });
+assert.strictEqual(page.data.orders.length, 4);
+page.open({ currentTarget: { dataset: { id: page.data.orders[0].id } } });
+assert.ok(url.startsWith("/pages/provider-request/index?id="));
+assert.strictEqual(helpers.normalizeGroup("acceptance"), "execution");
+assert.strictEqual(create({ audit: "1", empty: "1" }).data.orders.length, 0);
+process.stdout.write("S06 root three-tab list audit: 10 assertions passed\n");

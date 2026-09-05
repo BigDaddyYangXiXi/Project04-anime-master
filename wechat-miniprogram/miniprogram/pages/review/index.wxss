@@ -1,0 +1,31 @@
+.review-shell { padding: 20rpx 32rpx 80rpx; }
+.review-brand-hero { position: relative; height: 300rpx; border: 1rpx solid #f0ddd7; border-radius: 36rpx; overflow: hidden; background: #ffded0; }
+.review-brand-hero image { width: 100%; height: 100%; }
+.review-hero-copy { position: absolute; right: 22rpx; bottom: 22rpx; left: 22rpx; padding: 18rpx 20rpx; border: 2rpx solid rgba(255,255,255,.9); border-radius: 22rpx; background: rgba(255,249,240,.88); }
+.review-hero-copy text { display: block; }
+.review-hero-copy text:first-child { color: #c6536b; font-size: 20rpx; font-weight: 800; line-height: 30rpx; letter-spacing: 2rpx; }
+.review-hero-copy text:last-child { margin-top: 4rpx; color: #2b2523; font-size: 32rpx; font-weight: 800; line-height: 44rpx; }
+.page-intro { padding: 20rpx 8rpx 26rpx; }
+.intro-copy { color: #6f625d; font-size: 24rpx; line-height: 38rpx; }
+.content-card, .action-state { padding: 32rpx; border: 1rpx solid #eee3df; border-radius: 38rpx; background: #fff; box-shadow: 0 14rpx 44rpx rgba(49,36,56,.05); }
+.review-provider { display: flex; align-items: center; gap: 20rpx; }
+.avatar { display: grid; place-items: center; width: 88rpx; height: 88rpx; border-radius: 28rpx; color: #fff; background: linear-gradient(145deg,#f0787e,#ed8c68); font-size: 28rpx; font-weight: 800; }
+.review-provider view text { display: block; }
+.review-provider view text:first-child { font-size: 28rpx; font-weight: 800; line-height: 40rpx; }
+.review-provider view text:last-child { color: #6f625d; font-size: 22rpx; line-height: 34rpx; }
+.gummy-stars { display: grid; grid-template-columns: repeat(5,1fr); gap: 8rpx; margin: 32rpx 0; }
+.gummy-stars button { width: 100%; min-width: 0; min-height: 88rpx; border-radius: 20rpx; color: #c9c1cc; background: #f6f3f0; font-size: 44rpx; }
+.gummy-stars button.active { color: #f0a436; background: #fff4d9; }
+.field-label { display: block; margin-bottom: 12rpx; font-size: 22rpx; font-weight: 600; line-height: 34rpx; }
+.content-card textarea { width: 100%; min-height: 180rpx; padding: 20rpx 22rpx; border: 1rpx solid #d9d0d9; border-radius: 22rpx; background: #fcfbfc; font-size: 24rpx; line-height: 38rpx; }
+.helper-copy { display: block; margin-top: 12rpx; color: #6f625d; font-size: 22rpx; line-height: 34rpx; }
+.primary-block, .action-state button { min-height: 88rpx; margin-top: 24rpx; padding: 20rpx 32rpx; border: 2rpx solid rgba(255,255,255,.92); border-radius: 28rpx; color: #fff; background: linear-gradient(135deg,#f0787e,#ee8f88 52%,#e77c90); box-shadow: none; font-size: 28rpx; font-weight: 700; line-height: 40rpx; }
+.primary-block { display: block; width: 100%; }
+.primary-block.blocked, .primary-block[disabled] { opacity: .42; }
+.required-note { display: flex; align-items: flex-start; gap: 10rpx; color: #b5434e; font-size: 22rpx; line-height: 34rpx; }
+.required-dot { width: 12rpx; height: 12rpx; flex: 0 0 12rpx; margin-top: 11rpx; border-radius: 50%; background: #d83b46; box-shadow: 0 0 0 6rpx #fff0f1; }
+brand-success-card { display: block; }
+.action-state { display: flex; min-height: 480rpx; flex-direction: column; align-items: center; justify-content: center; gap: 16rpx; text-align: center; }
+.empty-title { font-size: 30rpx; font-weight: 800; line-height: 42rpx; }
+.empty-copy { max-width: 520rpx; color: #6f625d; font-size: 26rpx; line-height: 40rpx; }
+.action-state button { min-width: 320rpx; margin-top: 16rpx; }

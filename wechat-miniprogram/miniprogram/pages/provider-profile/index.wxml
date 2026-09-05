@@ -1,0 +1,130 @@
+<app-top-nav class="app-navigation" title="{{navTitle}}" workspace="provider" show-back="{{true}}"/>
+<view wx:if="{{cloudLoading}}" class="profile-shell content-card"><text class="card-title">正在读取云端橱窗</text><text class="page-copy">请稍候，不会覆盖本地或已发布内容。</text></view>
+<view wx:elif="{{cloudError}}" class="profile-shell content-card"><text class="card-title">橱窗暂时无法载入</text><text class="page-copy">{{cloudError}}</text><button class="secondary-button" bindtap="retryCloudLoad">重新加载</button></view>
+<view class="profile-shell" wx:elif="{{profile}}">
+  <block wx:if="{{editing}}">
+    <view wx:if="{{editorSection !== 'works'}}" class="page-intro">
+      <text class="page-title">编辑服务橱窗</text>
+      <text class="page-copy">公开资料、服务项目和作品集保存后，会同步到需求方看到的服务者详情。</text>
+    </view>
+
+    <view wx:if="{{editorSection !== 'works'}}" class="content-card form-stack">
+      <text class="card-title">公开资料</text>
+      <view class="profile-quick-grid">
+        <view class="readonly-field"><text>公开昵称</text><view><text>{{accountNickname || '未设置昵称'}}</text><text>从账号资料读取</text></view></view>
+        <view class="compact-field"><text>服务职业</text><picker range="{{careerOptions}}" bindchange="updateCareer"><view class="region-picker-value">{{career || '请选择服务职业'}}<text>›</text></view></picker></view>
+        <view class="compact-field"><text>常驻城市</text><picker mode="region" bindchange="updateProfileRegion"><view class="region-picker-value">{{profileDraft.city || '请选择常驻城市'}}<text>›</text></view></picker></view>
+      </view>
+      <text wx:if="{{!profileDraft.nickname}}" class="field-error compact-error">请先到“我的”修改昵称。</text>
+      <label>个人简介<textarea value="{{profileDraft.bio}}" data-key="bio" bindinput="updateProfile"/></label>
+      <label>购买须知<textarea value="{{profileDraft.notice}}" data-key="notice" bindinput="updateProfile"/></label>
+      <view class="upload-field"><text>须知配图</text><button class="upload-button" bindtap="chooseNoticeImage">选择一张图片</button></view>
+      <image wx:if="{{noticeImageDraft}}" class="upload-preview" src="{{noticeImageDraft}}" mode="aspectFill"/>
+      <label class="compact-field">主页标签（逗号分隔）<input value="{{profileDraft.tags}}" data-key="tags" bindinput="updateProfile"/></label>
+      <view wx:if="{{profileTagPreview.length}}" class="tag-preview" aria-label="主页标签预览"><text wx:for="{{profileTagPreview}}" wx:key="*this" class="tag-preview-item">{{item}}</text></view>
+    </view>
+
+    <view wx:if="{{editorSection !== 'works'}}" class="content-card services-card">
+      <view class="section-title"><view><text>全部服务项目</text><text>每项独立设置价格、描述与关联作品</text></view><text>{{serviceDrafts.length}} 项</text></view>
+      <view wx:for="{{serviceEditors}}" wx:for-index="serviceIndex" wx:key="id" class="service-editor">
+        <view class="service-editor-head">
+          <view><text>{{serviceIndex === 0 ? '主服务项目' : '服务项目 ' + (serviceIndex + 1)}}</text><text>{{item.name || '未命名服务'}} · ￥{{item.price || '—'}} / {{item.unit || '—'}} · {{item.workCount}} 件作品</text></view>
+          <view class="expand-control" role="button" aria-expanded="{{item.expanded}}" data-id="{{item.id}}" bindtap="toggleServiceEditor"><text>{{item.expanded ? '收起' : '展开'}}</text><view class="service-chevron {{item.expanded ? 'expanded' : ''}}"></view></view>
+        </view>
+        <view wx:if="{{item.expanded}}" class="service-editor-body">
+          <view class="service-quick-grid">
+            <label>项目名称<input value="{{item.name}}" data-index="{{serviceIndex}}" data-key="name" bindinput="updateService"/></label>
+            <label>价格<input type="number" value="{{item.price}}" data-index="{{serviceIndex}}" data-key="price" bindinput="updateService"/></label>
+            <label>单位<input value="{{item.unit}}" data-index="{{serviceIndex}}" data-key="unit" bindinput="updateService"/></label>
+          </view>
+          <view class="service-location-grid">
+            <view><text class="field-label">服务方式</text><picker range="{{serviceModeOptions}}" value="{{item.serviceModeIndex}}" data-index="{{serviceIndex}}" bindchange="updateServiceMode"><view class="region-picker-value">{{item.serviceModeLabel}}<text>›</text></view></picker></view>
+            <view wx:if="{{item.serviceMode !== 'ONLINE'}}"><text class="field-label">可服务城市</text><picker mode="region" data-index="{{serviceIndex}}" bindchange="addServiceArea"><view class="region-picker-value">添加服务城市<text>＋</text></view></picker></view>
+          </view>
+          <view wx:if="{{item.serviceMode !== 'ONLINE'}}" class="service-area-list">
+            <text class="service-area-base">常驻城市 {{profileDraft.city || '未设置'}}</text>
+            <view wx:for="{{item.serviceAreas}}" wx:for-item="area" wx:key="cityCode" class="service-area-chip"><text>{{area.cityName}}</text><text role="button" aria-label="移除 {{area.cityName}}" data-index="{{serviceIndex}}" data-city-code="{{area.cityCode}}" bindtap="removeServiceArea">×</text></view>
+          </view>
+          <label class="service-description">详细描述<textarea value="{{item.description}}" data-index="{{serviceIndex}}" data-key="description" bindinput="updateService"/></label>
+          <view class="work-picker-trigger" role="button" data-index="{{serviceIndex}}" bindtap="openWorkPicker"><view><text>关联公开作品</text><text>从全部公开作品中选择</text></view><view><text>{{item.workCount}} 件</text><view class="chevron"></view></view></view>
+          <button wx:if="{{serviceDrafts.length > 1}}" class="danger-button" data-index="{{serviceIndex}}" bindtap="deleteService">删除此服务</button>
+        </view>
+      </view>
+      <button class="dashed-button" bindtap="addService">＋ 新增服务项目</button>
+    </view>
+
+    <view wx:if="{{editorSection !== 'works'}}" id="works-editor" class="content-card portfolio-card">
+      <view class="section-title"><view><text>作品集管理</text><text>点击作品进入编辑；最多选择 2 件置顶</text></view><text>置顶 {{pinnedDraft.length}} / 2</text></view>
+      <view class="portfolio-grid">
+        <view wx:for="{{workEditors}}" wx:key="id" class="portfolio-work" role="button" aria-label="编辑作品 {{item.title}}" data-id="{{item.id}}" bindtap="openWorkEditor">
+          <view class="portfolio-visual">
+            <image wx:if="{{item.coverImage}}" src="{{item.coverImage}}" mode="aspectFill" lazy-load="{{true}}"/><view wx:else class="portfolio-cover tone-{{item.tone}}"></view>
+            <view class="portfolio-pin" role="checkbox" aria-checked="{{item.pinned}}" data-id="{{item.id}}" catchtap="togglePortfolioPin"><view class="right-check {{item.pinned ? 'checked' : ''}}"></view><text>{{item.pinned ? '已置顶' : '置顶'}}</text></view>
+          </view>
+          <view class="portfolio-info">
+            <text class="portfolio-title">{{item.title || '未命名作品'}}</text>
+            <view wx:if="{{item.tags.length}}" class="portfolio-tags"><text wx:for="{{item.tags}}" wx:for-item="tag" wx:key="*this" class="portfolio-tag">{{tag}}</text></view>
+            <view class="portfolio-meta"><text>￥{{item.price || '—'}}</text><text>引用 {{item.referenceCount}} 次 · 编辑 ›</text></view>
+          </view>
+        </view>
+      </view>
+      <button class="dashed-button" bindtap="openNewWorkEditor">＋ 上传新作品</button>
+    </view>
+
+    <view wx:if="{{selectedWork && editorSection === 'works'}}" id="selected-work-editor" class="work-upload-editor">
+      <view class="composer-surface">
+        <view class="composer-media-head"><text>{{selectedWork.imagePreviews.length ? '作品图片' : '添加作品图片'}}</text><text>{{selectedWork.imagePreviews.length}} / 5</text></view>
+        <scroll-view class="composer-media-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
+          <view class="composer-media-strip">
+            <view wx:for="{{selectedWork.imagePreviews}}" wx:key="*this" class="composer-image-item">
+              <image src="{{item}}" mode="aspectFill"/>
+              <button data-action="remove-work-image" data-index="{{index}}" bindtap="removeWorkImage" aria-label="移除第 {{index + 1}} 张作品图片">×</button>
+              <text>{{selectedWork.mediaStatuses[index] === 'READY' ? '已审核' : selectedWork.mediaStatuses[index] === 'REJECTED' ? '未通过' : index + 1}}</text>
+            </view>
+            <button wx:if="{{selectedWork.imagePreviews.length < 5}}" class="composer-add-image" bindtap="chooseWorkImages" aria-label="添加作品图片"><view></view><text>添加图片</text></button>
+          </view>
+        </scroll-view>
+        <text class="composer-media-help">按当前顺序在作品详情中连续展示</text>
+
+        <input class="composer-title" value="{{selectedWork.title}}" data-key="title" bindinput="updateWork" placeholder="添加标题" placeholder-class="composer-placeholder" maxlength="40"/>
+        <textarea class="composer-body" value="{{selectedWork.description}}" data-key="description" bindinput="updateWork" placeholder="添加作品正文" placeholder-class="composer-placeholder" maxlength="1200" auto-height/>
+
+        <view class="composer-details">
+          <view class="composer-price"><text>￥</text><input type="number" value="{{selectedWork.price || ''}}" data-key="price" bindinput="updateWork" placeholder="展示价格" placeholder-class="composer-placeholder"/></view>
+          <input class="composer-subtitle" value="{{selectedWork.subtitle}}" data-key="subtitle" bindinput="updateWork" placeholder="添加一句副标题（选填）" placeholder-class="composer-placeholder" maxlength="60"/>
+        </view>
+
+        <view class="composer-tags-field"><text>#</text><input value="{{selectedWork.tagsText}}" data-key="tagsText" bindinput="updateWork" placeholder="添加标签，用逗号分隔" placeholder-class="composer-placeholder" maxlength="120"/></view>
+        <scroll-view wx:if="{{selectedWorkTagPreview.length}}" class="composer-tag-scroll" scroll-x enable-flex show-scrollbar="{{false}}" aria-label="作品标签预览"><view class="composer-tags"><text wx:for="{{selectedWorkTagPreview}}" wx:key="*this" class="tag-preview-item">#{{item}}</text></view></scroll-view>
+        <view class="composer-foot"><text>作品码 {{selectedWork.code}}</text><text>系统生成 · 只读</text></view>
+        <button wx:if="{{!isNewWork}}" class="composer-preview" bindtap="previewSelectedWork">预览需求方作品详情 <text>›</text></button>
+      </view>
+    </view>
+
+    <block wx:if="{{editorSection !== 'works'}}">
+      <text wx:if="{{workDrafts.length < 3}}" class="field-error standalone">至少需要 3 件公开作品；当前还差 {{3 - workDrafts.length}} 件。</text>
+      <view wx:if="{{hasPendingMedia}}" class="field-error standalone required-note"><view class="required-dot"></view><text>部分图片正在内容安全审核；可以保存预览，审核通过后才能确认发布。</text></view>
+      <view wx:if="{{hasRejectedMedia}}" class="field-error standalone required-note"><view class="required-dot"></view><text>部分图片未通过内容安全审核，请移除并重新上传。</text></view>
+      <view wx:if="{{!canPublish}}" class="field-error standalone required-note"><view class="required-dot"></view><text>还需先设置账号昵称、服务职业和常驻城市、完成服务项目必填信息，并为至少 3 件作品填写标题、描述与有效价格。</text></view>
+      <view class="two-actions"><button class="secondary-button" bindtap="cancelEdit">取消修改</button><button class="primary-button {{!canPublish || saving ? 'blocked' : ''}}" aria-disabled="{{!canPublish || saving}}" bindtap="saveAndPreview">{{saving ? '正在保存' : '保存并预览'}}</button></view>
+    </block>
+    <block wx:else>
+      <view wx:if="{{!canSaveWork}}" class="field-error standalone required-note"><view class="required-dot"></view><text>请上传至少 1 张图片，并填写标题、作品描述与有效展示价格。</text></view>
+      <view class="two-actions work-save-actions"><button class="secondary-button" bindtap="cancelEdit">取消</button><button class="primary-button {{!canSaveWork ? 'blocked' : ''}}" aria-disabled="{{!canSaveWork}}" bindtap="saveWork">{{isNewWork ? '保存作品' : '保存修改'}}</button></view>
+    </block>
+  </block>
+</view>
+<view wx:if="{{workPickerOpen}}" class="picker-mask" bindtap="closeWorkPicker">
+  <view class="work-picker-sheet" catchtap="noop">
+    <view class="picker-head"><view><text>关联公开作品</text><text>已选择 {{workPickerDraftIds.length}} 件</text></view><view role="button" bindtap="closeWorkPicker">关闭</view></view>
+    <scroll-view class="picker-scroll" scroll-y>
+      <view wx:for="{{workPickerOptions}}" wx:key="id" class="picker-work-row" role="checkbox" aria-checked="{{item.checked}}" data-id="{{item.id}}" bindtap="toggleWorkPickerWork">
+        <image wx:if="{{item.coverImage}}" src="{{item.coverImage}}" mode="aspectFill"/><view wx:else class="picker-work-cover tone-{{item.tone}}"></view>
+        <view><text>{{item.title}}</text><text>{{item.code}}</text></view>
+        <view class="right-check {{item.checked ? 'checked' : ''}}"></view>
+      </view>
+    </scroll-view>
+    <view class="picker-actions"><button bindtap="closeWorkPicker">取消</button><button bindtap="confirmWorkPicker">确认关联</button></view>
+  </view>
+</view>
+<main-bottom-nav wx:if="{{editorSection !== 'works'}}"/>

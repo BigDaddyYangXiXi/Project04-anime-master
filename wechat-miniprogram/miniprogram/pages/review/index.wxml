@@ -1,0 +1,45 @@
+<app-top-nav class="app-navigation" title="评价服务" show-back="{{true}}"/>
+<view wx:if="{{loading}}" class="empty-page"><text class="empty-page-title">正在读取订单评价</text></view>
+<view class="review-shell" wx:elif="{{order}}">
+  <view wx:if="{{!order.rating}}" class="review-brand-hero">
+    <image src="/assets/brand/peach-slime-main-768.jpg" mode="aspectFill"/>
+    <view class="review-hero-copy"><text>完成订单评价</text><text>这次合作合你心意吗？</text></view>
+  </view>
+  <view wx:if="{{!order.rating}}" class="page-intro">
+    <text class="intro-copy">评价会作为本订单的公开合作记录；服务方只能公开回复，不能修改或隐藏评分。</text>
+  </view>
+
+  <view wx:if="{{!canReview}}" class="empty-state action-state">
+    <text class="empty-title">当前订单还不能评价</text>
+    <text class="empty-copy">只有完成验收的订单可以提交五星评价。</text>
+    <button bindtap="goOrders">返回订单列表</button>
+  </view>
+
+  <brand-success-card
+    wx:elif="{{order.rating}}"
+    eyebrow="评价提交完成"
+    title="你的评价已经点亮"
+    copy="评分已写入本订单，提交后不可修改。"
+    score-text="{{order.ratingText}}"
+    detail-text="{{order.reviewText || '本次评价未填写补充文字。'}}"
+    reply-text="{{order.reviewReply}}"
+  />
+
+  <view wx:else class="content-card review-order-card">
+    <view class="review-provider">
+      <text class="avatar">{{order.initial}}</text>
+      <view><text>{{providerIdentity.nickname}} · {{providerIdentity.uid}}</text><text>{{order.career}} · {{order.id}}</text></view>
+    </view>
+    <view class="gummy-stars" aria-label="五星评分">
+      <button wx:for="{{stars}}" wx:key="*this" class="{{rating >= item ? 'active' : ''}}" data-value="{{item}}" bindtap="chooseRating">★</button>
+    </view>
+    <view wx:if="{{!rating}}" class="required-note"><view class="required-dot"></view><text>请选择 1—5 星评分后再提交。</text></view>
+    <text class="field-label">补充感受（选填）</text>
+    <textarea maxlength="200" value="{{text}}" placeholder="说说哪些细节让你满意，或哪些地方可以改进" bindinput="updateText"></textarea>
+    <text class="helper-copy">{{textCount}}/200 · 评价提交后不可修改</text>
+    <button class="primary-block {{!rating ? 'blocked' : ''}}" disabled="{{actionPending}}" aria-disabled="{{!rating}}" bindtap="submit">{{actionPending ? '正在提交' : '提交 ' + (rating || '—') + ' 星评价'}}</button>
+  </view>
+</view>
+
+<view wx:else class="empty-page"><text class="empty-page-title">{{loadError || '没有找到订单'}}</text><button wx:if="{{loadError}}" bindtap="retryLoad">重新加载</button></view>
+<main-bottom-nav/>

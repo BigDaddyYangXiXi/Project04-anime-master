@@ -1,0 +1,40 @@
+<app-top-nav title="动漫高手" show-back="{{false}}"/>
+<view class="auth-shell">
+  <view class="auth-content">
+    <image class="app-mark" src="/assets/brand/peach-slime-main-768.jpg" mode="aspectFill" aria-label="动漫高手"/>
+
+    <view wx:if="{{checking}}" class="status-block" role="status">
+      <view class="loading-mark"><view></view><view></view><view></view></view>
+      <text class="auth-title">正在确认账号</text>
+    </view>
+
+    <view wx:elif="{{success}}" class="status-block" role="status">
+      <view class="success-mark"><view></view></view>
+      <text class="auth-title">{{successTitle}}</text>
+    </view>
+
+    <view wx:else class="auth-form">
+      <text class="auth-title">{{mode === 'login' ? '登录' : '创建账号'}}</text>
+      <text class="auth-subtitle">{{mode === 'login' ? (sessionRegistered ? account.nickname : '选择一种方式继续') : '设置昵称后即可开始'}}</text>
+
+      <view wx:if="{{mode === 'register'}}" class="register-fields">
+        <input type="nickname" class="nickname-input {{fieldError ? 'invalid' : ''}}" value="{{nickname}}" maxlength="20" placeholder="昵称" aria-label="昵称，1 至 20 个字符" bindinput="updateNickname"/>
+        <text wx:if="{{fieldError}}" class="field-error" role="alert">请输入 1 至 20 个字符的昵称</text>
+        <button class="notice-row {{acceptedNotice ? 'checked' : ''}}" role="checkbox" aria-checked="{{acceptedNotice}}" disabled="{{processing}}" bindtap="toggleNotice">
+          <view class="check-box"><view></view></view>
+          <text>同意将账号信息用于登录和服务展示</text>
+        </button>
+        <text wx:if="{{noticeError}}" class="field-error" role="alert">请先确认账号信息用途</text>
+      </view>
+
+      <view class="auth-actions">
+        <button wx:if="{{mode === 'login'}}" class="primary-button" disabled="{{processing}}" loading="{{processing}}" bindtap="submitLogin">微信快捷登录</button>
+        <button wx:else class="primary-button {{canRegister ? '' : 'incomplete'}}" disabled="{{processing}}" loading="{{processing}}" bindtap="submitRegister">微信快捷注册</button>
+        <button class="secondary-button phone-button {{mode === 'register' && !canRegister ? 'incomplete' : ''}}" open-type="getRealtimePhoneNumber" phone-number-no-quota-toast="{{true}}" disabled="{{processing}}" bindgetrealtimephonenumber="submitPhone">{{mode === 'login' ? '手机号登录' : '手机号注册'}}</button>
+      </view>
+      <button class="switch-button" disabled="{{processing}}" data-mode="{{mode === 'login' ? 'register' : 'login'}}" bindtap="switchMode">{{mode === 'login' ? '没有账号？立即注册' : '已有账号？去登录'}}</button>
+      <text class="privacy-note">手机号由微信验证，完整号码不会保存在客户端</text>
+      <text wx:if="{{errorMessage}}" class="error-message" role="alert">{{errorMessage}}</text>
+    </view>
+  </view>
+</view>

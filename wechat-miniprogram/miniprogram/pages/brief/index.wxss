@@ -1,0 +1,42 @@
+.brief-shell { padding: 20rpx 32rpx 80rpx; }
+.page-intro { padding: 20rpx 8rpx 28rpx; }
+.page-intro text { display: block; }
+.intro-title { margin: 0 0 12rpx; font-size: 52rpx; font-weight: 800; line-height: 64rpx; letter-spacing: -1rpx; }
+.intro-copy { color: #6f625d; font-size: 26rpx; line-height: 40rpx; }
+.source-note { display: flex; align-items: flex-start; gap: 18rpx; margin-bottom: 20rpx; padding: 22rpx 24rpx; border: 1rpx solid #f0dfd7; border-radius: 28rpx; background: #fff7f2; }
+.source-note.has-source { border-color: #bee6d9; background: #ecf8f3; }
+.source-icon { display: flex; width: 40rpx; height: 40rpx; flex: 0 0 40rpx; align-items: center; justify-content: center; border-radius: 50%; color: #fff; background: #e27a65; font-size: 22rpx; font-weight: 800; line-height: 40rpx; }
+.has-source .source-icon { background: #35a77e; }
+.source-check { width: 11rpx; height: 19rpx; border-right: 4rpx solid #fff; border-bottom: 4rpx solid #fff; transform: rotate(45deg) translate(-1rpx, -1rpx); }
+.source-note text { display: block; }
+.source-note text:first-child { font-size: 24rpx; font-weight: 800; line-height: 36rpx; }
+.source-note text:last-child { margin-top: 4rpx; color: #75645f; font-size: 22rpx; line-height: 34rpx; }
+.content-card { padding: 32rpx; border: 1rpx solid #eedfd9; border-radius: 38rpx; background: #fff; }
+.form-stack { display: flex; flex-direction: column; gap: 24rpx; }
+.form-section { display: flex; flex-direction: column; gap: 14rpx; }
+.description-section { padding-top: 24rpx; border-top: 1rpx solid #f1e3de; }
+.target-section { padding-top: 24rpx; border-top: 1rpx solid #f1e3de; }
+.target-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20rpx; }
+.target-heading > view { min-width: 0; }
+.target-heading > view text { display: block; }
+.target-heading > text { flex: 0 0 auto; color: #9a8179; font-size: 22rpx; line-height: 34rpx; }
+.target-editor-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12rpx; }
+.target-editor-item { position: relative; overflow: hidden; height: 180rpx; border: 1rpx solid #ead8d1; border-radius: 20rpx; background: #fff7f2; }
+.target-editor-item image { width: 100%; height: 100%; }
+.remove-target { position: absolute; top: 8rpx; right: 8rpx; display: flex; width: 76rpx; height: 52rpx; align-items: center; justify-content: center; border: 1rpx solid rgba(255,255,255,.9); border-radius: 18rpx; color: #fff; background: rgba(91,52,48,.78); font-size: 20rpx; font-weight: 700; line-height: 32rpx; }
+.target-empty { padding: 22rpx; border: 1rpx dashed #e6cec5; border-radius: 22rpx; background: #fffaf7; }
+.target-empty text { display: block; }
+.target-empty text:first-child { color: #604d48; font-size: 23rpx; font-weight: 700; line-height: 34rpx; }
+.target-empty text:last-child { margin-top: 4rpx; color: #907b74; font-size: 21rpx; line-height: 32rpx; }
+.upload-target { width: 100%; min-height: 76rpx; padding: 16rpx 24rpx; border: 1rpx solid #f0c9c1; border-radius: 22rpx; color: #c94e61; background: #fff7f2; font-size: 24rpx; font-weight: 700; line-height: 36rpx; box-shadow: none; }
+.section-kicker { color: #d95168; font-size: 26rpx; font-weight: 800; line-height: 38rpx; }
+.field-label { margin-top: 6rpx; color: #5d4b47; font-size: 23rpx; font-weight: 700; line-height: 34rpx; }
+.field-hint { color: #8a7771; font-size: 22rpx; line-height: 34rpx; }
+.form-stack input, .form-stack textarea { width: 100%; padding: 20rpx 22rpx; border: 1rpx solid #e7d7d1; border-radius: 22rpx; background: #fffaf7; font-size: 25rpx; line-height: 38rpx; box-sizing: border-box; }
+.form-stack input { height: 88rpx; min-height: 88rpx; }
+.form-stack textarea { min-height: 240rpx; }
+.description-section textarea { font-size: 26rpx; line-height: 42rpx; }
+.primary-block { display: block; width: 100%; min-height: 88rpx; padding: 20rpx 32rpx; border: 2rpx solid rgba(255,255,255,.92); border-radius: 28rpx; color: #fff; background: linear-gradient(135deg,#f0787e,#ee8f88 52%,#e77c90); box-shadow: none; font-size: 28rpx; font-weight: 700; line-height: 40rpx; }
+.primary-block.blocked { opacity: .42; }
+.required-note { display: flex; align-items: flex-start; gap: 10rpx; color: #b5434e; font-size: 22rpx; line-height: 34rpx; }
+.required-dot { width: 12rpx; height: 12rpx; flex: 0 0 12rpx; margin-top: 11rpx; border-radius: 50%; background: #d83b46; }

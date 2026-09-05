@@ -1,0 +1,12 @@
+<app-top-nav title="资金管理" workspace="provider" show-back="{{true}}"/>
+<view class="funds-shell">
+  <view class="balance-card">
+    <text class="balance-label">可提现余额</text>
+    <text class="balance-value">￥{{withdrawableBalance}}</text>
+    <view class="balance-actions"><button class="secondary-button" data-key="withdraw" bindtap="openEntry">提现</button><button class="primary-button" data-key="recharge" bindtap="openEntry">充值</button></view>
+  </view>
+  <view class="funds-hero"><text>已核验入账</text><text>￥{{paidTotal}}</text><text>只统计带真实支付状态、流水号和支付时间的订单</text></view>
+  <view class="funds-menu"><button wx:for="{{entries}}" wx:key="key" data-key="{{item.key}}" bindtap="openEntry"><view><text>{{item.title}}</text><text>{{item.copy}}</text></view><text>{{item.state}}</text><view class="chevron"></view></button></view>
+  <view wx:if="{{verifiedTransactions.length}}" class="records"><text class="section-title">最近流水</text><view wx:for="{{verifiedTransactions}}" wx:key="id"><view><text>{{item.title}}</text><text>{{item.id}} · {{item.time}}</text></view><text>＋￥{{item.amount}}</text></view></view>
+  <view wx:else class="integrity-note"><text>资金数据边界</text><text>可提现余额读取资金账户底表；当前没有满足核验条件的支付流水，充值与提现也不会模拟成功。</text></view>
+</view>

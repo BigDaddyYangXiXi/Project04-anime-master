@@ -1,0 +1,18 @@
+<navigator
+  class="work-card"
+  url="/pages/work-detail/index?id={{work.id}}&source={{source}}{{workspace === 'provider' ? '&workspace=provider' : ''}}{{preview ? '&preview=' + preview : ''}}"
+  open-type="navigate"
+  hover-class="work-card-pressed"
+  aria-label="查看作品：{{work.title}}"
+>
+  <view class="work-visual tone-{{work.tone}}">
+    <image wx:if="{{coverImage}}" src="{{coverImage}}" mode="aspectFill" lazy-load="{{true}}"/>
+    <block wx:else><view class="work-orbit"></view><view class="work-figure"></view></block>
+    <text class="work-caption">{{work.code}}</text>
+  </view>
+  <view class="work-info">
+    <view class="work-author"><view class="avatar">{{work.provider.initial}}</view><text>{{work.provider.name}}</text></view>
+    <text class="work-title">{{work.title}}</text>
+    <view class="work-meta"><view class="work-tags"><text wx:for="{{displayTags}}" wx:key="*this" class="work-tag">{{item}}</text></view><text class="work-price">{{work.priceText}}</text></view>
+  </view>
+</navigator>

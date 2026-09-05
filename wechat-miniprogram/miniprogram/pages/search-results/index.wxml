@@ -1,0 +1,14 @@
+<app-top-nav class="app-navigation" title="搜索结果" show-back="{{true}}"/>
+<view class="search-page">
+  <button class="career-search" bindtap="openSearch"><view class="search-icon" aria-hidden="true"></view><text>{{searchQuery || '搜索' + career + '作品、风格或服务者'}}</text></button>
+  <view wx:if="{{selectedFilters.length}}" class="tag-row"><text wx:for="{{selectedFilters}}" wx:key="*this">{{item}}</text></view>
+  <view class="result-summary"><text>{{results.length}}</text><text>个结果 · {{career}} · {{city}}</text></view>
+
+  <view wx:if="{{catalogLoading}}" class="empty-state"><text>正在读取公开目录</text><text>请稍候。</text></view>
+  <view wx:elif="{{catalogError}}" class="empty-state"><text>公开目录暂不可用</text><text>{{catalogError}}</text></view>
+  <view wx:elif="{{results.length}}" class="work-grid"><work-card wx:for="{{results}}" wx:key="id" work="{{item}}" source="B01S"/></view>
+  <view wx:else class="empty-state"><text>没有匹配作品</text><text>换一个搜索词或减少筛选条件。</text></view>
+</view>
+
+<view wx:if="{{searchOpen}}" class="modal-layer"><view class="scrim" bindtap="closeSearch"></view><view class="modal-panel" catchtap="noop"><text class="modal-title">搜索{{career}}</text><view class="modal-search"><view class="search-icon" aria-hidden="true"></view><input value="{{searchDraft}}" placeholder="作品、风格或服务者" placeholder-class="search-placeholder" bindinput="updateSearchDraft" confirm-type="search" bindconfirm="submitSearch" /></view><view class="recent-head"><text>最近搜索</text><button disabled="{{!recent.length}}" bindtap="clearRecent">全部清空</button></view><view class="recent-list"><view wx:for="{{recent}}" wx:key="*this" class="recent-item"><button data-value="{{item}}" bindtap="submitSearch">{{item}}</button><button aria-label="删除最近搜索 {{item}}" data-value="{{item}}" bindtap="removeRecent">×</button></view></view><view class="modal-actions"><button class="secondary-button" bindtap="closeSearch">取消</button><button class="primary-button" bindtap="submitSearch">查看结果</button></view></view></view>
+<main-bottom-nav/>

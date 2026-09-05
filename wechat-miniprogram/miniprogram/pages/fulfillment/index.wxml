@@ -1,0 +1,68 @@
+<app-top-nav class="app-navigation" title="交付验收" show-back="{{true}}"/>
+<view wx:if="{{loading}}" class="empty-page"><text class="empty-page-title">正在读取交付结果</text><text>请稍候，不会重复执行任何操作。</text></view>
+<view class="fulfillment-shell" wx:elif="{{order}}">
+  <view class="page-intro">
+    <text class="intro-title">{{order.stage === 'COMPLETED' ? '本订单已完成' : '检查本次完成结果'}}</text>
+    <text class="intro-copy">先核对交付或现场完成情况，再选择申请修改或确认验收。</text>
+  </view>
+
+  <view wx:if="{{!validStage}}" class="empty-state action-state">
+    <text class="empty-title">当前没有待验收结果</text>
+    <text class="empty-copy">服务方提交现场完成确认或交付文件后，本订单会进入这里。</text>
+    <button bindtap="goOrders">返回订单列表</button>
+  </view>
+
+  <block wx:else>
+    <view class="content-card facts-card">
+      <view class="section-title"><text>已经确认的合作信息</text><text>{{order.id}}</text></view>
+      <text class="counterpart-line">{{providerIdentity.nickname}} · {{providerIdentity.uid}}</text>
+      <view class="order-fact-stack">
+        <view class="order-fact-item"><text class="order-fact-number">1</text><view class="order-fact-copy"><text>地点与时间</text><text>{{order.city}} · {{schedule.mode}}</text><view class="order-fact-schedule"><text wx:for="{{schedule.lines}}" wx:key="label">{{item.label}} · {{item.text}}</text></view></view></view>
+        <view class="order-fact-item"><text class="order-fact-number">2</text><view class="order-fact-copy"><text>服务内容</text><text>{{order.service}}</text></view></view>
+        <view class="order-fact-item"><text class="order-fact-number">3</text><view class="order-fact-copy"><text>交付与验收</text><text>{{onsite ? '现场服务完成后由需求方确认结算' : '服务方提交文件后由需求方验收'}}</text></view></view>
+        <view class="order-fact-item"><text class="order-fact-number">4</text><view class="order-fact-copy"><text>合作金额</text><text>合计 ￥{{order.finalPrice}}</text></view></view>
+      </view>
+    </view>
+
+    <brand-success-card
+      wx:if="{{order.stage === 'COMPLETED'}}"
+      eyebrow="验收结算完成"
+      title="这次合作顺利收官"
+      copy="验收结果已经写入本订单，现在可以评价服务方。"
+      action-text="评价本次服务"
+      bind:action="goReview"
+    />
+
+    <view wx:if="{{onsite && order.stage !== 'COMPLETED'}}" class="demand-card">
+      <text class="demand-kicker">服务方提交的完成说明</text>
+      <text class="demand-title">现场服务完成确认</text>
+      <text class="demand-copy">{{order.deliveryNote || '服务方已确认现场工作完成，请核对约定内容后确认验收。'}}</text>
+    </view>
+
+    <view wx:elif="{{order.stage !== 'COMPLETED'}}" class="content-card delivery-card">
+      <view class="section-title"><text>交付物</text><text>{{order.deliveryFiles.length}} 个文件</text></view>
+      <view class="delivery-grid">
+        <button wx:for="{{order.deliveryFiles}}" wx:key="fileId" class="delivery-file" data-index="{{index}}" disabled="{{actionPending}}" bindtap="openDeliveryFile">
+          <text class="file-mark">文件</text><text>{{item.name}}</text>
+        </button>
+        <text wx:if="{{!order.deliveryFiles.length}}" class="empty-files">暂无文件</text>
+      </view>
+      <text class="delivery-note">{{order.deliveryNote}}</text>
+    </view>
+
+    <view wx:if="{{order.stage === 'DELIVERY_PENDING'}}" class="content-card form-stack">
+      <text class="field-label">{{onsite ? '现场问题说明（有问题时必填）' : '修改意见（申请修改时必填）'}}</text>
+      <textarea value="{{revision}}" bindinput="updateRevision"></textarea>
+      <text class="helper-copy">只有申请修改／反馈问题时需要填写；确认结算不会提交此草稿。</text>
+      <view wx:if="{{acceptIssues.length}}" class="required-summary"><view class="required-heading"><view class="required-dot"></view><text>确认验收前还需完成</text></view><text wx:for="{{acceptIssues}}" wx:key="*this">{{item}}</text></view>
+      <view class="two-actions">
+        <button class="secondary-button" disabled="{{!canRevise || actionPending}}" bindtap="revise">{{onsite ? '反馈问题' : '申请修改'}}</button>
+        <button class="primary-button {{!canAccept ? 'blocked' : ''}}" disabled="{{actionPending}}" aria-disabled="{{!canAccept}}" bindtap="accept">{{actionPending ? '正在同步' : onsite ? '确认服务完成' : '确认验收完成'}}</button>
+      </view>
+    </view>
+
+  </block>
+</view>
+
+<view wx:else class="empty-page"><text class="empty-page-title">{{loadError || '没有找到订单'}}</text><button wx:if="{{loadError}}" bindtap="retryLoad">重新加载</button></view>
+<main-bottom-nav/>

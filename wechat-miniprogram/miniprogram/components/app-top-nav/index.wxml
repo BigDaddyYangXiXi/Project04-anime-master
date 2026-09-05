@@ -1,0 +1,8 @@
+<view class="app-top-nav" style="height: {{totalHeight}}px; padding-top: {{statusBarHeight}}px;">
+  <view class="app-top-nav-row" style="height: {{navBarHeight}}px; padding-right: {{sideInset}}px; padding-left: 8px;">
+    <view wx:if="{{showBack}}" class="app-back" role="button" bindtap="goBack" aria-label="返回上一页"><view class="back-chevron" aria-hidden="true"></view></view>
+    <view wx:elif="{{showRoleSwitch}}" class="role-switch" role="button" bindtap="switchRole" aria-label="切换使用身份"><text>{{roleText}}</text><text class="switch-glyph" aria-hidden="true">⇄</text></view>
+    <view wx:else class="app-back-placeholder"></view>
+    <text class="app-nav-title">{{title}}</text>
+  </view>
+</view>

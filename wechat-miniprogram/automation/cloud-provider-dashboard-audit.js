@@ -1,0 +1,15 @@
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const source = fs.readFileSync(path.resolve(__dirname, "..", "miniprogram", "pages", "discover", "index.js"), "utf8");
+assert.match(source, /cloudAccount\.getMine/);
+assert.match(source, /cloudOrders\.listOrders/);
+assert.match(source, /cloudAvailability\.getMine/);
+assert.match(source, /cloudCatalog\.getProvider/);
+assert.match(source, /providerOrders\.filter/);
+assert.match(source, /countFlow\(providerOrders/);
+assert.match(source, /provider\.works\.length/);
+assert.match(source, /provider\.services\.length/);
+assert.match(source, /openDates\.filter/);
+assert.match(source, /this\.dashboardCloudMode/);
+console.log("Cloud provider dashboard audit passed: 10 assertions");

@@ -1,0 +1,26 @@
+# 原型保留独立仓库，不在根仓库重复跟踪。
+/prototype/
+
+# 依赖、构建、自动化输出和本机状态。
+node_modules/
+.artifacts/
+.tmp-ui-audit/
+audit-output/
+.cloudbase-cli-config/
+.codex/
+.agents/
+dist/
+coverage/
+*.log
+/.codex-*.png
+project.private.config.json
+
+# 凭据不进入版本管理；环境示例需逐项检查后显式纳入。
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.dpapi
+*.secret

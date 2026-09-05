@@ -1,0 +1,10 @@
+{
+  "name": "anime-master-wechat-automation",
+  "private": true,
+  "scripts": {
+    "test:routes": "node route-smoke.js"
+  },
+  "dependencies": {
+    "miniprogram-automator": "^0.12.1"
+  }
+}

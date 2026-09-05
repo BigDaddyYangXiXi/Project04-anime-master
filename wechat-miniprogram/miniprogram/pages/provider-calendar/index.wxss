@@ -1,0 +1,12 @@
+@import "../../styles/availability-calendar.wxss";
+.calendar-shell { padding: 28rpx 32rpx 70rpx; }
+.page-intro { padding: 18rpx 8rpx 28rpx; }
+.page-intro text { display: block; }
+.page-intro text:first-child { color: #c6536b; font-size: 20rpx; font-weight: 700; line-height: 30rpx; letter-spacing: 3rpx; }
+.page-intro text:nth-child(2) { margin-top: 8rpx; font-size: 48rpx; font-weight: 800; line-height: 60rpx; }
+.page-intro text:last-child { margin-top: 8rpx; color: #6f625d; font-size: 24rpx; line-height: 38rpx; }
+.two-actions { display: flex; gap: 18rpx; margin-top: 24rpx; }
+.two-actions button { width: 100%; min-height: 88rpx; border-radius: 28rpx; font-size: 24rpx; font-weight: 700; line-height: 38rpx; }
+.primary-button { border: 2rpx solid rgba(255,255,255,.92); background: linear-gradient(135deg,#f0787e,#ee8f88 52%,#e77c90); color: #fff; }
+.two-actions button[disabled] { opacity: .4; }
+.message { display: block; margin-top: 18rpx; color: #208a66; text-align: center; font-size: 22rpx; line-height: 34rpx; }

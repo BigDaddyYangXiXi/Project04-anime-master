@@ -1,0 +1,20 @@
+<app-top-nav class="app-navigation" title="作品详情" workspace="{{navWorkspace}}" show-back="{{true}}"/>
+<view wx:if="{{work}}" class="detail-shell">
+  <view class="work-detail-head">
+    <view class="provider-head"><button class="provider-link" bindtap="openProvider"><image wx:if="{{work.provider.avatar}}" class="avatar avatar-image" src="{{work.provider.avatar}}" mode="aspectFill"/><view wx:else class="avatar">{{work.provider.initial}}</view><text>{{work.provider.name}}</text></button><view class="head-actions"><button disabled="{{socialPending}}" class="like-button {{liked ? 'active' : ''}}" bindtap="toggleLike">{{liked ? '已喜欢' : '喜欢'}}</button><button disabled="{{socialPending}}" class="follow-button {{followed ? 'active' : ''}}" bindtap="toggleFollow" aria-label="{{followed ? '取消关注' : '关注'}}"><image class="follow-icon" src="{{followed ? '/assets/actions/follow-active.svg' : '/assets/actions/follow.svg'}}" mode="aspectFit"/><text>{{followed ? '已关注' : '关注'}}</text></button></view></view>
+    <text class="detail-title">{{work.title}}</text>
+    <text class="detail-subtitle">{{work.subtitle}}</text>
+  </view>
+
+  <view class="work-image-stack"><view wx:for="{{gallery}}" wx:key="index" class="work-figure-card"><image wx:if="{{item.src}}" class="detail-image" src="{{item.src}}" mode="widthFix" lazy-load="{{true}}"/><view wx:else class="detail-visual tone-{{work.tone}}"><view class="detail-figure"></view></view><text class="figure-count">{{item.label}}</text></view></view>
+
+  <view class="work-code-bar">
+    <view class="work-code-copy"><text>服务器分配作品码</text><text>{{work.code}}</text></view>
+    <button class="code-copy-button {{codeCopied ? 'active' : ''}}" bindtap="copyCode"><view class="copy-glyph" aria-hidden="true"></view><text>{{codeCopied ? '已复制' : '复制'}}</text></button>
+  </view>
+
+  <view class="content-card work-detail-info"><view class="section-title"><view><text>作品对应服务展示价</text><text>{{work.priceText}}</text></view><text>被引用 {{work.referenceCount}} 次</text></view><text class="detail-description">{{work.description}}</text><view class="tag-row"><text wx:for="{{work.tags}}" wx:key="*this">{{item}}</text></view></view>
+
+  <view wx:if="{{!providerPreview}}" class="sticky-action"><view><text>{{work.provider.name}} · {{work.provider.career}}</text><text>{{work.priceText}}</text></view><button bindtap="startBooking">引用作品预约</button></view>
+</view>
+<main-bottom-nav/>

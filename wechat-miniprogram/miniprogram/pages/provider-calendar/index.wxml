@@ -1,0 +1,16 @@
+<app-top-nav class="app-navigation" title="档期管理" workspace="provider" show-back="{{false}}"/>
+<view class="calendar-shell">
+  <view class="page-intro"><text>公开档期用于筛选</text><text>2026 年 8 月</text><text>点击日期切换公开状态；执行中订单会锁定对应日期。</text></view>
+  <view class="calendar-card">
+    <view class="week-row"><text wx:for="{{weekdays}}" wx:key="*this">{{item}}</text></view>
+    <view class="calendar-grid">
+      <button wx:for="{{days}}" wx:key="key" disabled="{{!item.valid || item.locked}}" class="{{!item.valid ? 'placeholder' : item.locked ? 'locked' : item.open ? 'open' : 'unknown'}}" data-day="{{item.value}}" bindtap="toggle">
+        <text>{{item.value}}</text><text wx:if="{{item.open}}">可约</text><text wx:if="{{item.locked}}">已锁</text>
+      </button>
+    </view>
+    <view class="calendar-legend"><view><view class="calendar-dot open"></view><text>公开可约</text></view><view><view class="calendar-dot unknown"></view><text>未公开</text></view><view><view class="calendar-dot locked"></view><text>订单锁定</text></view></view>
+  </view>
+  <view class="two-actions"><button class="secondary-button" disabled="{{!changed}}" bindtap="reset">撤销修改</button><button class="primary-button" disabled="{{!changed}}" bindtap="save">保存档期</button></view>
+  <text wx:if="{{message}}" class="message">{{message}}</text>
+</view>
+<main-bottom-nav/>

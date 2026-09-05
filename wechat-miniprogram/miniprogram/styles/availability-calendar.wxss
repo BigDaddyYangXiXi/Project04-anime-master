@@ -1,0 +1,19 @@
+.calendar-card { padding: 28rpx 24rpx; border: 1rpx solid #eee3df; border-radius: 32rpx; background: #fff; overflow: hidden; }
+.week-row, .calendar-grid { display: flex; width: 100%; flex-wrap: wrap; }
+.week-row { margin-bottom: 12rpx; }
+.week-row text { width: 14.2857%; color: #7d6b65; font-size: 20rpx; line-height: 30rpx; text-align: center; }
+.calendar-grid button { position: relative; display: flex; width: 14.2857%; min-width: 14.2857%; max-width: 14.2857%; min-height: 86rpx; flex-direction: column; align-items: center; justify-content: center; border: 4rpx solid #fff; border-radius: 18rpx; color: #6f625d; background: #f7f4f2; box-shadow: none; }
+.calendar-grid button text { display: block; font-size: 20rpx; line-height: 28rpx; }
+.calendar-grid button text + text { margin-top: 2rpx; font-size: 15rpx; line-height: 22rpx; }
+.calendar-grid button.open { color: #208a66; background: #e6f6ef; font-weight: 800; }
+.calendar-grid button.full, .calendar-grid button.locked { color: #9b3542; background: #ffe7e9; font-weight: 800; opacity: 1; }
+.calendar-grid button.unknown { color: #7d6b65; background: #fbf8f6; }
+.calendar-grid button.past { color: #c5bdb9; background: #faf8f7; opacity: .56; }
+.calendar-grid button.selected { border-color: #fff; background: #fff0f1; box-shadow: inset 0 0 0 3rpx #ef7b84; color: #c6536b; }
+.calendar-grid button.placeholder { background: transparent; }
+.calendar-legend { display: flex; flex-wrap: wrap; gap: 18rpx 26rpx; margin-top: 22rpx; color: #6f625d; font-size: 20rpx; line-height: 30rpx; }
+.calendar-legend > view { display: flex; align-items: center; gap: 8rpx; }
+.calendar-dot { width: 18rpx; height: 18rpx; border-radius: 6rpx; background: #f7f4f2; }
+.calendar-dot.open { background: #b9e8d7; }
+.calendar-dot.full, .calendar-dot.locked { background: #ef7b84; }
+.calendar-dot.unknown { border: 1rpx solid #b8aaa4; background: #fbf8f6; }

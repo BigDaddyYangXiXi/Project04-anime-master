@@ -1,0 +1,54 @@
+<app-top-nav class="app-navigation" title="项目信息" show-back="{{true}}"/>
+<view wx:if="{{loading}}" class="empty-page"><text class="empty-page-title">正在读取项目草稿</text></view>
+<view wx:elif="{{project}}" class="brief-shell">
+  <view class="page-intro">
+    <text class="intro-title">整理项目草稿</text>
+    <text class="intro-copy">系统读取你此前预约中填写的日期、城市、服务需求和参考信息，整理为项目草稿。</text>
+  </view>
+
+  <view class="source-note {{sourceCount ? 'has-source' : ''}}">
+    <view class="source-icon"><view wx:if="{{sourceCount}}" class="source-check" aria-hidden="true"></view><text wx:else>!</text></view>
+    <view>
+      <text>{{sourceCount ? '已从 ' + sourceCount + ' 笔历史预约整理' : '暂无可读取的历史预约'}}</text>
+      <text>不复制联系方式，不自动关联订单或职业；提交前请核对内容。</text>
+    </view>
+  </view>
+
+  <view class="content-card form-stack">
+    <view class="form-section">
+      <text class="section-kicker">项目信息</text>
+      <text class="field-label">项目名称</text>
+      <input value="{{projectName}}" placeholder="给项目一个清晰名称" bindinput="updateProjectName"/>
+      <text class="field-label">日期</text>
+      <picker mode="date" value="{{date}}" bindchange="updateDate"><view class="picker-value">{{date || '请选择项目日期'}}</view></picker>
+      <text class="field-label">城市</text>
+      <picker mode="region" bindchange="updateCity"><view class="picker-value">{{city || '请选择项目城市'}}</view></picker>
+      <text class="field-label">地点</text>
+      <input value="{{location}}" placeholder="具体地点待确认" bindinput="updateLocation"/>
+    </view>
+    <view class="form-section description-section">
+      <text class="section-kicker">项目描述</text>
+      <text class="field-hint">由此前填写的服务需求与参考信息整合，可继续修改。</text>
+      <textarea value="{{description}}" placeholder="说明项目目标、服务内容和重要要求" bindinput="updateDescription"></textarea>
+    </view>
+    <view class="form-section target-section">
+      <view class="target-heading">
+        <view><text class="section-kicker">目标效果</text><text class="field-hint">添加参考图，帮助项目成员理解最终方向；最多 6 张。</text></view>
+        <text>{{targetImages.length}} / 6</text>
+      </view>
+      <view wx:if="{{targetImages.length}}" class="target-editor-grid">
+        <view wx:for="{{targetImages}}" wx:key="*this" class="target-editor-item">
+          <image src="{{item}}" mode="aspectFill" data-index="{{index}}" bindtap="previewTargetImage"/>
+          <view class="remove-target" role="button" data-index="{{index}}" catchtap="removeTargetImage" aria-label="删除第 {{index + 1}} 张目标效果图"><text>删除</text></view>
+        </view>
+      </view>
+      <view wx:else class="target-empty"><text>尚未添加目标效果图</text><text>图片为选填，不影响保存项目资料。</text></view>
+      <button wx:if="{{targetImages.length < 6}}" class="upload-target" disabled="{{actionPending}}" bindtap="chooseTargetImages">{{actionPending ? '正在处理图片' : '＋ 添加目标效果图'}}</button>
+    </view>
+    <view wx:if="{{!canSave}}" class="required-note"><view class="required-dot"></view><text>{{saveError}}</text></view>
+    <text wx:if="{{loadError}}" class="required-note">{{loadError}}</text>
+    <button class="primary-block {{!canSave ? 'blocked' : ''}}" disabled="{{actionPending}}" aria-disabled="{{!canSave}}" bindtap="save">{{actionPending ? '正在保存' : '保存项目信息'}}</button>
+  </view>
+</view>
+<view wx:else class="empty-page"><text class="empty-page-title">{{loadError || '没有找到项目'}}</text><button wx:if="{{loadError}}" bindtap="retryLoad">重新加载</button></view>
+<main-bottom-nav/>

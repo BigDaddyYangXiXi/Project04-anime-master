@@ -1,0 +1,12 @@
+{
+  "name": "anime-master-wechat-miniprogram",
+  "version": "0.7.0-native.7",
+  "private": true,
+  "scripts": {
+    "cloudbase": "node scripts/cloudbase-cli.js",
+    "cloudbase:envs": "node scripts/cloudbase-cli.js env:list"
+  },
+  "devDependencies": {
+    "@cloudbase/cli": "3.8.1"
+  }
+}

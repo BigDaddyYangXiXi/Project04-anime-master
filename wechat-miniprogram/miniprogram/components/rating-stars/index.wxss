@@ -1,0 +1,4 @@
+:host { display: block; }
+.rating-stars { display: flex; align-items: center; gap: 16rpx; }
+.stars { color: #c6536b; font-size: 28rpx; letter-spacing: 4rpx; }
+.rating-stars text:last-child { font-size: 22rpx; line-height: 32rpx; font-weight: 500; }

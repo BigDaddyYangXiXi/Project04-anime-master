@@ -1,0 +1,4 @@
+<view class="availability-strip {{topGap ? 'with-top-gap' : ''}}" aria-label="未来八天档期简况">
+  <view class="availability-days"><view wx:for="{{days}}" wx:key="day" class="availability-day {{item.state}}"><text>{{item.weekday}}</text><text>{{item.day}}</text><view class="availability-icon {{item.state}}"></view></view></view>
+  <view class="availability-legend"><view><view class="availability-icon open-all"></view><text>全天</text></view><view><view class="availability-icon full"></view><text>满客</text></view><view><view class="availability-icon unknown"></view><text>未知</text></view></view>
+</view>

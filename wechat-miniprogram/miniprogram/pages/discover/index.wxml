@@ -1,0 +1,69 @@
+<app-top-nav class="app-navigation" title="{{role === 'provider' ? '服务方工作台' : '动漫高手'}}" workspace="{{role}}" show-back="{{false}}"/>
+<block wx:if="{{role === 'buyer'}}">
+<view class="market-page">
+  <view class="hero-panel">
+    <text class="hero-title">找到能接住你想法的人</text>
+    <text class="hero-copy">作品、档期与真实完成订单评价一起看。</text>
+    <view class="where-when-row">
+      <picker class="where-when-field" mode="region" value="{{regionValue}}" bindchange="updateCity"><view><text>地点</text><text>{{city || '选择城市'}}</text></view></picker>
+      <picker class="where-when-field" mode="date" value="{{date}}" bindchange="updateDate"><view><text>日期</text><text>{{date}}</text></view></picker>
+    </view>
+    <text wx:if="{{locationMessage}}" class="location-message">{{locationMessage}}</text>
+  </view>
+
+  <view class="career-section"><view class="career-row" aria-label="职业筛选"><button wx:for="{{careerTabs}}" wx:key="name" class="career-chip {{career === item.name ? 'active' : ''}}" data-career="{{item.name}}" bindtap="chooseCareer"><view class="career-icon-shell"><image src="{{item.asset}}" mode="aspectFill" /></view><view class="career-label"><text wx:for="{{item.letters}}" wx:for-item="letter" wx:key="*this" class="career-letter letter-{{index + 1}}">{{letter}}</text></view></button></view></view>
+
+  <view class="retrieval-sticky">
+    <button class="career-search" bindtap="openSearch"><view class="search-icon" aria-hidden="true"></view><text>{{searchQuery || '搜索' + career + '作品、风格或服务者'}}</text></button>
+    <view class="discovery-toolbar"><button class="{{mode === 'works' ? 'active' : ''}}" data-mode="works" bindtap="chooseMode">按作品</button><button class="{{mode === 'people' ? 'active' : ''}}" data-mode="people" bindtap="chooseMode">按人</button><button class="{{selectedFilters.length ? 'active' : ''}}" bindtap="openFilters">高级筛选</button></view>
+  </view>
+
+  <view wx:if="{{catalogLoading}}" class="empty-state"><text>正在读取公开目录</text><text>请稍候。</text></view>
+  <view wx:elif="{{catalogError}}" class="empty-state"><text>公开目录暂不可用</text><text>{{catalogError}}</text></view>
+
+  <view wx:elif="{{mode === 'works' && visibleWorks.length}}" class="work-grid"><work-card wx:for="{{visibleWorks}}" wx:key="id" work="{{item}}" source="B01"/></view>
+
+  <view wx:elif="{{mode === 'people' && visibleProviders.length}}" class="provider-list"><button wx:for="{{visibleProviders}}" wx:key="id" class="provider-card" data-id="{{item.id}}" bindtap="showProvider"><view class="provider-head"><view class="avatar">{{item.initial}}</view><text>{{item.name}}</text></view><view class="provider-data"><text>{{item.orders}}次拯救世界</text><text>{{item.works.length}}件作品</text><text wx:for="{{item.topTags}}" wx:for-item="tag" wx:key="*this" class="provider-tag">{{tag}}</text><text class="provider-price">{{item.priceText}}</text></view><view class="mini-works"><view wx:for="{{item.miniWorks}}" wx:for-item="work" wx:key="id" class="mini-work tone-{{work.tone}}"></view></view><availability-strip days="{{item.availabilityDays}}" top-gap="{{true}}"/><view class="provider-rating"><rating-stars rating-text="{{item.ratingText}}"/></view></button></view>
+
+  <view wx:else class="empty-state"><text>没有匹配结果</text><text>调整城市、搜索词或高级筛选后再试。</text></view>
+</view>
+
+<view wx:if="{{searchOpen}}" class="modal-layer"><view class="scrim" bindtap="closeSearch"></view><view class="modal-panel" catchtap="noop"><text class="modal-title">搜索{{career}}</text><view class="modal-search"><view class="search-icon" aria-hidden="true"></view><input value="{{searchDraft}}" placeholder="作品、风格或服务者" placeholder-class="search-placeholder" bindinput="updateSearchDraft" confirm-type="search" bindconfirm="submitSearch" /></view><view class="recent-head"><text>最近搜索</text><button disabled="{{!recent.length}}" bindtap="clearRecent">全部清空</button></view><view class="recent-list"><view wx:for="{{recent}}" wx:key="*this" class="recent-item"><button data-value="{{item}}" bindtap="submitSearch">{{item}}</button><button aria-label="删除最近搜索 {{item}}" data-value="{{item}}" bindtap="removeRecent">×</button></view></view><view class="modal-actions"><button class="secondary-button" bindtap="closeSearch">取消</button><button class="primary-button" bindtap="submitSearch">查看结果</button></view></view></view>
+
+<view wx:if="{{filterOpen}}" class="modal-layer"><view class="scrim" bindtap="closeFilters"></view><view class="modal-panel" catchtap="noop"><text class="modal-title">{{career}}高级筛选</text><view wx:for="{{availableFilterGroups}}" wx:key="group" class="filter-group"><text>{{item.group}}</text><view class="filter-options"><button wx:for="{{item.values}}" wx:for-item="option" wx:key="value" class="{{option.selected ? 'active' : ''}}" data-value="{{option.value}}" bindtap="toggleFilter"><view class="check" aria-hidden="true"><view wx:if="{{option.selected}}" class="check-mark"></view></view>{{option.value}}</button></view></view><view class="modal-actions"><button class="secondary-button" bindtap="resetFilters">重置</button><button class="primary-button" bindtap="applyFilters">应用筛选</button></view></view></view>
+</block>
+
+<view wx:else class="dashboard-shell">
+  <view wx:if="{{dashboardLoading}}" class="empty-state"><text>正在读取工作台</text><text>请稍候。</text></view>
+  <view wx:elif="{{dashboardError}}" class="empty-state"><text>工作台暂不可用</text><text>{{dashboardError}}</text></view>
+  <view class="dashboard-head">
+    <view class="dashboard-copy">
+      <text class="dashboard-title">{{profile.nickname}}，今天先处理待办</text>
+      <text class="dashboard-subtitle">主身份：{{providerCareer}} · 主页公开展示中</text>
+    </view>
+    <image wx:if="{{profile.avatar}}" class="avatar-large avatar-image" src="{{profile.avatar}}" mode="aspectFill"/><view wx:else class="avatar-large">{{profileInitial}}</view>
+  </view>
+
+  <view class="metric-row">
+    <button wx:for="{{metrics}}" wx:key="flow" data-flow="{{item.flow}}" bindtap="openFlow"><text class="metric-count">{{item.count}}</text><text class="metric-label">{{item.label}}</text></button>
+  </view>
+
+  <view class="content-card priority-section">
+    <view class="section-title"><text>优先处理</text><text>{{priorityTotal}} 条</text></view>
+    <block wx:if="{{priorityOrders.length}}">
+      <view class="priority-list">
+        <button wx:for="{{priorityOrders}}" wx:key="id" class="attention-card" data-id="{{item.id}}" bindtap="openPriority" aria-label="打开{{item.buyer}}的预约详情"><view class="attention-main"><view class="attention-primary"><text class="status-dot">{{item.statusLabel}}</text><text class="attention-title">{{item.buyer}} · {{item.service}}</text></view><view class="attention-secondary"><text class="attention-meta">{{item.city}} · {{item.time}}</text><text class="attention-id">{{item.id}}</text></view></view><view class="attention-chevron" aria-hidden="true"></view></button>
+        <button wx:if="{{remainingPriority > 0}}" class="priority-more" bindtap="openProviderOrders"><text>查看其余 {{remainingPriority}} 条待办</text><view class="attention-chevron" aria-hidden="true"></view></button>
+      </view>
+    </block>
+    <view wx:else class="empty-state"><text>当前没有紧急待办</text><text>新预约、待签 NDA 和修改任务会显示在这里。</text></view>
+  </view>
+
+  <view class="content-card"><view class="section-title"><text>橱窗概览</text><text>{{providerCareer}}</text></view><view class="timeline"><view wx:for="{{overview}}" wx:key="label"><text>{{item.label}}</text><text>{{item.value}}</text></view></view></view>
+
+  <view class="content-card tools-card">
+    <text class="tools-title">管理工具</text>
+    <view class="two-actions"><button class="secondary-button" bindtap="openProviderOrders">全部订单</button><button class="primary-button" bindtap="openProviderProfile">编辑橱窗</button></view>
+    <view class="two-actions"><button class="secondary-button" bindtap="openProviderCalendar">公开档期</button><button class="secondary-button" bindtap="openProviderReviews">评价管理</button></view>
+  </view>
+</view>
