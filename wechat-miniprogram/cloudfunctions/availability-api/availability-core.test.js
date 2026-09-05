@@ -60,3 +60,45 @@ test("derives locked dates from execution orders and rejects changing one", asyn
 test("rejects a caller without trusted provider identity", async () => {
   await assert.rejects(() => handleAvailability(mockDb(), { action: "getMine" }, {}), (error) => error.code === "AUTH_CONTEXT_MISSING");
 });
+
+test("locks every occupied China date and protects the second day from editing", async () => {
+  const db = mockDb();
+  db.orders[0].payload = JSON.stringify({ public: { timeSegments: [{
+    startsAt: Date.parse("2026-09-20T10:00:00+08:00"), endsAt: Date.parse("2026-09-21T18:00:00+08:00")
+  }] } });
+  const expected = ["2026-09-20", "2026-09-21"];
+  const publicRead = await handleAvailability(db, { action: "getPublic", providerId: PROVIDER });
+  const mine = await handleAvailability(db, { action: "getMine" }, { WX_OPENID: "openid-provider" });
+  assert.deepEqual(publicRead.lockedDates, expected);
+  assert.deepEqual(mine.lockedDates, expected);
+  await assert.rejects(
+    () => handleAvailability(db, { action: "saveMine", expectedVersion: 0, openDates: ["2026-09-21"] }, { WX_OPENID: "openid-provider" }, Date.parse("2026-09-19T00:00:00+08:00")),
+    (error) => error.code === "LOCKED_DATE_MUTATION"
+  );
+  assert.deepEqual(db.availability, []);
+});
+
+test("excludes a midnight endpoint and includes a day with actual execution after midnight", async () => {
+  const db = mockDb();
+  for (const [endsAt, expected] of [
+    ["2026-09-21T00:00:00+08:00", ["2026-09-20"]],
+    ["2026-09-21T00:00:00.001+08:00", ["2026-09-20", "2026-09-21"]]
+  ]) {
+    db.orders[0].payload = JSON.stringify({ public: { timeSegments: [{ startsAt: Date.parse("2026-09-20T23:00:00+08:00"), endsAt: Date.parse(endsAt) }] } });
+    const read = await handleAvailability(db, { action: "getPublic", providerId: PROVIDER });
+    assert.deepEqual(read.lockedDates, expected);
+  }
+});
+
+test("handles leap days, year boundaries and separate segments without locking the gap", async () => {
+  const db = mockDb();
+  const segments = [
+    ["2028-02-28T12:00:00+08:00", "2028-03-01T08:00:00+08:00"],
+    ["2028-03-01T18:00:00+08:00", "2028-03-01T20:00:00+08:00"],
+    ["2028-12-31T12:00:00+08:00", "2029-01-01T12:00:00+08:00"]
+  ].map(([start, end]) => ({ startsAt: Date.parse(start), endsAt: Date.parse(end) }));
+  db.orders[0].payload = JSON.stringify({ public: { timeSegments: segments } });
+  db.orders.push({ ...db.orders[0], stage: "COMPLETED", payload: JSON.stringify({ public: { timeSegments: [{ startsAt: Date.parse("2028-03-02T10:00:00+08:00"), endsAt: Date.parse("2028-03-03T10:00:00+08:00") }] } }) });
+  const read = await handleAvailability(db, { action: "getPublic", providerId: PROVIDER });
+  assert.deepEqual(read.lockedDates, ["2028-02-28", "2028-02-29", "2028-03-01", "2028-12-31", "2029-01-01"]);
+});

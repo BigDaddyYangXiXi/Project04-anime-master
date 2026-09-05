@@ -189,9 +189,17 @@ Page({
     if (!this.data.priceCanSave) return;
     const serviceItems = this.data.quoteItems.map(({ id, name, displayPrice, finalPrice }) => ({ id, name, displayPrice, finalPrice }));
     confirmAction("确认锁定本次报价", `合计 ￥${this.data.price}。确认后本次报价不能再次修改。`, () => {
-      if (this.cloudMode) return this.runTransition("PROVIDER_LOCKS_QUOTE", {
-        items: serviceItems.map((item) => ({ serviceId: item.id, finalPriceFen: Math.round(item.finalPrice * 100) }))
-      });
+      if (this.cloudMode) {
+        const confirmations = {
+          timePlaceConfirmed: this.data.timePlaceConfirmed,
+          serviceScopeConfirmed: this.data.serviceScopeConfirmed,
+          ndaChoice: this.data.ndaChoice,
+          amountConfirmed: false
+        };
+        return this.runTransition("PROVIDER_LOCKS_QUOTE", {
+          items: serviceItems.map((item) => ({ serviceId: item.id, finalPriceFen: Math.round(item.finalPrice * 100) }))
+        }, () => this.setData(confirmations, () => this.refreshDerived()));
+      }
       const order = store.findOrder(this.orderId);
       if (!order || order.stage !== "CONTACTING" || order.priceEdited) return this.load();
       store.updateOrder(this.orderId, { serviceItems, finalPrice: this.data.price, priceEdited: true });
@@ -209,7 +217,12 @@ Page({
     if (!this.data.readyConfirm) return wx.showToast({ title: "请完成四项合作确认", icon: "none" });
     const ndaRequired = this.data.ndaChoice === "yes";
     confirmAction("确认结束沟通", `${ndaRequired ? "需要先完成 NDA 签署" : "无需 NDA"}；合作金额 ￥${this.data.price}。提交后进入需求方确认。`, () => {
-      if (this.cloudMode) return this.runTransition("PROVIDER_ENDS_COMMUNICATION", { ndaRequired });
+      if (this.cloudMode) return this.runTransition("PROVIDER_ENDS_COMMUNICATION", {
+        ndaRequired,
+        timePlaceConfirmed: this.data.timePlaceConfirmed,
+        serviceScopeConfirmed: this.data.serviceScopeConfirmed,
+        amountConfirmed: this.data.amountConfirmed
+      });
       const order = store.findOrder(this.orderId);
       if (!order || order.stage !== "CONTACTING") return this.load();
       store.updateOrder(this.orderId, {
@@ -238,8 +251,8 @@ Page({
     this.setData({ actionPending: true });
     try {
       const order = await cloudOrders.transitionOrder(this.orderId, this.data.order.version, event, fields);
-      if (after) after(order);
       this.renderOrder(order);
+      if (after) after(order);
       this.setData({ actionPending: false, loadError: "" });
     } catch (error) {
       this.setData({ actionPending: false, loadError: this.cloudErrorMessage(error) });
@@ -256,6 +269,7 @@ Page({
       QUOTE_OUT_OF_RANGE: "报价超出允许范围，请修正后重试。",
       QUOTE_ALREADY_LOCKED: "报价已经锁定，正在刷新最新订单。",
       CONTACT_NOT_ACCESSED: "请先获取需求方联系方式，再提交沟通结果。",
+      COOPERATION_CONFIRMATION_REQUIRED: "请逐项确认时间地点、服务内容和合作金额。",
       PROGRESS_INVALID: "执行进度只能填写 0—99；提交交付后自动变为 100%。",
       PROGRESS_UNCHANGED: "执行进度没有变化。",
       DELIVERY_FILES_REQUIRED: "请选择 1—5 个交付文件。",

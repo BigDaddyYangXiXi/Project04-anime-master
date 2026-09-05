@@ -5,6 +5,7 @@ const { decryptContact, encryptContact, handleOrder, requestHash } = require("./
 const KEY = Buffer.alloc(32, 7).toString("base64");
 const PROVIDER = "acct_provider";
 const BUYER = "acct_buyer";
+const CONFIRMATIONS = { timePlaceConfirmed: true, serviceScopeConfirmed: true, amountConfirmed: true, ndaRequired: false };
 const publication = {
   provider_id: PROVIDER,
   publication_version: 1,
@@ -254,7 +255,7 @@ test("communication failure and buyer agreement persist as explicit events", asy
     (error) => error.code === "CONTACT_NOT_ACCESSED"
   );
   await handleOrder(confirmedDb, { action: "transitionOrder", orderId: confirmedOrder.id, expectedVersion: 2, event: "PROVIDER_RECORDS_CONTACT" }, { WX_OPENID: "openid-provider" }, KEY, 2600, uuidSequence());
-  await handleOrder(confirmedDb, { action: "transitionOrder", orderId: confirmedOrder.id, expectedVersion: 3, event: "PROVIDER_ENDS_COMMUNICATION", ndaRequired: false }, { WX_OPENID: "openid-provider" }, KEY, 3000, uuidSequence());
+  await handleOrder(confirmedDb, { action: "transitionOrder", orderId: confirmedOrder.id, expectedVersion: 3, event: "PROVIDER_ENDS_COMMUNICATION", ...CONFIRMATIONS }, { WX_OPENID: "openid-provider" }, KEY, 3000, uuidSequence());
   const agreement = await handleOrder(confirmedDb, { action: "transitionOrder", orderId: confirmedOrder.id, expectedVersion: 4, event: "BUYER_CONFIRMS_AGREEMENT" }, { WX_OPENID: "openid-buyer" }, KEY, 4000, uuidSequence());
   assert.equal(agreement.stage, "BUYER_FINAL_CONFIRM");
   assert.equal(agreement.buyerAgreementConfirmedAt, 4000);
@@ -279,7 +280,7 @@ test("buyer cannot enter production before a server-verified payment", async () 
   const created = await handleOrder(db, createEvent(), { WX_OPENID: "openid-buyer" }, KEY, 1000, uuidSequence());
   const contacting = await handleOrder(db, { action: "transitionOrder", orderId: created.id, expectedVersion: 1, event: "PROVIDER_INTERESTED" }, { WX_OPENID: "openid-provider" }, KEY, 2000, uuidSequence());
   await handleOrder(db, { action: "transitionOrder", orderId: created.id, expectedVersion: 2, event: "PROVIDER_RECORDS_CONTACT" }, { WX_OPENID: "openid-provider" }, KEY, 2500, uuidSequence());
-  const confirmed = await handleOrder(db, { action: "transitionOrder", orderId: created.id, expectedVersion: 3, event: "PROVIDER_ENDS_COMMUNICATION", ndaRequired: false }, { WX_OPENID: "openid-provider" }, KEY, 3000, uuidSequence());
+  const confirmed = await handleOrder(db, { action: "transitionOrder", orderId: created.id, expectedVersion: 3, event: "PROVIDER_ENDS_COMMUNICATION", ...CONFIRMATIONS }, { WX_OPENID: "openid-provider" }, KEY, 3000, uuidSequence());
   assert.equal(confirmed.stage, "BUYER_FINAL_CONFIRM");
   await assert.rejects(
     () => handleOrder(db, { action: "transitionOrder", orderId: created.id, expectedVersion: 4, event: "BUYER_CONFIRMS_EXECUTION" }, { WX_OPENID: "openid-buyer" }, KEY, 4000, uuidSequence()),
@@ -291,6 +292,70 @@ test("buyer cannot enter production before a server-verified payment", async () 
 
 test("request hash is stable across object key order", () => {
   assert.equal(requestHash({ b: 2, a: 1 }), requestHash({ a: 1, b: 2 }));
+});
+
+test("communication requires explicit confirmations and rejects incomplete input without changing the order", async () => {
+  const db = mockDb();
+  const order = await handleOrder(db, createEvent(), { WX_OPENID: "openid-buyer" }, KEY, 1000, uuidSequence());
+  const provider = { WX_OPENID: "openid-provider" };
+  const transition = (event, expectedVersion, fields = {}) => handleOrder(db, {
+    action: "transitionOrder", orderId: order.id, expectedVersion, event, ...fields
+  }, provider, KEY, 2000, uuidSequence());
+  await transition("PROVIDER_INTERESTED", 1);
+  await transition("PROVIDER_RECORDS_CONTACT", 2);
+  const before = JSON.stringify(db.orders[0]);
+  for (const field of ["timePlaceConfirmed", "serviceScopeConfirmed", "amountConfirmed"]) {
+    for (const value of [undefined, false, "true", 1]) {
+      await assert.rejects(() => transition("PROVIDER_ENDS_COMMUNICATION", 3, { ...CONFIRMATIONS, [field]: value }),
+        (error) => error.code === "COOPERATION_CONFIRMATION_REQUIRED");
+      assert.equal(JSON.stringify(db.orders[0]), before);
+    }
+  }
+  await assert.rejects(() => transition("PROVIDER_ENDS_COMMUNICATION", 3, { ...CONFIRMATIONS, ndaRequired: undefined }),
+    (error) => error.code === "VALIDATION_ERROR");
+  const confirmed = await transition("PROVIDER_ENDS_COMMUNICATION", 3, CONFIRMATIONS);
+  assert.equal(confirmed.stage, "BUYER_FINAL_CONFIRM");
+  for (const [field, value] of Object.entries(CONFIRMATIONS)) assert.equal(confirmed[field], value);
+});
+
+test("confirmations apply to the current quote version and preserve the NDA signing stage", async () => {
+  const db = mockDb();
+  const order = await handleOrder(db, createEvent(), { WX_OPENID: "openid-buyer" }, KEY, 1000, uuidSequence());
+  const transition = (event, expectedVersion, fields = {}) => handleOrder(db, {
+    action: "transitionOrder", orderId: order.id, expectedVersion, event, ...fields
+  }, { WX_OPENID: "openid-provider" }, KEY, 2000, uuidSequence());
+  await transition("PROVIDER_INTERESTED", 1);
+  await transition("PROVIDER_RECORDS_CONTACT", 2);
+  await transition("PROVIDER_LOCKS_QUOTE", 3, { items: [{ serviceId: "service_1", finalPriceFen: 70000 }] });
+  await assert.rejects(() => transition("PROVIDER_ENDS_COMMUNICATION", 3, CONFIRMATIONS), (error) => error.code === "VERSION_CONFLICT");
+  const confirmed = await transition("PROVIDER_ENDS_COMMUNICATION", 4, { ...CONFIRMATIONS, ndaRequired: true });
+  assert.equal(confirmed.stage, "NDA_BUYER_PENDING");
+  assert.equal(confirmed.amountFen, 70000);
+  assert.equal(confirmed.ndaRequired, true);
+});
+
+test("verified payment still requires buyer agreement before execution", async () => {
+  const db = mockDb();
+  const buyer = { WX_OPENID: "openid-buyer" };
+  const provider = { WX_OPENID: "openid-provider" };
+  const order = await handleOrder(db, createEvent(), buyer, KEY, 1000, uuidSequence());
+  const transition = (event, expectedVersion, actor, fields = {}) => handleOrder(db, {
+    action: "transitionOrder", orderId: order.id, expectedVersion, event, ...fields
+  }, actor, KEY, 4000, uuidSequence());
+  await transition("PROVIDER_INTERESTED", 1, provider);
+  await transition("PROVIDER_RECORDS_CONTACT", 2, provider);
+  await transition("PROVIDER_ENDS_COMMUNICATION", 3, provider, CONFIRMATIONS);
+  // In-memory payment fixture only; this does not invoke or simulate a production payment API.
+  const payload = JSON.parse(db.orders[0].payload);
+  payload.public.paymentStatus = "PAID";
+  db.orders[0].payload = JSON.stringify(payload);
+  const before = JSON.stringify(db.orders[0]);
+  await assert.rejects(() => transition("BUYER_CONFIRMS_EXECUTION", 4, buyer), (error) => error.code === "AGREEMENT_NOT_CONFIRMED");
+  assert.equal(JSON.stringify(db.orders[0]), before);
+  await transition("BUYER_CONFIRMS_AGREEMENT", 4, buyer);
+  const executing = await transition("BUYER_CONFIRMS_EXECUTION", 5, buyer);
+  assert.equal(executing.stage, "IN_PRODUCTION");
+  await assert.rejects(() => transition("BUYER_CONFIRMS_EXECUTION", 5, buyer), (error) => error.code === "VERSION_CONFLICT");
 });
 
 test("provider progress and delivery persist before buyer revision and acceptance", async () => {

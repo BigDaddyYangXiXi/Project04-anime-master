@@ -59,7 +59,7 @@ App({
     return route;
   },
   globalData: {
-    version: "0.7.0-native.7",
+    version: "0.7.0-native.8",
     account: null,
     roles: [],
     pendingRoute: ""

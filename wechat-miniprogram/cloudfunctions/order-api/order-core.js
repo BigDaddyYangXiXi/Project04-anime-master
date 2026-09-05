@@ -390,6 +390,9 @@ async function transition(db, event, context, keyValue, now, uuid, storage) {
   if (event.event === "PROVIDER_ENDS_COMMUNICATION") {
     if (typeof event.ndaRequired !== "boolean") fail("VALIDATION_ERROR", "ndaRequired is required");
     if (!payload.public.contactFirstCopiedAt) fail("CONTACT_NOT_ACCESSED", "provider must access contact before ending communication");
+    if ([event.timePlaceConfirmed, event.serviceScopeConfirmed, event.amountConfirmed].some((value) => value !== true)) {
+      fail("COOPERATION_CONFIRMATION_REQUIRED", "time, scope and amount must be explicitly confirmed");
+    }
     payload.public.ndaRequired = event.ndaRequired;
     payload.public.communicationDone = true;
     payload.public.timePlaceConfirmed = true;
@@ -405,6 +408,7 @@ async function transition(db, event, context, keyValue, now, uuid, storage) {
     payload.public.buyerAgreementConfirmedAt = now;
   }
   if (event.event === "BUYER_CONFIRMS_EXECUTION" && payload.public.paymentStatus !== "PAID") fail("PAYMENT_NOT_VERIFIED", "payment is not verified");
+  if (event.event === "BUYER_CONFIRMS_EXECUTION" && !payload.public.buyerAgreementConfirmedAt) fail("AGREEMENT_NOT_CONFIRMED", "buyer must confirm the agreement before execution");
   if (event.event === "PROVIDER_UPDATES_PROGRESS") {
     if (!Number.isSafeInteger(event.progress) || event.progress < 0 || event.progress > 99) fail("PROGRESS_INVALID", "progress must be an integer from 0 to 99");
     if (event.progress === Number(payload.public.progress || 0)) fail("PROGRESS_UNCHANGED", "progress did not change");

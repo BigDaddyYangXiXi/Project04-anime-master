@@ -13,6 +13,14 @@ function dbVersion(value) {
   return normalized;
 }
 function chinaDate(timestamp) { return new Date(Number(timestamp) + 8 * 60 * 60 * 1000).toISOString().slice(0, 10); }
+function occupiedDates(segment) {
+  const start = Number(segment.startsAt);
+  const last = chinaDate(Math.max(start, Number(segment.endsAt == null ? start : segment.endsAt) - 1));
+  const cursor = new Date(`${chinaDate(start)}T00:00:00Z`);
+  const dates = [];
+  for (let date = cursor.toISOString().slice(0, 10); date <= last; cursor.setUTCDate(cursor.getUTCDate() + 1), date = cursor.toISOString().slice(0, 10)) dates.push(date);
+  return dates;
+}
 function normalizeDates(value, today) {
   if (!Array.isArray(value) || value.length > 366) fail("VALIDATION_ERROR", "openDates is invalid");
   const latest = new Date(`${today}T00:00:00Z`); latest.setUTCDate(latest.getUTCDate() + 366);
@@ -42,7 +50,7 @@ async function lockedDates(db, providerId) {
   const orders = rows(await db.from("order_aggregates").select("stage,payload").eq("provider_id", providerId), "read provider orders");
   return [...new Set(orders.filter((row) => LOCKED_STAGES.has(row.stage)).flatMap((row) => {
     const payload = parse(row.payload);
-    return ((payload && payload.public && payload.public.timeSegments) || []).map((segment) => chinaDate(segment.startsAt));
+    return ((payload && payload.public && payload.public.timeSegments) || []).flatMap(occupiedDates);
   }))].sort();
 }
 

@@ -194,7 +194,8 @@ Page({
       VERSION_CONFLICT: "订单状态已变化，正在刷新。",
       ILLEGAL_TRANSITION: "当前状态不能执行该操作，请刷新后重试。",
       ORDER_ROLE_FORBIDDEN: "当前身份不能执行该操作。",
-      PAYMENT_NOT_VERIFIED: "支付尚未由服务端确认，不能进入制作。"
+      PAYMENT_NOT_VERIFIED: "支付尚未由服务端确认，不能进入制作。",
+      AGREEMENT_NOT_CONFIRMED: "请先确认本次合作信息，再进入制作。"
     };
     return messages[error && error.code] || "订单请求失败，请稍后重试。";
   },
