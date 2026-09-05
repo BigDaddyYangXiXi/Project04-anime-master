@@ -5,7 +5,7 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..", "miniprogram", "pages");
 const read = (page) => fs.readFileSync(path.join(root, page, "index.js"), "utf8");
 const cloudPages = [
-  "account-profile", "booking", "booking-status", "brief", "discover", "fulfillment", "me", "me-assets",
+  "account-profile", "booking", "booking-status", "brief", "discover", "fulfillment", "funds", "me", "me-assets",
   "order-detail", "orders", "project-detail", "projects", "provider-detail", "provider-orders", "provider-profile",
   "provider-request", "provider-reviews", "provider-schedule", "provider-task", "review", "search-results", "work-detail"
 ];
@@ -15,6 +15,7 @@ for (const page of cloudPages) {
 }
 
 const legacyHome = read("provider-home");
+assert.ok(!read("funds").includes("v063-store") && read("funds").includes("cloudOrders.getProviderFunds"), "资金页必须读取本人云端付款记录，不能读取演示余额");
 const legacyCalendar = read("provider-calendar");
 assert.match(legacyHome, /options\.audit === "1"/);
 assert.match(legacyHome, /wx\.switchTab\(\{ url: "\/pages\/discover\/index" \}\)/);

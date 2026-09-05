@@ -1,4 +1,5 @@
 const crypto = require("node:crypto");
+const { readProviderFunds } = require("./funds-core");
 
 const TRANSITIONS = {
   REQUESTED: { PROVIDER_INTERESTED: ["CONTACTING", "PROVIDER"], PROVIDER_REQUESTS_SUPPLEMENT: ["SUPPLEMENT_REQUESTED", "PROVIDER"], PROVIDER_DECLINES: ["DECLINED", "PROVIDER"] },
@@ -458,6 +459,7 @@ async function handleOrder(db, event = {}, context = {}, keyValue, now = Date.no
   if (event.action === "createOrder") return createOrder(db, event, context, keyValue, now, uuid);
   if (event.action === "transitionOrder") return transition(db, event, context, keyValue, now, uuid, storage);
   const actor = await resolveActor(db, context);
+  if (event.action === "getProviderFunds") return readProviderFunds(db, actor, event);
   if (event.action === "getOrder") {
     const { row } = await readOrder(db, event.orderId, actor.accountId);
     return publicOrder(row, keyValue, actor.accountId);

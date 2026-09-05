@@ -141,6 +141,10 @@ function listOrders() {
   return call({ action: "listOrders" }).then((data) => (data.orders || []).map(toClientOrder));
 }
 
+function getProviderFunds(cursor = null) {
+  return call({ action: "getProviderFunds", cursor });
+}
+
 function transitionOrder(orderId, expectedVersion, event, fields = {}) {
   return call({ action: "transitionOrder", orderId, expectedVersion, event, ...fields }).then(toClientOrder);
 }
@@ -211,5 +215,5 @@ function idempotencyKey() {
 
 module.exports = {
   createOrder, getOrder, idempotencyKey, isAvailable, listOrders, scheduleFromSegments, toClientOrder,
-  transitionOrder, uploadDeliveryFiles
+  transitionOrder, uploadDeliveryFiles, getProviderFunds
 };

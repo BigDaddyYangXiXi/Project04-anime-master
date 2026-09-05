@@ -47,7 +47,7 @@ assert.ok(meWxml.includes("{{previewMeta}}") && !meWxml.includes("worksCount"), 
 assert.ok(profileWxml.includes("editorSection !== 'works'") && profileWxml.includes("editorSection === 'works'"), "作品与橱窗编辑必须是两个明确分区");
 assert.ok(profileWxml.includes("previewSelectedWork") && profileJs.includes("/pages/work-detail/index"), "作品编辑必须提供需求方详情预览");
 assert.ok(workJs.includes("anime-master-v063-liked-work-ids"), "我的喜欢必须来自可写入的作品行为状态");
-assert.ok(fundsJs.includes("paymentTransactionId") && fundsJs.includes("paidAt") && fundsJs.includes("paymentStatus === \"PAID\""), "资金记录必须满足三项核验门禁");
-assert.ok(!fundsJs.includes("withdrawSuccess") && fundsJs.includes("不会模拟余额"), "未接入资金能力时不得模拟提现成功");
+assert.ok(fundsJs.includes("cloudOrders.getProviderFunds") && !fundsJs.includes("v063-store"), "资金记录必须由当前服务方的云端付款事实提供");
+assert.ok(fundsJs.includes("不代表已结算") && !fundsJs.includes("withdrawSuccess"), "付款不得冒充已结算或模拟提现成功");
 ["pages/account-profile/index", "pages/me-assets/index", "pages/funds/index"].forEach((route) => assert.ok(appJson.pages.includes(route), `${route} 未注册`));
 process.stdout.write("M01 storefront contract audit passed\n");

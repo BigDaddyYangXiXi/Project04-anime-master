@@ -17,7 +17,7 @@ function entryFor(error) {
 }
 
 test("cloud entry preserves actionable cooperation and agreement rejections", async () => {
-  for (const code of ["COOPERATION_CONFIRMATION_REQUIRED", "AGREEMENT_NOT_CONFIRMED"]) {
+  for (const code of ["COOPERATION_CONFIRMATION_REQUIRED", "AGREEMENT_NOT_CONFIRMED", "PROVIDER_ROLE_REQUIRED"]) {
     const result = await entryFor({ code })({ action: "transitionOrder" }, {});
     assert.equal(result.ok, false);
     assert.equal(result.error.code, code);

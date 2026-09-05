@@ -23,13 +23,13 @@ const result = (payment, overrides = {}) => ({ tradeState: "SUCCESS", combineOut
 const code = (expected) => (error) => error.code === expected;
 async function order(id = "order_1") { const [[row]] = await pool.execute("SELECT * FROM order_aggregates WHERE id = ?", [id]); return row; }
 async function payments() { const [rows] = await pool.query("SELECT * FROM order_payments ORDER BY created_at, id"); return rows; }
-async function seedOrder(id) {
+async function seedOrder(id, providerId = "provider") {
   const payload = { public: { amountFen: 10000, paymentStatus: "UNPAID", buyerAgreementConfirmedAt: now,
     communicationDone: true, timePlaceConfirmed: true, serviceScopeConfirmed: true, amountConfirmed: true, executable: true, ndaRequired: false,
     items: [{ serviceId: "test_service", name: "TEST", finalPriceFen: 10000 }], timeSegments: [{ startsAt: now, endsAt: now + 3600000 }] },
     contactEncrypted: encryptContact({ name: "TEST", wechat: "test_only", phone: "" }, contactKey), events: [] };
-  await pool.execute("INSERT INTO order_aggregates (id,buyer_id,provider_id,request_idempotency_key,request_hash,stage,payload,created_at,updated_at) VALUES (?,'buyer','provider',?,?,'BUYER_FINAL_CONFIRM',?,?,?)",
-    [id, id, "0".repeat(64), JSON.stringify(payload), now, now]);
+  await pool.execute("INSERT INTO order_aggregates (id,buyer_id,provider_id,request_idempotency_key,request_hash,stage,payload,created_at,updated_at) VALUES (?,'buyer',?,?,?,'BUYER_FINAL_CONFIRM',?,?,?)",
+    [id, providerId, id, "0".repeat(64), JSON.stringify(payload), now, now]);
 }
 before(async () => {
   admin = await mysql.createConnection(config);
@@ -172,12 +172,22 @@ test("database rejects fake paid state with no receipt", async () => {
 // Read-only CloudBase query shape backed by the real local database, not an in-memory order fixture.
 function databaseReader() {
   return { from(table) {
-    assert.ok(["accounts", "wechat_identities", "account_roles", "order_aggregates"].includes(table));
-    const filters = [];
-    return { select() { return this; }, eq(column, value) { assert.match(column, /^[a-z_]+$/); filters.push([column, value]); return this; },
+    assert.ok(["accounts", "wechat_identities", "account_roles", "order_aggregates", "order_payments", "provider_payment_merchants"].includes(table));
+    const filters = [], values = [], sorting = [];
+    let limit = "", join = false;
+    const columnName = (column) => {
+      assert.match(column, /^(order_aggregates\.)?[a-z_]+$/);
+      return column.includes(".") ? `o.\`${column.split(".")[1]}\`` : `t.\`${column}\``;
+    };
+    return { select(fields = "") { join = fields.includes("!inner"); return this; },
+      eq(column, value) { filters.push(`${columnName(column)} = ?`); values.push(value); return this; },
+      lt(column, value) { filters.push(`${columnName(column)} < ?`); values.push(value); return this; },
+      in(column, expected) { filters.push(`${columnName(column)} IN (${expected.map(() => "?").join(",")})`); values.push(...expected); return this; },
+      order(column, options) { sorting.push(`${columnName(column)} ${options.ascending ? "ASC" : "DESC"}`); return this; },
+      limit(value) { assert.ok(Number.isInteger(value) && value > 0 && value <= 21); limit = ` LIMIT ${value}`; return this; },
       then(resolve, reject) {
-        return pool.execute(`SELECT * FROM \`${table}\` WHERE ${filters.map(([column]) => `\`${column}\` = ?`).join(" AND ")}`,
-          filters.map(([, value]) => value)).then(([data]) => ({ data, error: null })).then(resolve, reject);
+        return pool.execute(`SELECT t.*${join ? ", o.provider_id AS joined_provider_id" : ""} FROM \`${table}\` t${join ? " INNER JOIN order_aggregates o ON o.id = t.order_id" : ""} WHERE ${filters.join(" AND ")}${sorting.length ? ` ORDER BY ${sorting.join(",")}` : ""}${limit}`,
+          values).then(([data]) => ({ data: join ? data.map((row) => ({ ...row, order_aggregates: { provider_id: row.joined_provider_id } })) : data, error: null })).then(resolve, reject);
       }
     };
   } };
@@ -204,4 +214,37 @@ test("persisted review flows through server participant checks and actual buyer/
   }
   await assert.rejects(handleOrder(databaseReader(), { action: "transitionOrder", orderId: "order_1", expectedVersion: 2, event: "BUYER_CONFIRMS_EXECUTION" },
     { WX_OPENID: "test_openid" }, contactKey), code("PAYMENT_NOT_VERIFIED"));
+});
+
+test("real receipts paginate through provider-only funds API and actual funds page", async () => {
+  await pool.query("INSERT INTO accounts (id,uid,nickname,created_at,updated_at) VALUES ('other_provider','other_provider','TEST',1,1)");
+  await pool.query("INSERT INTO provider_payment_merchants VALUES ('other_provider','test_platform','test_other_sub','READY',1)");
+  await seedOrder("foreign_order", "other_provider");
+  const foreign = await reservePayment(pool, input({ orderId: "foreign_order" }), now);
+  await recordPaymentSuccess(pool, result(foreign));
+  for (let i = 0; i < 23; i++) {
+    const orderId = i === 0 ? "order_1" : `funds_order_${i}`;
+    if (i) await seedOrder(orderId);
+    const p = await reservePayment(pool, input({ orderId }), now);
+    await recordPaymentSuccess(pool, result(p, i === 22 ? { totalFen: 12000 } : {}));
+  }
+  const call = (cursor = null) => handleOrder(databaseReader(), { action: "getProviderFunds", providerId: "stranger", cursor }, { WX_OPENID: "test_provider_openid" }, contactKey);
+  const first = await call();
+  const second = await call(first.nextCursor);
+  assert.equal(first.records.length, 20); assert.equal(second.records.length, 3);
+  assert.equal(new Set([...first.records, ...second.records].map((r) => r.id)).size, 23);
+  assert.equal(second.nextCursor, null);
+  assert.equal(first.withdrawableBalanceFen, null);
+  assert.equal(JSON.stringify(first).includes("test_openid"), false);
+  assert.equal(JSON.stringify(first).includes("transaction_id"), false);
+  await assert.rejects(handleOrder(databaseReader(), { action: "getProviderFunds" }, { WX_OPENID: "test_openid" }, contactKey), code("PROVIDER_ROLE_REQUIRED"));
+  let definition;
+  global.Page = (value) => { definition = value; };
+  require("../miniprogram/pages/funds/index");
+  delete global.Page;
+  const page = { data: structuredClone(definition.data), setData(patch) { Object.assign(this.data, patch); } };
+  definition.renderResponse.call(page, first, false);
+  definition.renderResponse.call(page, second, true);
+  assert.equal(page.data.records.length, 23);
+  assert.ok(page.data.records.some((r) => r.statusText === "付款待核对"));
 });

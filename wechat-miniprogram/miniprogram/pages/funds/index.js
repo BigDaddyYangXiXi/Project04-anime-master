@@ -1,30 +1,57 @@
-const store = require("../../data/v063-store");
+const cloudOrders = require("../../services/cloud-orders");
 
 function formatCents(value) {
-  const cents = Number.isFinite(Number(value)) ? Math.max(0, Math.round(Number(value))) : 0;
-  return (cents / 100).toFixed(2);
+  return Number.isSafeInteger(value) && value >= 0 ? `${Math.floor(value / 100)}.${String(value % 100).padStart(2, "0")}` : "—";
 }
+function chinaTime(value) {
+  return new Date(value + 8 * 3600000).toISOString().slice(0, 16).replace("T", " ");
+}
+const MERCHANT_COPY = {
+  NOT_STARTED: "收款资料尚未开通，需完成资料提交与核验。",
+  PENDING: "收款资料待核验，核验结果确认后再开放收款。",
+  READY: "收款资料已核验；支付与结算能力开放情况以平台通知为准。",
+  SUSPENDED: "收款资格暂不可用，需要完成处理并重新核验。"
+};
 
 Page({
-  data: { verifiedTransactions: [], paidTotal: 0, withdrawableBalance: "0.00", entries: [
-    { key: "transactions", title: "交易记录", copy: "查看已核验的支付流水", state: "" },
-    { key: "bills", title: "账单", copy: "按订单核对收入明细", state: "" },
-    { key: "password", title: "支付密码", copy: "设置或修改支付安全验证", state: "需接入安全能力" }
-  ] },
-  onShow() {
-    const account = store.getFundsAccount();
-    const verifiedTransactions = store.getOrders().filter((order) => order.providerId === store.CURRENT_PROVIDER_ID && order.paymentStatus === "PAID" && order.paymentTransactionId && order.paidAt).map((order) => ({ id: order.id, title: order.service, amount: Number(order.finalPrice || 0), time: new Date(order.paidAt).toLocaleDateString() }));
-    const entries = this.data.entries.map((entry) => ["transactions", "bills"].includes(entry.key) ? Object.assign({}, entry, { state: `${verifiedTransactions.length} 笔` }) : entry);
-    this.setData({ verifiedTransactions, entries, paidTotal: verifiedTransactions.reduce((sum, item) => sum + item.amount, 0), withdrawableBalance: formatCents(account.withdrawableBalanceCents) });
+  data: { records: [], loading: false, loadingMore: false, loadError: "", moreError: "", loaded: false,
+    nextCursor: null, merchantCopy: "", settlementCopy: "结算功能尚未开放；付款记录不代表已结算或可提现金额。" },
+  onShow() { return this.load(); },
+  async onPullDownRefresh() { try { await this.load(); } finally { wx.stopPullDownRefresh(); } },
+  async load() {
+    const request = this.request = (this.request || 0) + 1;
+    this.setData({ loading: true, loadingMore: false, loadError: "", moreError: "", loaded: false, records: [], nextCursor: null, merchantCopy: "" });
+    try {
+      const response = await cloudOrders.getProviderFunds();
+      if (request !== this.request) return;
+      this.renderResponse(response, false);
+      this.setData({ loaded: true });
+    } catch (error) {
+      if (request === this.request) this.setData({ loadError: error.code === "PROVIDER_ROLE_REQUIRED" ? "仅服务方可查看自己的资金记录。"
+        : ["ACCOUNT_NOT_FOUND", "AUTH_CONTEXT_MISSING"].includes(error.code) ? "请先登录后查看自己的资金记录。" : "暂时无法读取资金记录，请稍后重试。" });
+    } finally { if (request === this.request) this.setData({ loading: false }); }
   },
-  openEntry(event) {
-    const key = event.currentTarget.dataset.key;
-    if (["transactions", "bills"].includes(key)) {
-      if (!this.data.verifiedTransactions.length) wx.showToast({ title: "暂无已核验流水", icon: "none" });
-      return;
-    }
-    const title = key === "withdraw" ? "提现尚未开通" : key === "recharge" ? "充值尚未开通" : "支付安全能力尚未接入";
-    wx.showModal({ title, content: "当前原型不会模拟余额、充值、提现结果或支付密码。接入真实资金账户与安全组件后，此入口将承载对应能力。", showCancel: false });
+  async loadMore() {
+    if (!this.data.nextCursor || this.data.loading || this.data.loadingMore) return;
+    const request = this.request;
+    this.setData({ loadingMore: true, moreError: "" });
+    try {
+      const response = await cloudOrders.getProviderFunds(this.data.nextCursor);
+      if (request === this.request) this.renderResponse(response, true);
+    } catch {
+      if (request === this.request) this.setData({ moreError: "更多记录读取失败，已显示的记录仍保留。" });
+    } finally { if (request === this.request) this.setData({ loadingMore: false }); }
+  },
+  renderResponse(response, append) {
+    const records = response.records.map((record) => ({ ...record, amountText: record.currency === "CNY" ? `￥${formatCents(record.totalFen)}` : "金额待核对",
+      timeText: chinaTime(record.paidAt), statusText: record.status === "PAID" ? "付款已确认" : "付款待核对",
+      needsReview: record.status === "PAID_REQUIRES_REVIEW" }));
+    this.setData({ records: append ? [...new Map([...this.data.records, ...records].map((row) => [row.id, row])).values()] : records,
+      nextCursor: response.nextCursor, merchantCopy: MERCHANT_COPY[response.merchantStatus] || "收款资料状态暂不可用，请刷新重试。" });
+  },
+  openOrder(event) {
+    const record = this.data.records.find((row) => row.id === event.currentTarget.dataset.id);
+    if (record) wx.navigateTo({ url: `/pages/provider-request/index?id=${encodeURIComponent(record.orderId)}` });
   }
 });
 
