@@ -7,6 +7,7 @@ node_modules/
 .tmp-ui-audit/
 audit-output/
 .cloudbase-cli-config/
+.github-cli-config/
 .codex/
 .agents/
 dist/
