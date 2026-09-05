@@ -1,6 +1,7 @@
 <app-top-nav class="app-navigation" title="预约请求" workspace="provider" show-back="{{true}}"/>
 <view wx:if="{{loading}}" class="empty-state"><text>正在读取订单</text><text>请稍候，不会重复执行任何操作。</text></view>
 <view class="request-shell" wx:elif="{{order}}">
+  <view wx:if="{{order.paymentStatus === 'PAYMENT_REVIEW'}}" class="content-card nda-card"><text>付款待核对</text><text>已收到付款记录，金额或订单状态需要核对。请勿要求需求方重复付款；本状态不代表已向你结算。</text></view>
   <block wx:if="{{isRequest}}">
     <view class="page-intro evaluation-intro"><text class="status-dot">待你评估</text><text class="page-title">是否愿意开始沟通？</text><text class="page-copy">需求方正在等待你的判断；确认有意向后才会向你展示联系方式。</text></view>
     <view class="content-card request-summary">
@@ -51,7 +52,7 @@
   </block>
 
   <block wx:elif="{{isWaitingBuyerConfirm}}">
-    <view class="content-card nda-card"><text>合作条件已提交</text><text>需求方正在核对双方信息并完成支付。支付经服务端确认后，订单才会进入执行制作。</text></view>
+    <view wx:if="{{order.paymentStatus !== 'PAYMENT_REVIEW'}}" class="content-card nda-card"><text>{{order.paymentStatus === 'PAID' ? '付款已确认' : '合作条件已提交'}}</text><text>{{order.paymentStatus === 'PAID' ? '付款记录已确认，等待订单进入执行；验收后再按结算结果更新款项状态。' : order.paymentStatus === 'VERIFYING' ? '支付结果确认中，请稍后重新进入本页查看；请勿要求需求方重复付款。' : '需求方正在核对双方信息并完成支付。支付确认后，订单才会进入执行制作。'}}</text></view>
   </block>
 
   <block wx:elif="{{isProduction}}">

@@ -131,7 +131,8 @@ Page({
       agreementConfirmed, paymentStatus: order.paymentStatus || "UNPAID", totalPrice,
       buyerIdentity: presentation.buyerIdentity(order), providerIdentity: presentation.providerIdentity(order), schedule,
       paymentHint: order.paymentStatus === "PAID" ? "付款已确认，等待订单进入履约"
-        : order.paymentStatus === "VERIFYING" ? "支付结果确认中，请稍后下拉刷新" : "确认合作信息后可继续付款"
+        : order.paymentStatus === "PAYMENT_REVIEW" ? "已收到付款记录，金额或订单状态需要核对，请勿重复付款"
+          : order.paymentStatus === "VERIFYING" ? "支付结果确认中，请稍后下拉刷新" : "确认合作信息后可继续付款"
     });
   },
 
@@ -160,7 +161,7 @@ Page({
     });
   },
   startPayment() {
-    if (this.auditStage || !this.data.agreementConfirmed || this.data.paying || this.data.paymentStatus === "VERIFYING") return;
+    if (this.auditStage || !this.data.agreementConfirmed || this.data.paying || ["PAID", "VERIFYING", "PAYMENT_REVIEW"].includes(this.data.paymentStatus)) return;
     if (this.cloudMode) return this.startCloudPayment();
     this.setData({ paying: true });
     paymentGateway.requestOrderPayment(this.data.order).then(() => {
@@ -196,7 +197,7 @@ Page({
       cashierReturned = true;
       const latest = await cloudOrders.getOrder(this.orderId);
       this.renderOrder(latest);
-      if (latest.paymentStatus !== "PAID" && latest.paymentStatus !== "VERIFYING") {
+      if (!["PAID", "VERIFYING", "PAYMENT_REVIEW"].includes(latest.paymentStatus)) {
         this.setData({ paymentHint: paymentError && paymentError.code === "PAYMENT_CANCELLED"
           ? "已退出收银台；尚未确认付款，可下拉刷新核对"
           : "尚未确认付款结果，请稍后下拉刷新核对" });

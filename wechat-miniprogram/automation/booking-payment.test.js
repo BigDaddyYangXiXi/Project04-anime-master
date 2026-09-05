@@ -104,3 +104,19 @@ test("repeated clicks share one in-flight payment attempt", async (t) => {
   await first;
   assert.equal(page.data.paying, false);
 });
+
+test("payment review prevents another cashier attempt and survives late cashier errors", async (t) => {
+  prohibitLocalWrites(t);
+  const page = pageFor(order({ paymentStatus: "PAYMENT_REVIEW" }));
+  const pay = t.mock.method(gateway, "requestOrderPayment", async () => { throw { code: "PAYMENT_CANCELLED" }; });
+  let reads = 0;
+  t.mock.method(cloudOrders, "getOrder", async () => order({ paymentStatus: ++reads === 1 ? "UNPAID" : "PAYMENT_REVIEW" }));
+  await page.startPayment();
+  assert.equal(pay.mock.callCount(), 0);
+  assert.equal(reads, 0);
+  assert.match(page.data.paymentHint, /请勿重复付款/);
+  page.renderOrder(order());
+  await page.startPayment();
+  assert.equal(page.data.paymentStatus, "PAYMENT_REVIEW");
+  assert.match(page.data.paymentHint, /需要核对/);
+});
