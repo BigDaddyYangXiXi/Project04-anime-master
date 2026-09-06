@@ -6,6 +6,9 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const mysql = require("../cloudfunctions/payment-api/node_modules/mysql2/promise");
 const { reservePayment, recordPaymentSuccess, recordPaymentClosed } = require("../cloudfunctions/payment-api/payment-store");
+const { acceptPaymentNotification, acceptSuccessfulQuery } = require("../cloudfunctions/payment-api/payment-notifications");
+const { createNotificationFixture } = require("../cloudfunctions/payment-api/test-notification-fixture");
+const notificationFixture = createNotificationFixture();
 const { handleOrder, encryptContact } = require("../cloudfunctions/order-api/order-core");
 const { toClientOrder } = require("../miniprogram/services/cloud-orders");
 const contactKey = Buffer.alloc(32, 17).toString("base64");
@@ -192,9 +195,14 @@ function databaseReader() {
     };
   } };
 }
-test("persisted review flows through server participant checks and actual buyer/provider pages", async () => {
+test("verified encrypted notification reaches database and actual buyer/provider payment states", async () => {
   const p = await reservePayment(pool, input(), now);
-  await recordPaymentSuccess(pool, result(p, { totalFen: 12000 }));
+  const request = notificationFixture.notify(notificationFixture.transaction(result(p, { totalFen: 12000 })), now + 200);
+  assert.equal((await acceptPaymentNotification(pool, request, notificationFixture.config, now + 200)).statusCode, 204);
+  await seedOrder("order_2");
+  const normal = await reservePayment(pool, input({ orderId: "order_2" }), now);
+  const normalRequest = notificationFixture.notify(notificationFixture.transaction(result(normal)), now + 200);
+  await acceptPaymentNotification(pool, normalRequest, notificationFixture.config, now + 200);
   for (const [openId, role, pageName] of [["test_openid", "BUYER", "booking-status"], ["test_provider_openid", "PROVIDER", "provider-request"]]) {
     const response = await handleOrder(databaseReader(), { action: "getOrder", orderId: "order_1" }, { WX_OPENID: openId }, contactKey);
     assert.equal(response.viewerRole, role);
@@ -211,9 +219,44 @@ test("persisted review flows through server participant checks and actual buyer/
     assert.equal(page.data.order.paymentStatus, "PAYMENT_REVIEW");
     if (role === "BUYER") assert.match(page.data.paymentHint, /请勿重复付款/);
     else assert.equal(page.data.isWaitingBuyerConfirm, true);
+    const paidOrder = await handleOrder(databaseReader(), { action: "getOrder", orderId: "order_2" }, { WX_OPENID: openId }, contactKey);
+    page.renderOrder(toClientOrder(paidOrder));
+    assert.equal(page.data.order.paymentStatus, "PAID");
+    if (role === "BUYER") { assert.match(page.data.paymentHint, /付款已确认/); await page.startPayment(); }
   }
   await assert.rejects(handleOrder(databaseReader(), { action: "transitionOrder", orderId: "order_1", expectedVersion: 2, event: "BUYER_CONFIRMS_EXECUTION" },
     { WX_OPENID: "test_openid" }, contactKey), code("PAYMENT_NOT_VERIFIED"));
+});
+
+test("20 signed notification retries acknowledge only one committed receipt", async () => {
+  const p = await reservePayment(pool, input(), now);
+  const request = notificationFixture.notify(notificationFixture.transaction(result(p)), now + 200);
+  const responses = await Promise.all(Array.from({ length: 20 }, () => acceptPaymentNotification(pool, request, notificationFixture.config, now + 200)));
+  assert.ok(responses.every((response) => response.statusCode === 204 && response.body === ""));
+  assert.equal((await order()).version, 2);
+  assert.equal((await order()).payload.events.length, 1);
+});
+
+test("invalid signature never writes, failed commit path can recover from a signed query", async () => {
+  const p = await reservePayment(pool, input(), now);
+  const transaction = notificationFixture.transaction(result(p));
+  const request = notificationFixture.notify(transaction, now + 200);
+  await assert.rejects(acceptPaymentNotification(pool, { ...request, body: Buffer.concat([request.body, Buffer.from(" ")]) }, notificationFixture.config, now + 200), code("PAYMENT_SIGNATURE_INVALID"));
+  await assert.rejects(acceptPaymentNotification(faultyPool("write"), request, notificationFixture.config, now + 200), /injected order write failure/);
+  assert.equal((await payments())[0].transaction_id, null);
+  assert.equal((await order()).version, 1);
+  const query = notificationFixture.sign(JSON.stringify(transaction), now + 200);
+  assert.equal((await acceptSuccessfulQuery(pool, query, notificationFixture.config, p.id, now + 200)).status, "PAID");
+  assert.equal((await acceptPaymentNotification(pool, request, notificationFixture.config, now + 200)).statusCode, 204);
+  assert.equal((await order()).payload.events.length, 1);
+});
+
+test("notification commit acknowledgement loss is not falsely acknowledged and retry is safe", async () => {
+  const p = await reservePayment(pool, input(), now);
+  const request = notificationFixture.notify(notificationFixture.transaction(result(p)), now + 200);
+  await assert.rejects(acceptPaymentNotification(faultyPool("ack"), request, notificationFixture.config, now + 200), /acknowledgement loss/);
+  assert.equal((await acceptPaymentNotification(pool, request, notificationFixture.config, now + 200)).statusCode, 204);
+  assert.equal((await order()).version, 2);
 });
 
 test("real receipts paginate through provider-only funds API and actual funds page", async () => {
