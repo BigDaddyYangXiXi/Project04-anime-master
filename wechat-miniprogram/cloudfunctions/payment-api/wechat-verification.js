@@ -68,7 +68,7 @@ function decryptNotification(rawBody, headers, config, now = Date.now()) {
   return { notificationId: envelope.id, transaction: parse(plaintext) };
 }
 
-function normalizeCombineSuccess(transaction) {
+function normalizeCombineSuccess(transaction, allowMissingPayer = false) {
   const data = object(transaction);
   if (!Array.isArray(data.sub_orders) || data.sub_orders.length !== 1) fail("PAYMENT_SUBORDERS_UNSUPPORTED");
   const sub = object(data.sub_orders[0]), amount = object(sub.amount);
@@ -84,9 +84,11 @@ function normalizeCombineSuccess(transaction) {
   const zone = sub.success_time.slice(-6);
   const offset = sub.success_time.endsWith("Z") ? 0 : (zone[0] === "+" ? 1 : -1) * (Number(zone.slice(1, 3)) * 60 + Number(zone.slice(4)));
   if (new Date(paidAt + offset * 60000).toISOString().slice(0, 19) !== sub.success_time.slice(0, 19)) fail("PAYMENT_MESSAGE_INVALID");
+  const payer = data.combine_payer_info === undefined ? undefined : object(data.combine_payer_info).openid;
+  if (payer === undefined && !allowMissingPayer) fail("PAYMENT_MESSAGE_INVALID");
   return { tradeState: "SUCCESS", combineOutTradeNo: token(data.combine_out_trade_no, 32), outTradeNo: token(sub.out_trade_no, 32),
     appid: token(data.combine_appid, 32), platformMchid: token(data.combine_mchid, 32), subMchid: token(sub.sub_mchid, 32),
-    payerOpenid: token(object(data.combine_payer_info).openid), transactionId: token(sub.transaction_id, 64),
+    ...(payer === undefined ? {} : { payerOpenid: token(payer) }), payerVerification: payer === undefined ? "MISSING" : "MATCHED", transactionId: token(sub.transaction_id, 64),
     totalFen: amount.total_amount, payerPaidFen: amount.payer_amount, currency: amount.currency, paidAt };
 }
 
@@ -94,7 +96,7 @@ function normalizeCombineQuery(transaction) {
   const data = object(transaction);
   if (!Array.isArray(data.sub_orders) || data.sub_orders.length !== 1) fail("PAYMENT_SUBORDERS_UNSUPPORTED");
   const sub = object(data.sub_orders[0]);
-  if (sub.trade_state === "SUCCESS") return normalizeCombineSuccess(data);
+  if (sub.trade_state === "SUCCESS") return normalizeCombineSuccess(data, true);
   if (!["NOTPAY", "CLOSED", "PAYERROR"].includes(sub.trade_state)) fail("PAYMENT_EVENT_UNSUPPORTED");
   if (sub.mchid !== data.combine_mchid || sub.trade_type !== undefined && sub.trade_type !== "JSAPI") fail("PAYMENT_MESSAGE_INVALID");
   // Unpaid query results may omit the payer. Never substitute the expected OpenID for a missing channel fact.

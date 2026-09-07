@@ -1,7 +1,7 @@
 {
   "appid": "wx57412ad07a806b70",
   "compileType": "miniprogram",
-  "projectname": "anime-master-v0.7.0-native.11",
+  "projectname": "anime-master-v0.7.0-native.12",
   "description": "动漫高手 0.7 微信小程序工程",
   "miniprogramRoot": "miniprogram/",
   "cloudfunctionRoot": "cloudfunctions/",

@@ -5,7 +5,7 @@ const { acceptPaymentNotification, acceptPaymentQuery } = require("./payment-not
 const { createNotificationFixture } = require("./test-notification-fixture");
 const fixture = createNotificationFixture(), now = 1788616800000;
 const payment = { tradeState: "SUCCESS", combineOutTradeNo: "a".repeat(32), outTradeNo: "a".repeat(32), appid: "test_app", platformMchid: "test_platform",
-  subMchid: "test_sub", payerOpenid: "test_openid", transactionId: "test_transaction", totalFen: 10000, payerPaidFen: 9800, currency: "CNY", paidAt: now - 1234 };
+  subMchid: "test_sub", payerOpenid: "test_openid", payerVerification: "MATCHED", transactionId: "test_transaction", totalFen: 10000, payerPaidFen: 9800, currency: "CNY", paidAt: now - 1234 };
 const code = (expected) => (error) => error.code === expected;
 
 test("unpaid query preserves absent payer and permits absent trade type without inventing receipt fields", () => {
@@ -24,9 +24,11 @@ test("unpaid query preserves absent payer and permits absent trade type without 
   }
 });
 
-test("optional payer is limited to unpaid query states and never relaxes a success notification", () => {
+test("query may mark payer missing while a success notification still requires the payer", () => {
   const data = fixture.transaction(payment); delete data.combine_payer_info;
-  assert.throws(() => normalizeCombineQuery(data), code("PAYMENT_MESSAGE_INVALID"));
+  assert.equal(normalizeCombineQuery(data).payerVerification, "MISSING");
+  assert.equal(Object.hasOwn(normalizeCombineQuery(data), "payerOpenid"), false);
+  assert.throws(() => normalizeCombineSuccess(data), code("PAYMENT_MESSAGE_INVALID"));
   data.sub_orders[0].trade_state = "CLOSED"; data.sub_orders[0].trade_type = "NATIVE";
   assert.throws(() => normalizeCombineQuery(data), code("PAYMENT_MESSAGE_INVALID"));
   delete data.sub_orders[0].trade_type; delete data.sub_orders[0].sub_mchid;

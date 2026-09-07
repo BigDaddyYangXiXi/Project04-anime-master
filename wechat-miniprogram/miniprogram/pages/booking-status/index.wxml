@@ -1,7 +1,7 @@
 <app-top-nav class="app-navigation" title="预约状态" show-back="{{true}}"/>
 <view wx:if="{{loading}}" class="empty-page"><text class="empty-page-title">正在读取预约状态</text><text class="empty-page-copy">请稍候，不会重复提交任何操作。</text></view>
 <view wx:elif="{{order}}" class="status-shell">
-  <view wx:if="{{order.paymentStatus === 'PAYMENT_REVIEW' && !isStepThree}}" class="waiting-panel"><text>付款待核对</text><text>已收到付款记录，金额或订单状态需要核对，请勿重复付款。</text></view>
+  <view wx:if="{{order.paymentStatus === 'PAYMENT_REVIEW' && !isStepThree}}" class="waiting-panel"><text>付款待核对</text><text>已收到付款记录，付款信息或订单状态需要核对，请勿重复付款。</text></view>
   <view class="page-intro">
     <text class="status-dot {{isStepFour ? 'ready' : ''}}">{{statusTitle}}</text>
     <text class="intro-title">{{order.service}}</text>

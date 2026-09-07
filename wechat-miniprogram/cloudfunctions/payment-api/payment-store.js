@@ -88,9 +88,11 @@ async function reservePayment(pool, input, now = Date.now(), randomId = () => cr
 }
 
 function validateBinding(payment, result) {
+  const missingPayerAllowed = ["NOTPAY", "CLOSED", "PAYERROR"].includes(result.tradeState)
+    || result.tradeState === "SUCCESS" && result.payerVerification === "MISSING";
   if (result.combineOutTradeNo !== payment.id || result.outTradeNo !== payment.id || result.appid !== payment.appid
     || result.platformMchid !== payment.platform_mchid || result.subMchid !== payment.sub_mchid
-    || (result.payerOpenid !== undefined || !["NOTPAY", "CLOSED", "PAYERROR"].includes(result.tradeState))
+    || (result.payerOpenid !== undefined || !missingPayerAllowed)
       && result.payerOpenid !== payment.payer_openid) fail("PAYMENT_RESULT_MISMATCH");
 }
 
@@ -110,6 +112,8 @@ async function withPayment(pool, result, work) {
 // Only invoke with a normalized, cryptographically verified SUCCESS from WeChat, never a client event.
 async function recordPaymentSuccess(pool, result, now = Date.now()) {
   if (result.tradeState !== "SUCCESS") fail("PAYMENT_RESULT_INVALID");
+  if (!["MATCHED", "MISSING"].includes(result.payerVerification)
+    || (result.payerVerification === "MISSING") !== (result.payerOpenid === undefined)) fail("PAYMENT_RESULT_INVALID");
   const transactionId = token(result.transactionId, 64);
   const total = cents(result.totalFen), paid = cents(result.payerPaidFen, 0), paidAt = cents(result.paidAt);
   if (paid > total || !/^[A-Z]{3}$/.test(result.currency)) fail("PAYMENT_RESULT_INVALID");
@@ -126,11 +130,12 @@ async function recordPaymentSuccess(pool, result, now = Date.now()) {
       : payment.status === "CLOSED" ? "SUCCESS_AFTER_CLOSE"
         : otherReceipts.length ? "OTHER_PAYMENT_RECEIVED"
           : p.paymentStatus === "PAID" ? "ORDER_ALREADY_PAID"
-          : !agreementReady(order) || agreementHash(order) !== payment.agreement_hash ? "AGREEMENT_OR_STAGE_CHANGED" : null;
+          : !agreementReady(order) || agreementHash(order) !== payment.agreement_hash ? "AGREEMENT_OR_STAGE_CHANGED"
+            : result.payerVerification === "MISSING" ? "PAYER_NOT_RETURNED" : null;
     const status = reason ? "PAID_REQUIRES_REVIEW" : "PAID";
     await connection.execute(`UPDATE order_payments SET status = ?, transaction_id = ?, received_total_fen = ?,
-      payer_paid_fen = ?, received_currency = ?, paid_at = ?, review_reason = ?, updated_at = ? WHERE id = ?`,
-    [status, transactionId, total, paid, result.currency, paidAt, reason, now, payment.id]);
+      payer_paid_fen = ?, received_currency = ?, paid_at = ?, review_reason = ?, payer_verification = ?, updated_at = ? WHERE id = ?`,
+    [status, transactionId, total, paid, result.currency, paidAt, reason, result.payerVerification, now, payment.id]);
     if (!reason) {
       p.paymentStatus = "PAID";
       p.paymentTransactionId = transactionId;

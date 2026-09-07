@@ -24,7 +24,7 @@ const now = 1788600000000;
 const input = (overrides = {}) => ({ orderId: "order_1", buyerId: "buyer", requestKey: "request_0000000001", expectedVersion: 1,
   appid: "test_app", platformMchid: "test_platform", payerOpenid: "test_openid", fee: { version: "TEST_ONLY", amountFen: 100 }, ...overrides });
 const result = (payment, overrides = {}) => ({ tradeState: "SUCCESS", combineOutTradeNo: payment.id, outTradeNo: payment.id,
-  appid: payment.appid, platformMchid: payment.platform_mchid, subMchid: payment.sub_mchid, payerOpenid: payment.payer_openid,
+  appid: payment.appid, platformMchid: payment.platform_mchid, subMchid: payment.sub_mchid, payerOpenid: payment.payer_openid, payerVerification: "MATCHED",
   transactionId: `wx_${payment.id}`, totalFen: 10000, payerPaidFen: 9800, currency: "CNY", paidAt: now + 100, ...overrides });
 const code = (expected) => (error) => error.code === expected;
 function queryResult(p, tradeState) {
@@ -47,9 +47,17 @@ before(async () => {
   pool = mysql.createPool({ ...config, database, connectionLimit: 12 });
   const folder = path.join(__dirname, "../database/mysql");
   for (const file of fs.readdirSync(folder).filter((name) => /^\d{4}.*\.sql$/.test(name)).sort()) {
+    if (file === "0019_payment_payer_verification.sql") {
+      await pool.query("INSERT INTO accounts (id,uid,nickname,created_at,updated_at) VALUES ('buyer','buyer','TEST',1,1),('provider','provider','TEST',1,1)");
+      await seedOrder("migration_order");
+      await pool.query(`INSERT INTO order_payments
+        (id,order_id,request_key,order_version,agreement_hash,appid,platform_mchid,sub_mchid,payer_openid,amount_fen,fee_rule_version,platform_fee_fen,status,transaction_id,received_total_fen,payer_paid_fen,received_currency,paid_at,created_at,updated_at)
+        VALUES ('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','migration_order','migration_request',1,REPEAT('0',64),'test_app','test_platform','test_sub','test_openid',10000,'TEST_ONLY',100,'PAID','legacy_verified_transaction',10000,9800,'CNY',1,1,1)`);
+    }
     for (const sql of fs.readFileSync(path.join(folder, file), "utf8").split(";").filter((s) => s.trim())) await pool.query(sql);
   }
-  await pool.query("INSERT INTO accounts (id,uid,nickname,created_at,updated_at) VALUES ('buyer','buyer','TEST',1,1),('provider','provider','TEST',1,1)");
+  const [[migrated]] = await pool.query("SELECT payer_verification FROM order_payments WHERE transaction_id = 'legacy_verified_transaction'");
+  assert.equal(migrated.payer_verification, "MATCHED");
   await pool.query("INSERT INTO wechat_identities (account_id,open_id,created_at,updated_at) VALUES ('buyer','test_openid',1,1),('provider','test_provider_openid',1,1)");
   await pool.query("INSERT INTO account_roles VALUES ('buyer','BUYER',1),('provider','PROVIDER',1)");
 });
@@ -215,6 +223,11 @@ test("verified notification and outgoing query reach database and actual buyer/p
   const closed = await reservePayment(pool, input({ orderId: "order_3", platformMchid: queryFixture.config.platformMchid }), now);
   await pool.query("UPDATE order_aggregates SET payload = JSON_SET(payload, '$.public.paymentStatus', 'VERIFYING') WHERE id = 'order_3'");
   await queryPayment(pool, closed.id, queryFixture.config, queryFixture.requestFor(queryResult(closed, "CLOSED")), () => now + 200);
+  await seedOrder("order_4");
+  const missing = await reservePayment(pool, input({ orderId: "order_4", platformMchid: queryFixture.config.platformMchid }), now);
+  const missingData = notificationFixture.transaction(result(missing)); delete missingData.combine_payer_info;
+  const missingResponse = notificationFixture.sign(JSON.stringify(missingData), now + 200);
+  await queryPayment(pool, missing.id, queryFixture.config, queryFixture.requestFor(missingResponse), () => now + 200);
   for (const [openId, role, pageName] of [["test_openid", "BUYER", "booking-status"], ["test_provider_openid", "PROVIDER", "provider-request"]]) {
     const response = await handleOrder(databaseReader(), { action: "getOrder", orderId: "order_1" }, { WX_OPENID: openId }, contactKey);
     assert.equal(response.viewerRole, role);
@@ -231,6 +244,10 @@ test("verified notification and outgoing query reach database and actual buyer/p
     assert.equal(page.data.order.paymentStatus, "PAYMENT_REVIEW");
     if (role === "BUYER") assert.match(page.data.paymentHint, /请勿重复付款/);
     else assert.equal(page.data.isWaitingBuyerConfirm, true);
+    const missingOrder = await handleOrder(databaseReader(), { action: "getOrder", orderId: "order_4" }, { WX_OPENID: openId }, contactKey);
+    page.renderOrder(toClientOrder(missingOrder));
+    assert.equal(page.data.order.paymentStatus, "PAYMENT_REVIEW");
+    if (role === "BUYER") { assert.match(page.data.paymentHint, /付款信息或订单状态需要核对/); await page.startPayment(); }
     const paidOrder = await handleOrder(databaseReader(), { action: "getOrder", orderId: "order_2" }, { WX_OPENID: openId }, contactKey);
     page.renderOrder(toClientOrder(paidOrder));
     assert.equal(page.data.order.paymentStatus, "PAID");
@@ -243,6 +260,47 @@ test("verified notification and outgoing query reach database and actual buyer/p
   }
   await assert.rejects(handleOrder(databaseReader(), { action: "transitionOrder", orderId: "order_1", expectedVersion: 2, event: "BUYER_CONFIRMS_EXECUTION" },
     { WX_OPENID: "test_openid" }, contactKey), code("PAYMENT_NOT_VERIFIED"));
+  await assert.rejects(handleOrder(databaseReader(), { action: "transitionOrder", orderId: "order_4", expectedVersion: 2, event: "BUYER_CONFIRMS_EXECUTION" },
+    { WX_OPENID: "test_openid" }, contactKey), code("PAYMENT_NOT_VERIFIED"));
+});
+
+test("query missing payer preserves money for review once without inventing identity or auto-releasing review", async () => {
+  const p = await reservePayment(pool, input(), now);
+  const data = notificationFixture.transaction(result(p)); delete data.combine_payer_info;
+  const response = notificationFixture.sign(JSON.stringify(data), now + 200);
+  await assert.rejects(acceptPaymentQuery(faultyPool("write"), response, notificationFixture.config, p.id, now + 200), /injected order write failure/);
+  assert.equal((await payments())[0].payer_verification, null);
+  const read = () => acceptPaymentQuery(pool, response, notificationFixture.config, p.id, now + 200);
+  const outcomes = await Promise.all(Array.from({ length: 10 }, read));
+  assert.equal(outcomes.filter((item) => !item.duplicate).length, 1);
+  const saved = (await payments())[0];
+  assert.equal(saved.payer_verification, "MISSING");
+  assert.equal(saved.payer_openid, "test_openid"); // Original reservation remains expected identity, never a claimed returned payer.
+  assert.equal(saved.review_reason, "PAYER_NOT_RETURNED");
+  assert.equal(Number(saved.received_total_fen), 10000);
+  assert.equal(Number(saved.payer_paid_fen), 9800);
+  assert.equal(saved.status, "PAID_REQUIRES_REVIEW");
+  await acceptPaymentNotification(pool, notificationFixture.notify(notificationFixture.transaction(result(p)), now + 300), notificationFixture.config, now + 300);
+  assert.equal((await order()).version, 2);
+  assert.equal((await order()).payload.public.paymentStatus, "PAYMENT_REVIEW");
+  assert.equal((await payments())[0].payer_verification, "MISSING");
+  const funds = await handleOrder(databaseReader(), { action: "getProviderFunds" }, { WX_OPENID: "test_provider_openid" }, contactKey);
+  assert.equal(funds.records[0].status, "PAID_REQUIRES_REVIEW");
+  assert.equal(JSON.stringify(funds).includes("test_openid"), false);
+});
+
+test("later missing-payer query cannot downgrade paid receipt and missing identity cannot be marked verified", async () => {
+  const p = await reservePayment(pool, input(), now);
+  await recordPaymentSuccess(pool, result(p), now + 200);
+  const data = notificationFixture.transaction(result(p)); delete data.combine_payer_info;
+  await acceptPaymentQuery(pool, notificationFixture.sign(JSON.stringify(data), now + 200), notificationFixture.config, p.id, now + 200);
+  assert.equal((await payments())[0].payer_verification, "MATCHED");
+  assert.equal((await payments())[0].status, "PAID");
+  await assert.rejects(pool.query("UPDATE order_payments SET payer_verification = 'MISSING'"), code("ER_CHECK_CONSTRAINT_VIOLATED"));
+  await assert.rejects(pool.query("UPDATE order_payments SET payer_verification = NULL"), code("ER_CHECK_CONSTRAINT_VIOLATED"));
+  await assert.rejects(recordPaymentSuccess(pool, result(p, { payerOpenid: undefined }), now + 200), code("PAYMENT_RESULT_INVALID"));
+  const wrong = notificationFixture.transaction(result(p, { payerOpenid: "wrong" }));
+  await assert.rejects(acceptPaymentQuery(pool, notificationFixture.sign(JSON.stringify(wrong), now + 200), notificationFixture.config, p.id, now + 200), code("PAYMENT_RESULT_MISMATCH"));
 });
 
 test("unpaid observations never downgrade a received payment and present payer must match", async () => {
