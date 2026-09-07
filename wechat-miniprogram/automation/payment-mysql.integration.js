@@ -4,9 +4,11 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const http = require("node:http");
 const mysql = require("../cloudfunctions/payment-api/node_modules/mysql2/promise");
 const { reservePayment, recordPaymentSuccess, recordPaymentClosed } = require("../cloudfunctions/payment-api/payment-store");
 const { acceptPaymentNotification, acceptPaymentQuery } = require("../cloudfunctions/payment-api/payment-notifications");
+const { handlePaymentHttp } = require("../cloudfunctions/payment-api/payment-http");
 const { createNotificationFixture } = require("../cloudfunctions/payment-api/test-notification-fixture");
 const { queryPayment } = require("../cloudfunctions/payment-api/wechat-query");
 const { createQueryFixture } = require("../cloudfunctions/payment-api/test-query-fixture");
@@ -30,6 +32,19 @@ const code = (expected) => (error) => error.code === expected;
 function queryResult(p, tradeState) {
   return notificationFixture.sign(JSON.stringify({ combine_appid: p.appid, combine_mchid: p.platform_mchid, combine_out_trade_no: p.id,
     sub_orders: [{ mchid: p.platform_mchid, sub_mchid: p.sub_mchid, out_trade_no: p.id, trade_state: tradeState }] }), now + 200);
+}
+async function withNotificationHttp(connectionPool, work) {
+  // Local bridge exercises real HTTP status/body delivery. It is not evidence of CloudBase gateway behavior.
+  const server = http.createServer(async (request, response) => {
+    const chunks = [];
+    for await (const chunk of request) chunks.push(chunk);
+    const event = { httpMethod: request.method, headers: request.headers, isBase64Encoded: true, body: Buffer.concat(chunks).toString("base64") };
+    const result = await handlePaymentHttp(connectionPool, event, notificationFixture.config, now + 200, () => {});
+    response.writeHead(result.statusCode, result.headers); response.end(result.body);
+  });
+  await new Promise((resolve, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolve); });
+  try { return await work(`http://127.0.0.1:${server.address().port}/payment-notify`); }
+  finally { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); }
 }
 async function order(id = "order_1") { const [[row]] = await pool.execute("SELECT * FROM order_aggregates WHERE id = ?", [id]); return row; }
 async function payments() { const [rows] = await pool.query("SELECT * FROM order_payments ORDER BY created_at, id"); return rows; }
@@ -213,7 +228,10 @@ function databaseReader() {
 test("verified notification and outgoing query reach database and actual buyer/provider payment states", async () => {
   const p = await reservePayment(pool, input(), now);
   const request = notificationFixture.notify(notificationFixture.transaction(result(p, { totalFen: 12000 })), now + 200);
-  assert.equal((await acceptPaymentNotification(pool, request, notificationFixture.config, now + 200)).statusCode, 204);
+  await withNotificationHttp(pool, async (url) => {
+    const response = await fetch(url, { method: "POST", headers: request.headers, body: request.body });
+    assert.equal(response.status, 204); assert.equal(await response.text(), "");
+  });
   await seedOrder("order_2");
   await pool.execute("UPDATE provider_payment_merchants SET platform_mchid = ? WHERE provider_id = 'provider'", [queryFixture.config.platformMchid]);
   const normal = await reservePayment(pool, input({ orderId: "order_2", platformMchid: queryFixture.config.platformMchid }), now);
@@ -262,6 +280,31 @@ test("verified notification and outgoing query reach database and actual buyer/p
     { WX_OPENID: "test_openid" }, contactKey), code("PAYMENT_NOT_VERIFIED"));
   await assert.rejects(handleOrder(databaseReader(), { action: "transitionOrder", orderId: "order_4", expectedVersion: 2, event: "BUYER_CONFIRMS_EXECUTION" },
     { WX_OPENID: "test_openid" }, contactKey), code("PAYMENT_NOT_VERIFIED"));
+});
+
+test("real HTTP acknowledgement distinguishes invalid notification, lost commit reply and durable retry", async () => {
+  const p = await reservePayment(pool, input(), now);
+  const request = notificationFixture.notify(notificationFixture.transaction(result(p)), now + 200, { summary: "支付成功" });
+  await withNotificationHttp(pool, async (url) => {
+    assert.equal((await fetch(url)).status, 405);
+    const invalid = await fetch(url, { method: "POST", headers: request.headers, body: Buffer.concat([request.body, Buffer.from(" ")]) });
+    assert.equal(invalid.status, 403); assert.equal((await invalid.json()).code, "FAIL");
+  });
+  assert.equal((await payments())[0].transaction_id, null);
+  await withNotificationHttp(faultyPool("ack"), async (url) => {
+    const uncertain = await fetch(url, { method: "POST", headers: request.headers, body: request.body });
+    assert.equal(uncertain.status, 500);
+    const body = await uncertain.text();
+    assert.equal(body.includes("acknowledgement"), false); assert.equal(body.includes(p.id), false);
+  });
+  assert.equal((await order()).payload.public.paymentStatus, "PAID");
+  await withNotificationHttp(pool, async (url) => {
+    const retry = await fetch(url, { method: "POST", headers: request.headers, body: request.body });
+    assert.equal(retry.status, 204); assert.equal(await retry.text(), "");
+    assert.equal(retry.headers.get("cache-control"), "no-store");
+  });
+  assert.equal((await order()).version, 2);
+  assert.equal((await order()).payload.events.length, 1);
 });
 
 test("query missing payer preserves money for review once without inventing identity or auto-releasing review", async () => {
