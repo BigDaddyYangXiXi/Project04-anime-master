@@ -16,7 +16,19 @@ async function call(data) {
     error.code = "CLOUD_UNAVAILABLE";
     throw error;
   }
-  const response = await wx.cloud.callFunction({ name: "account-bootstrap", data });
+  let response;
+  try {
+    response = await wx.cloud.callFunction({ name: "account-bootstrap", data });
+  } catch (cause) {
+    const details = String(cause && (cause.errMsg || cause.message) || "");
+    if (cause && (cause.code === "EXCEED_REQUEST_LIMIT" || cause.errCode === -501003)
+      || /\bEXCEED_REQUEST_LIMIT\b|\bexceed request limit\b|errCode:\s*-501003\b/i.test(details)) {
+      const error = new Error("登录服务暂不可用");
+      error.code = "AUTH_SERVICE_UNAVAILABLE";
+      throw error;
+    }
+    throw cause;
+  }
   if (!response || !response.result || !response.result.ok) throw errorFrom(response && response.result);
   return response.result.data;
 }

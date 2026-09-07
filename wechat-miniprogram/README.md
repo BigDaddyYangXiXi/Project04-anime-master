@@ -1,6 +1,6 @@
 # 动漫高手微信小程序工程
 
-本工程源自 `prototype/app/full-prototype-v063.tsx`，现已接入真实 CloudBase 后端。本地目标版本为 `0.7.0-native.12`，小程序 AppID 为 `wx57412ad07a806b70`；Web 原型保留独立历史。当前证据和未完成事项见 [工程基线与任务台账](../product-records/development-baseline.md)。
+本工程源自 `prototype/app/full-prototype-v063.tsx`，现已接入真实 CloudBase 后端。本地目标版本为 `0.7.0-native.13`，小程序 AppID 为 `wx57412ad07a806b70`；Web 原型保留独立历史。当前证据和未完成事项见 [工程基线与任务台账](../product-records/development-baseline.md)。
 
 `.12` 增加成功查询缺付款人的到账待核对记录、数据库约束及双方提示，181 项通用与 24 项真实 MySQL 测试通过。支付模块仍为内部实现，未部署、未真实支付；完整页／真机待验，见 [本批日志](../product-records/worklog-2026-09-07-payment-payer-review.md)。
 
