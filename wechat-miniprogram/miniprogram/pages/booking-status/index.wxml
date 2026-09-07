@@ -87,7 +87,7 @@
         <button wx:if="{{canConfirmAgreement}}" class="primary-block" disabled="{{actionPending}}" bindtap="confirmAgreement">确认以上合作信息</button>
         <view wx:if="{{agreementConfirmed}}" class="payment-panel">
           <view><text>合作信息已确认</text><text>{{paymentHint}}</text></view><text>￥{{totalPrice}}</text>
-          <button class="primary-block {{paymentStatus === 'PAID' || paymentStatus === 'VERIFYING' || paymentStatus === 'PAYMENT_REVIEW' || paying ? 'blocked' : ''}}" disabled="{{paymentStatus === 'PAID' || paymentStatus === 'VERIFYING' || paymentStatus === 'PAYMENT_REVIEW' || paying}}" bindtap="startPayment">{{paying ? '正在核对付款…' : paymentStatus === 'PAYMENT_REVIEW' ? '付款待核对' : paymentStatus === 'PAID' ? '付款已确认' : paymentStatus === 'VERIFYING' ? '等待支付结果确认' : '微信支付 ￥' + totalPrice}}</button>
+          <button class="primary-block {{paymentStatus === 'PAID' || paymentStatus === 'VERIFYING' || paymentStatus === 'PAYMENT_REVIEW' || paying || paymentQuerying ? 'blocked' : ''}}" disabled="{{paymentStatus === 'PAID' || paymentStatus === 'VERIFYING' || paymentStatus === 'PAYMENT_REVIEW' || paying || paymentQuerying}}" bindtap="startPayment">{{paying || paymentQuerying ? '正在核对付款…' : paymentStatus === 'PAYMENT_REVIEW' ? '付款待核对' : paymentStatus === 'PAID' ? '付款已确认' : paymentStatus === 'VERIFYING' ? '等待支付结果确认' : '微信支付 ￥' + totalPrice}}</button>
         </view>
       </view>
 

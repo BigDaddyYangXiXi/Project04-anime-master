@@ -133,6 +133,15 @@ function createOrder(input) {
   return call({ action: "createOrder", ...input }).then(toClientOrder);
 }
 
+async function refreshPayment(orderId) {
+  if (!isAvailable()) { const error = new Error('付款核对暂不可用'); error.code = 'CLOUD_UNAVAILABLE'; throw error; }
+  const response = await wx.cloud.callFunction({ name: 'payment-api', data: { action: 'refreshPayment', orderId } });
+  if (!response || !response.result || !response.result.ok) throw cloudError(response && response.result);
+  const result = response.result.data;
+  if (!result || !['QUERIED', 'FINAL', 'NOT_STARTED', 'THROTTLED'].includes(result.queryStatus)) throw cloudError(null);
+  return result;
+}
+
 function getOrder(orderId) {
   return call({ action: "getOrder", orderId }).then(toClientOrder);
 }
@@ -215,5 +224,5 @@ function idempotencyKey() {
 
 module.exports = {
   createOrder, getOrder, idempotencyKey, isAvailable, listOrders, scheduleFromSegments, toClientOrder,
-  transitionOrder, uploadDeliveryFiles, getProviderFunds
+  transitionOrder, uploadDeliveryFiles, getProviderFunds, refreshPayment
 };

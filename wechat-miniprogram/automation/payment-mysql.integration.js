@@ -468,3 +468,81 @@ test("real receipts paginate through provider-only funds API and actual funds pa
   assert.equal(page.data.records.length, 23);
   assert.ok(page.data.records.some((r) => r.statusText === "付款待核对"));
 });
+
+const { refreshPayment, COOLDOWN_MS, LEASE_MS } = require('../cloudfunctions/payment-api/payment-refresh');
+const refreshEvent = { action:'refreshPayment', orderId:'order_1' };
+const refreshCaller = { WX_OPENID:'test_openid', WX_APPID:'test_app' };
+test('public refresh rejects foreign orders, provider identity and payment identity before external query', async () => {
+  const p = await reservePayment(pool, input(), now);
+  let calls = 0;
+  const query = async () => { calls++; };
+  await assert.rejects(refreshPayment(pool, refreshEvent, {WX_OPENID:'test_provider_openid',WX_APPID:'test_app'}, {}, query, () => now), code('ACCOUNT_NOT_FOUND'));
+  await assert.rejects(refreshPayment(pool, refreshEvent, {...refreshCaller,WX_APPID:'foreign_app'}, {}, query, () => now), code('PAYMENT_IDENTITY_MISMATCH'));
+  await pool.query("UPDATE order_aggregates SET buyer_id = 'provider' WHERE id = 'order_1'");
+  await assert.rejects(refreshPayment(pool, refreshEvent, refreshCaller, {}, query, () => now), code('ORDER_NOT_FOUND'));
+  assert.equal(calls, 0);
+  assert.equal(Number((await payments())[0].query_started_at), 0);
+});
+test('public refresh shares one query across concurrent instances and keeps failure cooldown', async () => {
+  await reservePayment(pool, input(), now);
+  let calls = 0;
+  const query = async () => { calls++; throw Object.assign(new Error('timeout'), {code:'PAYMENT_QUERY_TIMEOUT'}); };
+  const outcomes = await Promise.allSettled(Array.from({length:12}, () => refreshPayment(pool,refreshEvent,refreshCaller,{},query,()=>now)));
+  assert.equal(calls, 1);
+  assert.equal(outcomes.filter(item => item.status === 'fulfilled' && item.value.queryStatus === 'THROTTLED').length,11);
+  assert.equal((await payments())[0].query_lease_token, null);
+  assert.equal((await refreshPayment(pool,refreshEvent,refreshCaller,{},query,()=>now+COOLDOWN_MS-1)).queryStatus,'THROTTLED');
+  await assert.rejects(refreshPayment(pool,refreshEvent,refreshCaller,{},query,()=>now+COOLDOWN_MS), code('PAYMENT_QUERY_TIMEOUT'));
+  assert.equal(calls,2);
+  assert.equal((await order()).payload.public.paymentStatus,'UNPAID');
+});
+test('expired refresh lease recovers and late completion cannot release its successor', async () => {
+  await reservePayment(pool,input(),now);
+  const releases = [], starts = [];
+  let notify;
+  const started = () => new Promise(resolve => { notify = resolve; });
+  const query = () => new Promise(resolve => { releases.push(resolve); starts.push(true); if(notify) notify(); });
+  const firstStarted = started();
+  const first = refreshPayment(pool,refreshEvent,refreshCaller,{},query,()=>now);
+  await firstStarted;
+  const secondStarted = started();
+  const second = refreshPayment(pool,refreshEvent,refreshCaller,{},query,()=>now+LEASE_MS+1);
+  await secondStarted;
+  const secondToken = (await payments())[0].query_lease_token;
+  releases[0](); await first;
+  assert.equal((await payments())[0].query_lease_token,secondToken);
+  releases[1](); await second;
+  assert.equal((await payments())[0].query_lease_token,null);
+  assert.equal(starts.length,2);
+});
+test('public refresh without a payment or with a receipt does not call the channel', async () => {
+  let calls = 0; const query = async () => { calls++; };
+  assert.equal((await refreshPayment(pool,refreshEvent,refreshCaller,{},query,()=>now)).queryStatus,'NOT_STARTED');
+  const p = await reservePayment(pool,input(),now);
+  await recordPaymentSuccess(pool,result(p));
+  assert.equal((await refreshPayment(pool,refreshEvent,refreshCaller,{},query,()=>now)).queryStatus,'FINAL');
+  assert.equal(calls,0);
+});
+test('buyer refresh action reaches signed query, MySQL, existing order API and both actual pages', async t => {
+  await pool.execute("UPDATE provider_payment_merchants SET platform_mchid = ? WHERE provider_id = 'provider'",[queryFixture.config.platformMchid]);
+  const p = await reservePayment(pool,input({platformMchid:queryFixture.config.platformMchid}),now);
+  const signed = notificationFixture.sign(JSON.stringify(notificationFixture.transaction(result(p))),now+200);
+  const query = (db,id,config) => queryPayment(db,id,config,queryFixture.requestFor(signed),()=>now+200);
+  const service = require('../miniprogram/services/cloud-orders');
+  t.mock.method(service,'refreshPayment', id => refreshPayment(pool,{action:'refreshPayment',orderId:id},refreshCaller,queryFixture.config,query,()=>now+200));
+  const readFor = async openid => toClientOrder(await handleOrder(databaseReader(),{action:'getOrder',orderId:'order_1'},{WX_OPENID:openid},contactKey));
+  t.mock.method(service,'getOrder',() => readFor('test_openid'));
+  function pageFor(route) {
+    let definition; global.Page = value => { definition=value; };
+    const filename=require.resolve(`../miniprogram/pages/${route}/index`);delete require.cache[filename];require(filename);delete global.Page;
+    const page={...definition,cloudMode:true,orderId:'order_1',data:structuredClone(definition.data)};
+    page.setData=(patch,callback)=>{Object.assign(page.data,patch);if(callback)callback();};return page;
+  }
+  const buyer=pageFor('booking-status');buyer.renderOrder(await readFor('test_openid'));
+  await buyer.refreshCloudPayment();
+  assert.equal(buyer.data.paymentStatus,'PAID');assert.match(buyer.data.paymentHint,/付款已确认/);
+  const provider=pageFor('provider-request');provider.renderOrder(await readFor('test_provider_openid'));
+  assert.equal(provider.data.order.paymentStatus,'PAID');
+  assert.equal((await order()).version,2);
+  assert.equal((await payments())[0].query_lease_token,null);
+});

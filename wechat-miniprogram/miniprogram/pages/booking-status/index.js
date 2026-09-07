@@ -40,7 +40,7 @@ Page({
     isSupplement: false, isFailed: false, showJourney: false, isStepOne: false, isStepTwo: false,
     isStepThree: false, isStepFour: false, agreementIssues: [], canSignNda: false,
     waitingProviderNda: false, canConfirmAgreement: false, agreementConfirmed: false,
-    paymentStatus: "UNPAID", paying: false, paymentHint: "", totalPrice: 0,
+    paymentStatus: "UNPAID", paying: false, paymentQuerying: false, paymentHint: "", totalPrice: 0,
     buyerIdentity: null, providerIdentity: null, schedule: { mode: "", lines: [] },
     loading: false, loadError: "", actionPending: false
   },
@@ -58,10 +58,15 @@ Page({
   },
   onShow() { this.loadOrder(); },
   async onPullDownRefresh() {
-    try { await this.loadOrder(); }
+    try {
+      if (this.cloudMode && this.data.order && this.data.order.viewerRole === 'BUYER'
+        && this.data.order.buyerAgreementConfirmedAt && this.data.order.stage === 'BUYER_FINAL_CONFIRM'
+        && !['PAID', 'PAYMENT_REVIEW'].includes(this.data.order.paymentStatus)) await this.refreshCloudPayment();
+      else await this.loadOrder();
+    }
     finally { if (wx.stopPullDownRefresh) wx.stopPullDownRefresh(); }
   },
-  onUnload() { this.loadRequest = (this.loadRequest || 0) + 1; },
+  onUnload() { this.unloaded = true; this.loadRequest = (this.loadRequest || 0) + 1; },
   auditScroll(scrollTop) { if (this.auditStage && wx.pageScrollTo) wx.pageScrollTo({ scrollTop, duration: 0 }); },
 
   async loadOrder() {
@@ -174,7 +179,7 @@ Page({
     });
   },
   startPayment() {
-    if (this.auditStage || !this.data.agreementConfirmed || this.data.paying || ["PAID", "VERIFYING", "PAYMENT_REVIEW"].includes(this.data.paymentStatus)) return;
+    if (this.auditStage || !this.data.agreementConfirmed || this.data.paying || this.data.paymentQuerying || ["PAID", "VERIFYING", "PAYMENT_REVIEW"].includes(this.data.paymentStatus)) return;
     if (this.cloudMode) return this.startCloudPayment();
     this.setData({ paying: true });
     paymentGateway.requestOrderPayment(this.data.order).then(() => {
@@ -188,12 +193,29 @@ Page({
       wx.showToast({ title: "支付未完成，请重试", icon: "none" });
     });
   },
+  refreshCloudPayment() {
+    if (this.paymentRefreshPromise) return this.paymentRefreshPromise;
+    if (this.data.paying || this.unloaded) return Promise.resolve();
+    this.paymentRefreshPromise = (async () => {
+      let queryStatus = 'UNAVAILABLE';
+      this.setData({ paymentQuerying: true, paymentHint: '正在核对付款结果，请稍候' });
+      try { queryStatus = (await cloudOrders.refreshPayment(this.orderId)).queryStatus; } catch (_) {}
+      if (this.unloaded) return;
+      await this.loadOrder();
+      if (this.unloaded) return;
+      if (this.data.order && !['PAID', 'PAYMENT_REVIEW'].includes(this.data.order.paymentStatus)) {
+        if (queryStatus === 'UNAVAILABLE') this.setData({ paymentHint: '暂时无法核对付款结果，请稍后刷新；不要重复付款' });
+        else if (queryStatus === 'THROTTLED') this.setData({ paymentHint: '付款结果仍在核对中，请稍后刷新' });
+      }
+    })().finally(() => { this.paymentRefreshPromise = null; if (!this.unloaded) this.setData({ paymentQuerying: false }); });
+    return this.paymentRefreshPromise;
+  },
   async startCloudPayment() {
     this.setData({ paying: true });
     let cashierReturned = false;
     try {
       const order = await cloudOrders.getOrder(this.orderId);
-      if (this.renderOrder(order) === false) return;
+      if (this.unloaded || this.renderOrder(order) === false) return;
       if (order.viewerRole !== "BUYER" || order.stage !== "BUYER_FINAL_CONFIRM"
         || !order.buyerAgreementConfirmedAt || agreementIssues(order).length
         || !["UNPAID", "FAILED"].includes(order.paymentStatus)) return;
@@ -208,19 +230,25 @@ Page({
         paymentError = error;
       }
       cashierReturned = true;
+      if (this.unloaded) return;
+      let queryUnavailable = false;
+      try { await cloudOrders.refreshPayment(this.orderId); } catch (_) { queryUnavailable = true; }
+      if (this.unloaded) return;
       const latest = await cloudOrders.getOrder(this.orderId);
-      if (this.renderOrder(latest) === false) return;
+      if (this.unloaded || this.renderOrder(latest) === false) return;
       if (!["PAID", "VERIFYING", "PAYMENT_REVIEW"].includes(latest.paymentStatus)) {
-        this.setData({ paymentHint: paymentError && paymentError.code === "PAYMENT_CANCELLED"
+        this.setData({ paymentHint: queryUnavailable ? '暂时无法核对付款结果，请稍后刷新；不要重复付款'
+          : paymentError && paymentError.code === "PAYMENT_CANCELLED"
           ? "已退出收银台；尚未确认付款，可下拉刷新核对"
           : "尚未确认付款结果，请稍后下拉刷新核对" });
       }
     } catch (error) {
+      if (this.unloaded) return;
       this.setData({ paymentHint: cashierReturned
         ? "暂时无法核对付款结果，请下拉刷新；不要重复付款"
         : "暂时无法读取最新订单，请下拉刷新后重试" });
     } finally {
-      this.setData({ paying: false });
+      if (!this.unloaded) this.setData({ paying: false });
     }
   },
   retryBooking() { wx.navigateTo({ url: `/pages/booking/index?providerId=${this.data.order.providerId}&repeatOrderId=${this.orderId}` }); },

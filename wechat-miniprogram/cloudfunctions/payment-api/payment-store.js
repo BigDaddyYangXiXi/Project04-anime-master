@@ -48,7 +48,7 @@ async function lockedOrder(connection, orderId) {
 }
 
 // Internal persistence API. Callers must resolve identity and fee policy on the server.
-// No public cloud-function entry is registered until channel verification and slot reservation are implemented.
+// Public payment creation remains unavailable until channel preparation and slot reservation are implemented.
 async function reservePayment(pool, input, now = Date.now(), randomId = () => crypto.randomBytes(16).toString("hex")) {
   const orderId = token(input.orderId, 64), buyerId = token(input.buyerId, 64), requestKey = token(input.requestKey);
   const appid = token(input.appid, 32), platformMchid = token(input.platformMchid, 32), openid = token(input.payerOpenid);

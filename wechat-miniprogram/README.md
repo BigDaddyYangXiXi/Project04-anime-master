@@ -1,12 +1,14 @@
 # 动漫高手微信小程序工程
 
-本工程源自 `prototype/app/full-prototype-v063.tsx`，现已接入真实 CloudBase 后端。本地目标版本为 `0.7.0-native.14`，小程序 AppID 为 `wx57412ad07a806b70`；Web 原型保留独立历史。当前证据和未完成事项见 [工程基线与任务台账](../product-records/development-baseline.md)。
+本工程源自 `prototype/app/full-prototype-v063.tsx`，现已接入真实 CloudBase 后端。本地目标版本为 `0.7.0-native.15`，小程序 AppID 为 `wx57412ad07a806b70`；Web 原型保留独立历史。当前证据和未完成事项见 [工程基线与任务台账](../product-records/development-baseline.md)。
 
 `.12` 增加成功查询缺付款人的到账待核对记录、数据库约束及双方提示，181 项通用与 24 项真实 MySQL 测试通过。支付模块仍为内部实现，未部署、未真实支付；完整页／真机待验，见 [本批日志](../product-records/worklog-2026-09-07-payment-payer-review.md)。
 
 `.9` 修复生产付款回调写本地订单、旧参数及付款资格重检和云函数确认错误透传。148 项本地测试通过，真实支付仍待商户与服务端接入，完整页／真机待验；见 [付款边界日志](../product-records/worklog-2026-09-05-payment-boundary.md)。
 
 `.8` 修复跨日锁档、服务方四项确认提交与服务端校验、需求方执行前合作确认，以及云端改价时确认草稿丢失。客户端与 order-api 须配套更新；当前只完成本地回归，未上传或部署。发布与运行证据见 [本轮工作日志](../product-records/worklog-2026-09-05-rule-gates.md)。
+
+`.15` 增加主动付款核对入口与数据库查询租约，核对中禁止重复付款，失败后仍读取业务订单事实。220 项通用、30 项隔离 MySQL 测试通过；未部署或真实查单，生产同库连接、商户与原生证据待补。见 [核对日志](../product-records/worklog-2026-09-07-payment-refresh.md)。
 
 ## 已迁移范围
 
@@ -17,7 +19,7 @@
 
 微信可信身份、真实 CloudBase 后端和线上图片／交付文件已接通。微信支付、退款、资金结算、提现和法定电子签章仍未完成，不能用本地模拟结果代替。
 
-本地共有 19 个数据库迁移，最新为 `0019_payment_payer_verification.sql`；全部迁移和旧付款回填通过隔离 MySQL 验证，0018／0019 尚未部署。2026-09-04 工作日志记录线上已执行至 0017，本次未重新查询云端。媒体资产保存业务用途及订单绑定关系，关注／收藏支持本人列表和反向计数。历史记录确认 `READY` 孤儿使用 30 天未引用门槛与 24 小时隔离复核，每小时第 15 分钟运行并写入 `media_cleanup_runs`；CLS 平台日志与失败告警仍待配置。
+本地共有 20 个数据库迁移，最新为 `0020_payment_query_lease.sql`；全部迁移和旧付款回填通过隔离 MySQL 验证，0018—0020 尚未部署。2026-09-04 工作日志记录线上已执行至 0017，本次未重新查询云端。媒体资产保存业务用途及订单绑定关系，关注／收藏支持本人列表和反向计数。历史记录确认 `READY` 孤儿使用 30 天未引用门槛与 24 小时隔离复核，每小时第 15 分钟运行并写入 `media_cleanup_runs`；CLS 平台日志与失败告警仍待配置。
 
 部署单个云函数统一使用 `node scripts/deploy-cloud-function.js <函数名>`。脚本会读取 `cloudbaserc.json` 和函数 `package.json`：本地缺少任一直接运行依赖时自动启用云端依赖安装。部署前可加 `--dry-run` 只查看计划，禁止手工固定 `--install-dependency false`。
 

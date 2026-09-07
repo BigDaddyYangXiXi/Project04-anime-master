@@ -70,7 +70,7 @@ function requestCombineOrder(options, request) {
   });
 }
 
-// Internal recovery worker only. A public caller still needs server-resolved order ownership.
+// Low-level transport. Public refresh validates trusted identity and order ownership before calling this.
 // A failed query never means an unpaid/closed order; only a verified channel state can reach persistence.
 async function queryPayment(pool, id, config, request = https.request, clock = Date.now) {
   paymentId(id);
