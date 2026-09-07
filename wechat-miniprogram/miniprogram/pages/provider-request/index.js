@@ -51,16 +51,23 @@ Page({
     this.cloudMode = options.audit !== "1";
   },
   onShow() { this.load(); },
+  onUnload() { this.loadRequest = (this.loadRequest || 0) + 1; },
 
   async load() {
     if (this.cloudMode) {
+      const request = this.loadRequest = (this.loadRequest || 0) + 1;
+      const visibleOrder = this.data.order;
       this.setData({ loading: true, loadError: "" });
       try {
         const order = await cloudOrders.getOrder(this.orderId);
+        if (request !== this.loadRequest) return;
         this.renderOrder(order);
-        this.setData({ loading: false });
       } catch (error) {
-        this.setData({ order: null, loading: false, loadError: this.cloudErrorMessage(error) });
+        if (request === this.loadRequest && this.data.order === visibleOrder) {
+          this.setData({ order: null, loadError: this.cloudErrorMessage(error) });
+        }
+      } finally {
+        if (request === this.loadRequest) this.setData({ loading: false });
       }
       return;
     }
@@ -70,6 +77,8 @@ Page({
   },
 
   renderOrder(sourceOrder) {
+    if (sourceOrder.cloudOrder && this.data.order && this.data.order.id === sourceOrder.id
+      && Number(this.data.order.version) > Number(sourceOrder.version)) return false;
     let order = sourceOrder;
     if (this.auditStage) order = Object.assign({}, order, { stage: this.auditStage });
     if (this.auditSegments) order = Object.assign({}, order, { bookingDraft: Object.assign({}, order.bookingDraft, { timeMode: "segments", segments: [

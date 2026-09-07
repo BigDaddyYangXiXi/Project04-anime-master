@@ -57,18 +57,28 @@ Page({
     this.cloudMode = options.audit !== "1";
   },
   onShow() { this.loadOrder(); },
-  onPullDownRefresh() { this.loadOrder(); if (wx.stopPullDownRefresh) wx.stopPullDownRefresh(); },
+  async onPullDownRefresh() {
+    try { await this.loadOrder(); }
+    finally { if (wx.stopPullDownRefresh) wx.stopPullDownRefresh(); }
+  },
+  onUnload() { this.loadRequest = (this.loadRequest || 0) + 1; },
   auditScroll(scrollTop) { if (this.auditStage && wx.pageScrollTo) wx.pageScrollTo({ scrollTop, duration: 0 }); },
 
   async loadOrder() {
     if (this.cloudMode) {
+      const request = this.loadRequest = (this.loadRequest || 0) + 1;
+      const visibleOrder = this.data.order;
       this.setData({ loading: true, loadError: "" });
       try {
         const order = await cloudOrders.getOrder(this.orderId);
+        if (request !== this.loadRequest) return;
         this.renderOrder(order);
-        this.setData({ loading: false });
       } catch (error) {
-        this.setData({ order: null, loading: false, loadError: this.cloudErrorMessage(error) });
+        if (request === this.loadRequest && this.data.order === visibleOrder) {
+          this.setData({ order: null, loadError: this.cloudErrorMessage(error) });
+        }
+      } finally {
+        if (request === this.loadRequest) this.setData({ loading: false });
       }
       return;
     }
@@ -81,6 +91,8 @@ Page({
   },
 
   renderOrder(savedOrder) {
+    if (savedOrder.cloudOrder && this.data.order && this.data.order.id === savedOrder.id
+      && Number(this.data.order.version) > Number(savedOrder.version)) return false;
     const advancedStages = ["NDA_BUYER_PENDING", "NDA_PROVIDER_PENDING", "BUYER_FINAL_CONFIRM", "IN_PRODUCTION"];
     const order = this.auditStage ? Object.assign({}, savedOrder, {
       stage: this.auditStage,
@@ -134,6 +146,7 @@ Page({
         : order.paymentStatus === "PAYMENT_REVIEW" ? "已收到付款记录，付款信息或订单状态需要核对，请勿重复付款"
           : order.paymentStatus === "VERIFYING" ? "支付结果确认中，请稍后下拉刷新" : "确认合作信息后可继续付款"
     });
+    return true;
   },
 
   updateSupplement(event) { const supplement = event.detail.value; this.setData({ supplement, canSubmitSupplement: Boolean(supplement.trim()) }); },
@@ -180,7 +193,7 @@ Page({
     let cashierReturned = false;
     try {
       const order = await cloudOrders.getOrder(this.orderId);
-      this.renderOrder(order);
+      if (this.renderOrder(order) === false) return;
       if (order.viewerRole !== "BUYER" || order.stage !== "BUYER_FINAL_CONFIRM"
         || !order.buyerAgreementConfirmedAt || agreementIssues(order).length
         || !["UNPAID", "FAILED"].includes(order.paymentStatus)) return;
@@ -196,7 +209,7 @@ Page({
       }
       cashierReturned = true;
       const latest = await cloudOrders.getOrder(this.orderId);
-      this.renderOrder(latest);
+      if (this.renderOrder(latest) === false) return;
       if (!["PAID", "VERIFYING", "PAYMENT_REVIEW"].includes(latest.paymentStatus)) {
         this.setData({ paymentHint: paymentError && paymentError.code === "PAYMENT_CANCELLED"
           ? "已退出收银台；尚未确认付款，可下拉刷新核对"

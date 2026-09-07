@@ -120,3 +120,32 @@ test("payment review prevents another cashier attempt and survives late cashier 
   assert.equal(page.data.paymentStatus, "PAYMENT_REVIEW");
   assert.match(page.data.paymentHint, /需要核对/);
 });
+
+test("an older preflight response cannot reopen cashier after a newer paid order renders", async (t) => {
+  prohibitLocalWrites(t);
+  const page = pageFor();
+  let resolve;
+  t.mock.method(cloudOrders, "getOrder", () => new Promise(done => { resolve = done; }));
+  const pay = t.mock.method(gateway, "requestOrderPayment", async () => {});
+  const request = page.startPayment();
+  page.renderOrder(order({ version: 4, paymentStatus: "PAID" }));
+  resolve(order());
+  await request;
+  assert.equal(pay.mock.callCount(), 0);
+  assert.equal(page.data.paymentStatus, "PAID");
+  assert.equal(page.data.paying, false);
+});
+
+test("an older post-cashier response cannot replace a newer review result or its warning", async (t) => {
+  prohibitLocalWrites(t);
+  const page = pageFor();
+  let reads = 0;
+  t.mock.method(cloudOrders, "getOrder", async () => {
+    if (++reads === 2) page.renderOrder(order({ version: 5, paymentStatus: "PAYMENT_REVIEW" }));
+    return order();
+  });
+  t.mock.method(gateway, "requestOrderPayment", async () => {});
+  await page.startPayment();
+  assert.equal(page.data.paymentStatus, "PAYMENT_REVIEW");
+  assert.match(page.data.paymentHint, /需要核对，请勿重复付款/);
+});
