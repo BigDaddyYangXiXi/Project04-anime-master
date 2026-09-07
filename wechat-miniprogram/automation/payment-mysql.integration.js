@@ -8,7 +8,10 @@ const mysql = require("../cloudfunctions/payment-api/node_modules/mysql2/promise
 const { reservePayment, recordPaymentSuccess, recordPaymentClosed } = require("../cloudfunctions/payment-api/payment-store");
 const { acceptPaymentNotification, acceptSuccessfulQuery } = require("../cloudfunctions/payment-api/payment-notifications");
 const { createNotificationFixture } = require("../cloudfunctions/payment-api/test-notification-fixture");
+const { querySuccessfulPayment } = require("../cloudfunctions/payment-api/wechat-query");
+const { createQueryFixture } = require("../cloudfunctions/payment-api/test-query-fixture");
 const notificationFixture = createNotificationFixture();
+const queryFixture = createQueryFixture(notificationFixture.config);
 const { handleOrder, encryptContact } = require("../cloudfunctions/order-api/order-core");
 const { toClientOrder } = require("../miniprogram/services/cloud-orders");
 const contactKey = Buffer.alloc(32, 17).toString("base64");
@@ -195,14 +198,15 @@ function databaseReader() {
     };
   } };
 }
-test("verified encrypted notification reaches database and actual buyer/provider payment states", async () => {
+test("verified notification and outgoing query reach database and actual buyer/provider payment states", async () => {
   const p = await reservePayment(pool, input(), now);
   const request = notificationFixture.notify(notificationFixture.transaction(result(p, { totalFen: 12000 })), now + 200);
   assert.equal((await acceptPaymentNotification(pool, request, notificationFixture.config, now + 200)).statusCode, 204);
   await seedOrder("order_2");
-  const normal = await reservePayment(pool, input({ orderId: "order_2" }), now);
-  const normalRequest = notificationFixture.notify(notificationFixture.transaction(result(normal)), now + 200);
-  await acceptPaymentNotification(pool, normalRequest, notificationFixture.config, now + 200);
+  await pool.execute("UPDATE provider_payment_merchants SET platform_mchid = ? WHERE provider_id = 'provider'", [queryFixture.config.platformMchid]);
+  const normal = await reservePayment(pool, input({ orderId: "order_2", platformMchid: queryFixture.config.platformMchid }), now);
+  const normalResponse = notificationFixture.sign(JSON.stringify(notificationFixture.transaction(result(normal))), now + 200);
+  await querySuccessfulPayment(pool, normal.id, queryFixture.config, queryFixture.requestFor(normalResponse), () => now + 200);
   for (const [openId, role, pageName] of [["test_openid", "BUYER", "booking-status"], ["test_provider_openid", "PROVIDER", "provider-request"]]) {
     const response = await handleOrder(databaseReader(), { action: "getOrder", orderId: "order_1" }, { WX_OPENID: openId }, contactKey);
     assert.equal(response.viewerRole, role);
@@ -226,6 +230,23 @@ test("verified encrypted notification reaches database and actual buyer/provider
   }
   await assert.rejects(handleOrder(databaseReader(), { action: "transitionOrder", orderId: "order_1", expectedVersion: 2, event: "BUYER_CONFIRMS_EXECUTION" },
     { WX_OPENID: "test_openid" }, contactKey), code("PAYMENT_NOT_VERIFIED"));
+});
+
+test("failed outgoing query preserves the order and payment; verified retry recovers once", async () => {
+  await pool.execute("UPDATE provider_payment_merchants SET platform_mchid = ? WHERE provider_id = 'provider'", [queryFixture.config.platformMchid]);
+  const p = await reservePayment(pool, input({ platformMchid: queryFixture.config.platformMchid }), now);
+  const response = notificationFixture.sign(JSON.stringify(notificationFixture.transaction(result(p))), now + 200);
+  for (const statusCode of [302, 404, 500]) {
+    await assert.rejects(querySuccessfulPayment(pool, p.id, queryFixture.config, queryFixture.requestFor({ ...response, statusCode }), () => now + 200), code("PAYMENT_QUERY_FAILED"));
+  }
+  assert.equal((await payments())[0].status, "CREATED");
+  assert.equal((await order()).version, 1);
+  assert.equal((await order()).payload.public.paymentStatus, "UNPAID");
+  const recover = () => querySuccessfulPayment(pool, p.id, queryFixture.config, queryFixture.requestFor(response), () => now + 200);
+  const outcomes = await Promise.all(Array.from({ length: 10 }, recover));
+  assert.equal(outcomes.filter((item) => !item.duplicate).length, 1);
+  assert.equal((await order()).version, 2);
+  assert.equal((await order()).payload.events.length, 1);
 });
 
 test("20 signed notification retries acknowledge only one committed receipt", async () => {
