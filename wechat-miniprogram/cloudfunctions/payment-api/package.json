@@ -1,6 +1,6 @@
 {
   "name": "anime-master-payment-api",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "scripts": {
     "test": "node --test payment-store.test.js wechat-verification.test.js wechat-query.test.js"

@@ -2,7 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const { EventEmitter } = require("node:events");
-const { buildQueryRequest, querySuccessfulPayment } = require("./wechat-query");
+const { buildQueryRequest, queryPayment } = require("./wechat-query");
 const { createNotificationFixture } = require("./test-notification-fixture");
 const { createQueryFixture } = require("./test-query-fixture");
 const notification = createNotificationFixture(), fixture = createQueryFixture(notification.config);
@@ -12,7 +12,7 @@ const payment = { combineOutTradeNo: id, outTradeNo: id, appid: "test_app", plat
 const signed = () => notification.sign(JSON.stringify(notification.transaction(payment)), now);
 const code = (expected) => (error) => error.code === expected;
 const pool = { execute: async () => [[{ platform_mchid: fixture.config.platformMchid }]], getConnection: async () => { throw new Error("verified_database_boundary"); } };
-const query = (response, stream) => querySuccessfulPayment(pool, id, fixture.config, fixture.requestFor(response, () => {}, stream), () => now);
+const query = (response, stream) => queryPayment(pool, id, fixture.config, fixture.requestFor(response, () => {}, stream), () => now);
 
 test("GET signature covers exact path and empty body with distinct merchant certificate and WeChat key IDs", () => {
   const request = buildQueryRequest(id, fixture.config, now);
@@ -38,8 +38,8 @@ test("invalid IDs, credentials and key mode are rejected before constructing a r
 
 test("missing or foreign merchant payment cannot cause an outgoing query", async () => {
   const request = () => assert.fail("must not send");
-  await assert.rejects(querySuccessfulPayment({ execute: async () => [[]] }, id, fixture.config, request), code("PAYMENT_NOT_FOUND"));
-  await assert.rejects(querySuccessfulPayment(pool, id, { ...fixture.config, platformMchid: "1999999999" }, request), code("PAYMENT_QUERY_MERCHANT_MISMATCH"));
+  await assert.rejects(queryPayment({ execute: async () => [[]] }, id, fixture.config, request), code("PAYMENT_NOT_FOUND"));
+  await assert.rejects(queryPayment(pool, id, { ...fixture.config, platformMchid: "1999999999" }, request), code("PAYMENT_QUERY_MERCHANT_MISMATCH"));
 });
 
 test("fixed TLS transport retains split response bytes until verified and then enters the receipt transaction", async () => {
@@ -49,7 +49,7 @@ test("fixed TLS transport retains split response bytes until verified and then e
     assert.equal(options.rejectUnauthorized, true); assert.equal(options.agent, false); assert.equal(options.minVersion, "TLSv1.2");
     assert.equal(options.method, "GET"); assert.equal(options.headers["Accept-Encoding"], "identity");
   }, (incoming) => { incoming.write(response.body.subarray(0, 11)); incoming.end(response.body.subarray(11)); });
-  await assert.rejects(querySuccessfulPayment(pool, id, { ...fixture.config, hostname: "evil.example" }, request, () => now), /verified_database_boundary/);
+  await assert.rejects(queryPayment(pool, id, { ...fixture.config, hostname: "evil.example" }, request, () => now), /verified_database_boundary/);
 });
 
 test("redirects and non-200 responses never infer payment failure or close a payment", async () => {
@@ -71,14 +71,14 @@ test("partial response and connection errors are bounded generic failures withou
     client.end = () => queueMicrotask(() => client.emit("error", new Error("sensitive upstream body")));
     return client;
   };
-  await assert.rejects(querySuccessfulPayment(pool, id, fixture.config, request, () => now), code("PAYMENT_QUERY_TRANSPORT_FAILED"));
+  await assert.rejects(queryPayment(pool, id, fixture.config, request, () => now), code("PAYMENT_QUERY_TRANSPORT_FAILED"));
 });
 
 test("absolute deadline includes connection setup rather than only socket inactivity", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   let client;
   const request = () => { client = new EventEmitter(); client.end = () => {}; client.destroy = () => { client.destroyed = true; }; return client; };
-  const pending = querySuccessfulPayment(pool, id, fixture.config, request, () => now);
+  const pending = queryPayment(pool, id, fixture.config, request, () => now);
   const rejected = assert.rejects(pending, code("PAYMENT_QUERY_TIMEOUT"));
   await Promise.resolve();
   t.mock.timers.tick(8000);
@@ -86,10 +86,15 @@ test("absolute deadline includes connection setup rather than only socket inacti
   assert.equal(client.destroyed, true);
 });
 
-test("signed non-success and mismatched query IDs remain failures without changing stored payment", async () => {
-  for (const trade_state of ["NOTPAY", "USERPAYING", "CLOSED", "REFUND", "UNKNOWN"]) {
+test("unsupported states and mismatched query IDs fail; verified supported states enter persistence", async () => {
+  for (const trade_state of ["USERPAYING", "REFUND", "UNKNOWN"]) {
     const data = notification.transaction(payment); data.sub_orders[0].trade_state = trade_state;
     await assert.rejects(query(notification.sign(JSON.stringify(data), now)), code("PAYMENT_EVENT_UNSUPPORTED"));
+  }
+  for (const trade_state of ["NOTPAY", "CLOSED", "PAYERROR"]) {
+    const data = notification.transaction(payment); data.sub_orders[0].trade_state = trade_state;
+    delete data.combine_payer_info; delete data.sub_orders[0].amount; delete data.sub_orders[0].trade_type;
+    await assert.rejects(query(notification.sign(JSON.stringify(data), now)), /verified_database_boundary/);
   }
   const data = notification.transaction({ ...payment, combineOutTradeNo: "b".repeat(32) });
   await assert.rejects(query(notification.sign(JSON.stringify(data), now)), code("PAYMENT_QUERY_MISMATCH"));

@@ -90,4 +90,18 @@ function normalizeCombineSuccess(transaction) {
     totalFen: amount.total_amount, payerPaidFen: amount.payer_amount, currency: amount.currency, paidAt };
 }
 
-module.exports = { verifyMessage, decryptNotification, normalizeCombineSuccess };
+function normalizeCombineQuery(transaction) {
+  const data = object(transaction);
+  if (!Array.isArray(data.sub_orders) || data.sub_orders.length !== 1) fail("PAYMENT_SUBORDERS_UNSUPPORTED");
+  const sub = object(data.sub_orders[0]);
+  if (sub.trade_state === "SUCCESS") return normalizeCombineSuccess(data);
+  if (!["NOTPAY", "CLOSED", "PAYERROR"].includes(sub.trade_state)) fail("PAYMENT_EVENT_UNSUPPORTED");
+  if (sub.mchid !== data.combine_mchid || sub.trade_type !== undefined && sub.trade_type !== "JSAPI") fail("PAYMENT_MESSAGE_INVALID");
+  // Unpaid query results may omit the payer. Never substitute the expected OpenID for a missing channel fact.
+  const payer = data.combine_payer_info === undefined ? undefined : object(data.combine_payer_info).openid;
+  return { tradeState: sub.trade_state, combineOutTradeNo: token(data.combine_out_trade_no, 32), outTradeNo: token(sub.out_trade_no, 32),
+    appid: token(data.combine_appid, 32), platformMchid: token(data.combine_mchid, 32), subMchid: token(sub.sub_mchid, 32),
+    ...(payer === undefined ? {} : { payerOpenid: token(payer) }) };
+}
+
+module.exports = { verifyMessage, decryptNotification, normalizeCombineSuccess, normalizeCombineQuery };

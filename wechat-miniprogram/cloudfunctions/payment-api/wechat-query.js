@@ -1,6 +1,6 @@
 const crypto = require("node:crypto");
 const https = require("node:https");
-const { acceptSuccessfulQuery } = require("./payment-notifications");
+const { acceptPaymentQuery } = require("./payment-notifications");
 
 function failure(code) { const error = new Error(code); error.code = code; return error; }
 function paymentId(value) { if (typeof value !== "string" || !/^[a-f0-9]{32}$/.test(value)) throw failure("PAYMENT_INPUT_INVALID"); }
@@ -71,14 +71,14 @@ function requestCombineOrder(options, request) {
 }
 
 // Internal recovery worker only. A public caller still needs server-resolved order ownership.
-// Non-success trade states remain unsupported here; a failed query never means an unpaid/closed order.
-async function querySuccessfulPayment(pool, id, config, request = https.request, clock = Date.now) {
+// A failed query never means an unpaid/closed order; only a verified channel state can reach persistence.
+async function queryPayment(pool, id, config, request = https.request, clock = Date.now) {
   paymentId(id);
   const [[payment]] = await pool.execute("SELECT platform_mchid FROM order_payments WHERE id = ?", [id]);
   if (!payment) throw failure("PAYMENT_NOT_FOUND");
   if (!config || payment.platform_mchid !== config.platformMchid) throw failure("PAYMENT_QUERY_MERCHANT_MISMATCH");
   const response = await requestCombineOrder(buildQueryRequest(id, config, clock()), request);
-  return acceptSuccessfulQuery(pool, response, config, id, clock());
+  return acceptPaymentQuery(pool, response, config, id, clock());
 }
 
-module.exports = { buildQueryRequest, querySuccessfulPayment };
+module.exports = { buildQueryRequest, queryPayment };

@@ -1,12 +1,37 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { verifyMessage, decryptNotification, normalizeCombineSuccess } = require("./wechat-verification");
-const { acceptPaymentNotification, acceptSuccessfulQuery } = require("./payment-notifications");
+const { verifyMessage, decryptNotification, normalizeCombineSuccess, normalizeCombineQuery } = require("./wechat-verification");
+const { acceptPaymentNotification, acceptPaymentQuery } = require("./payment-notifications");
 const { createNotificationFixture } = require("./test-notification-fixture");
 const fixture = createNotificationFixture(), now = 1788616800000;
 const payment = { tradeState: "SUCCESS", combineOutTradeNo: "a".repeat(32), outTradeNo: "a".repeat(32), appid: "test_app", platformMchid: "test_platform",
   subMchid: "test_sub", payerOpenid: "test_openid", transactionId: "test_transaction", totalFen: 10000, payerPaidFen: 9800, currency: "CNY", paidAt: now - 1234 };
 const code = (expected) => (error) => error.code === expected;
+
+test("unpaid query preserves absent payer and permits absent trade type without inventing receipt fields", () => {
+  for (const trade_state of ["NOTPAY", "CLOSED", "PAYERROR"]) {
+    const data = fixture.transaction(payment);
+    delete data.combine_payer_info;
+    data.sub_orders = [{ mchid: payment.platformMchid, sub_mchid: payment.subMchid, out_trade_no: payment.outTradeNo, trade_state }];
+    const normalized = normalizeCombineQuery(data);
+    assert.equal(normalized.tradeState, trade_state);
+    assert.equal(Object.hasOwn(normalized, "payerOpenid"), false);
+    assert.equal(Object.hasOwn(normalized, "totalFen"), false);
+    data.combine_payer_info = { openid: "different_payer" };
+    assert.equal(normalizeCombineQuery(data).payerOpenid, "different_payer");
+    data.combine_payer_info.openid = null;
+    assert.throws(() => normalizeCombineQuery(data), code("PAYMENT_MESSAGE_INVALID"));
+  }
+});
+
+test("optional payer is limited to unpaid query states and never relaxes a success notification", () => {
+  const data = fixture.transaction(payment); delete data.combine_payer_info;
+  assert.throws(() => normalizeCombineQuery(data), code("PAYMENT_MESSAGE_INVALID"));
+  data.sub_orders[0].trade_state = "CLOSED"; data.sub_orders[0].trade_type = "NATIVE";
+  assert.throws(() => normalizeCombineQuery(data), code("PAYMENT_MESSAGE_INVALID"));
+  delete data.sub_orders[0].trade_type; delete data.sub_orders[0].sub_mchid;
+  assert.throws(() => normalizeCombineQuery(data), code("PAYMENT_MESSAGE_INVALID"));
+});
 
 test("illustrative documentation key and signature are not blindly accepted as a valid test vector", () => {
   // This copied public example combination does not verify; retain rejection rather than bypass verification.
@@ -99,8 +124,8 @@ test("query responses must be signed, successful and bound to the requested paym
   let acquired = false;
   const pool = { async getConnection() { acquired = true; throw new Error("must not write"); } };
   const response = fixture.sign(JSON.stringify(fixture.transaction(payment)), now);
-  await assert.rejects(acceptSuccessfulQuery(pool, { ...response, statusCode: 500 }, fixture.config, payment.outTradeNo, now), code("PAYMENT_QUERY_FAILED"));
-  await assert.rejects(acceptSuccessfulQuery(pool, response, fixture.config, "b".repeat(32), now), code("PAYMENT_QUERY_MISMATCH"));
-  await assert.rejects(acceptSuccessfulQuery(pool, { ...response, body: Buffer.concat([response.body, Buffer.from(" ")]) }, fixture.config, payment.outTradeNo, now), code("PAYMENT_SIGNATURE_INVALID"));
+  await assert.rejects(acceptPaymentQuery(pool, { ...response, statusCode: 500 }, fixture.config, payment.outTradeNo, now), code("PAYMENT_QUERY_FAILED"));
+  await assert.rejects(acceptPaymentQuery(pool, response, fixture.config, "b".repeat(32), now), code("PAYMENT_QUERY_MISMATCH"));
+  await assert.rejects(acceptPaymentQuery(pool, { ...response, body: Buffer.concat([response.body, Buffer.from(" ")]) }, fixture.config, payment.outTradeNo, now), code("PAYMENT_SIGNATURE_INVALID"));
   assert.equal(acquired, false);
 });

@@ -90,7 +90,8 @@ async function reservePayment(pool, input, now = Date.now(), randomId = () => cr
 function validateBinding(payment, result) {
   if (result.combineOutTradeNo !== payment.id || result.outTradeNo !== payment.id || result.appid !== payment.appid
     || result.platformMchid !== payment.platform_mchid || result.subMchid !== payment.sub_mchid
-    || result.payerOpenid !== payment.payer_openid) fail("PAYMENT_RESULT_MISMATCH");
+    || (result.payerOpenid !== undefined || !["NOTPAY", "CLOSED", "PAYERROR"].includes(result.tradeState))
+      && result.payerOpenid !== payment.payer_openid) fail("PAYMENT_RESULT_MISMATCH");
 }
 
 async function withPayment(pool, result, work) {
@@ -151,8 +152,23 @@ async function recordPaymentClosed(pool, result, now = Date.now()) {
   return withPayment(pool, result, async (connection, order, payment) => {
     if (payment.status !== "CREATED") return { status: payment.status };
     await connection.execute("UPDATE order_payments SET status = 'CLOSED', updated_at = ? WHERE id = ?", [now, payment.id]);
+    const payload = payloadOf(order);
+    if (order.stage === "BUYER_FINAL_CONFIRM" && payload.public.paymentStatus === "VERIFYING") {
+      const [other] = await connection.execute("SELECT id FROM order_payments WHERE order_id = ? AND id <> ? AND status <> 'CLOSED' FOR UPDATE", [order.id, payment.id]);
+      if (!other.length) {
+        payload.public.paymentStatus = "UNPAID";
+        payload.events.push({ id: `close_${payment.id}`, event: "PAYMENT_ATTEMPT_CLOSED", fromStage: order.stage, toStage: order.stage, createdAt: now });
+        await connection.execute("UPDATE order_aggregates SET payload = ?, version = version + 1, updated_at = ? WHERE id = ?", [JSON.stringify(payload), now, order.id]);
+      }
+    }
     return { status: "CLOSED" };
   });
 }
 
-module.exports = { inTransaction, reservePayment, recordPaymentSuccess, recordPaymentClosed };
+async function readPendingPayment(pool, result) {
+  if (!["NOTPAY", "PAYERROR"].includes(result.tradeState)) fail("PAYMENT_RESULT_INVALID");
+  // A nonterminal observation can race a successful notification. Return the current stored fact, never downgrade it.
+  return withPayment(pool, result, async (connection, order, payment) => ({ status: payment.status, channelStatus: result.tradeState }));
+}
+
+module.exports = { inTransaction, reservePayment, recordPaymentSuccess, recordPaymentClosed, readPendingPayment };

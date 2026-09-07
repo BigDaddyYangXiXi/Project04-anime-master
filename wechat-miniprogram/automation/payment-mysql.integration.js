@@ -6,9 +6,9 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const mysql = require("../cloudfunctions/payment-api/node_modules/mysql2/promise");
 const { reservePayment, recordPaymentSuccess, recordPaymentClosed } = require("../cloudfunctions/payment-api/payment-store");
-const { acceptPaymentNotification, acceptSuccessfulQuery } = require("../cloudfunctions/payment-api/payment-notifications");
+const { acceptPaymentNotification, acceptPaymentQuery } = require("../cloudfunctions/payment-api/payment-notifications");
 const { createNotificationFixture } = require("../cloudfunctions/payment-api/test-notification-fixture");
-const { querySuccessfulPayment } = require("../cloudfunctions/payment-api/wechat-query");
+const { queryPayment } = require("../cloudfunctions/payment-api/wechat-query");
 const { createQueryFixture } = require("../cloudfunctions/payment-api/test-query-fixture");
 const notificationFixture = createNotificationFixture();
 const queryFixture = createQueryFixture(notificationFixture.config);
@@ -27,6 +27,10 @@ const result = (payment, overrides = {}) => ({ tradeState: "SUCCESS", combineOut
   appid: payment.appid, platformMchid: payment.platform_mchid, subMchid: payment.sub_mchid, payerOpenid: payment.payer_openid,
   transactionId: `wx_${payment.id}`, totalFen: 10000, payerPaidFen: 9800, currency: "CNY", paidAt: now + 100, ...overrides });
 const code = (expected) => (error) => error.code === expected;
+function queryResult(p, tradeState) {
+  return notificationFixture.sign(JSON.stringify({ combine_appid: p.appid, combine_mchid: p.platform_mchid, combine_out_trade_no: p.id,
+    sub_orders: [{ mchid: p.platform_mchid, sub_mchid: p.sub_mchid, out_trade_no: p.id, trade_state: tradeState }] }), now + 200);
+}
 async function order(id = "order_1") { const [[row]] = await pool.execute("SELECT * FROM order_aggregates WHERE id = ?", [id]); return row; }
 async function payments() { const [rows] = await pool.query("SELECT * FROM order_payments ORDER BY created_at, id"); return rows; }
 async function seedOrder(id, providerId = "provider") {
@@ -206,7 +210,11 @@ test("verified notification and outgoing query reach database and actual buyer/p
   await pool.execute("UPDATE provider_payment_merchants SET platform_mchid = ? WHERE provider_id = 'provider'", [queryFixture.config.platformMchid]);
   const normal = await reservePayment(pool, input({ orderId: "order_2", platformMchid: queryFixture.config.platformMchid }), now);
   const normalResponse = notificationFixture.sign(JSON.stringify(notificationFixture.transaction(result(normal))), now + 200);
-  await querySuccessfulPayment(pool, normal.id, queryFixture.config, queryFixture.requestFor(normalResponse), () => now + 200);
+  await queryPayment(pool, normal.id, queryFixture.config, queryFixture.requestFor(normalResponse), () => now + 200);
+  await seedOrder("order_3");
+  const closed = await reservePayment(pool, input({ orderId: "order_3", platformMchid: queryFixture.config.platformMchid }), now);
+  await pool.query("UPDATE order_aggregates SET payload = JSON_SET(payload, '$.public.paymentStatus', 'VERIFYING') WHERE id = 'order_3'");
+  await queryPayment(pool, closed.id, queryFixture.config, queryFixture.requestFor(queryResult(closed, "CLOSED")), () => now + 200);
   for (const [openId, role, pageName] of [["test_openid", "BUYER", "booking-status"], ["test_provider_openid", "PROVIDER", "provider-request"]]) {
     const response = await handleOrder(databaseReader(), { action: "getOrder", orderId: "order_1" }, { WX_OPENID: openId }, contactKey);
     assert.equal(response.viewerRole, role);
@@ -227,9 +235,56 @@ test("verified notification and outgoing query reach database and actual buyer/p
     page.renderOrder(toClientOrder(paidOrder));
     assert.equal(page.data.order.paymentStatus, "PAID");
     if (role === "BUYER") { assert.match(page.data.paymentHint, /付款已确认/); await page.startPayment(); }
+    const unpaidOrder = await handleOrder(databaseReader(), { action: "getOrder", orderId: "order_3" }, { WX_OPENID: openId }, contactKey);
+    page.renderOrder(toClientOrder(unpaidOrder));
+    assert.equal(page.data.order.paymentStatus, "UNPAID");
+    if (role === "BUYER") { assert.equal(page.data.agreementConfirmed, true); assert.match(page.data.paymentHint, /继续付款/); }
+    else assert.equal(page.data.isWaitingBuyerConfirm, true);
   }
   await assert.rejects(handleOrder(databaseReader(), { action: "transitionOrder", orderId: "order_1", expectedVersion: 2, event: "BUYER_CONFIRMS_EXECUTION" },
     { WX_OPENID: "test_openid" }, contactKey), code("PAYMENT_NOT_VERIFIED"));
+});
+
+test("unpaid observations never downgrade a received payment and present payer must match", async () => {
+  const p = await reservePayment(pool, input(), now);
+  const read = (state) => acceptPaymentQuery(pool, queryResult(p, state), notificationFixture.config, p.id, now + 200);
+  assert.deepEqual(await read("NOTPAY"), { status: "CREATED", channelStatus: "NOTPAY" });
+  assert.deepEqual(await read("PAYERROR"), { status: "CREATED", channelStatus: "PAYERROR" });
+  assert.equal((await order()).version, 1);
+  await recordPaymentSuccess(pool, result(p), now + 200);
+  for (const state of ["NOTPAY", "PAYERROR", "CLOSED"]) assert.equal((await read(state)).status, "PAID");
+  assert.equal((await order()).payload.public.paymentStatus, "PAID");
+  assert.equal((await order()).version, 2);
+  const wrong = JSON.parse(queryResult(p, "CLOSED").body); wrong.combine_payer_info = { openid: "wrong" };
+  await assert.rejects(acceptPaymentQuery(pool, notificationFixture.sign(JSON.stringify(wrong), now + 200), notificationFixture.config, p.id, now + 200), code("PAYMENT_RESULT_MISMATCH"));
+});
+
+test("closed active payment restores unpaid once; an old close cannot clear a newer pending payment", async () => {
+  const p = await reservePayment(pool, input(), now);
+  await pool.query("UPDATE order_aggregates SET payload = JSON_SET(payload, '$.public.paymentStatus', 'VERIFYING')");
+  const closed = queryResult(p, "CLOSED");
+  const close = () => acceptPaymentQuery(pool, closed, notificationFixture.config, p.id, now + 200);
+  await close(); await close();
+  assert.equal((await order()).payload.public.paymentStatus, "UNPAID");
+  assert.equal((await order()).version, 2);
+  assert.equal((await order()).payload.events.length, 1);
+  const next = await reservePayment(pool, input({ expectedVersion: 2, requestKey: "request_after_closed" }), now + 200);
+  await pool.query("UPDATE order_aggregates SET payload = JSON_SET(payload, '$.public.paymentStatus', 'VERIFYING')");
+  await close();
+  assert.equal((await order()).payload.public.paymentStatus, "VERIFYING");
+  assert.equal((await order()).version, 2);
+  await recordPaymentSuccess(pool, result(p), now + 300);
+  await acceptPaymentQuery(pool, queryResult(next, "CLOSED"), notificationFixture.config, next.id, now + 300);
+  assert.equal((await order()).payload.public.paymentStatus, "PAYMENT_REVIEW");
+});
+
+test("failure restoring an order after verified close rolls back the payment close too", async () => {
+  const p = await reservePayment(pool, input(), now);
+  await pool.query("UPDATE order_aggregates SET payload = JSON_SET(payload, '$.public.paymentStatus', 'VERIFYING')");
+  await assert.rejects(acceptPaymentQuery(faultyPool("write"), queryResult(p, "CLOSED"), notificationFixture.config, p.id, now + 200), /injected order write failure/);
+  assert.equal((await payments())[0].status, "CREATED");
+  assert.equal((await order()).payload.public.paymentStatus, "VERIFYING");
+  assert.equal((await order()).version, 1);
 });
 
 test("failed outgoing query preserves the order and payment; verified retry recovers once", async () => {
@@ -237,12 +292,12 @@ test("failed outgoing query preserves the order and payment; verified retry reco
   const p = await reservePayment(pool, input({ platformMchid: queryFixture.config.platformMchid }), now);
   const response = notificationFixture.sign(JSON.stringify(notificationFixture.transaction(result(p))), now + 200);
   for (const statusCode of [302, 404, 500]) {
-    await assert.rejects(querySuccessfulPayment(pool, p.id, queryFixture.config, queryFixture.requestFor({ ...response, statusCode }), () => now + 200), code("PAYMENT_QUERY_FAILED"));
+    await assert.rejects(queryPayment(pool, p.id, queryFixture.config, queryFixture.requestFor({ ...response, statusCode }), () => now + 200), code("PAYMENT_QUERY_FAILED"));
   }
   assert.equal((await payments())[0].status, "CREATED");
   assert.equal((await order()).version, 1);
   assert.equal((await order()).payload.public.paymentStatus, "UNPAID");
-  const recover = () => querySuccessfulPayment(pool, p.id, queryFixture.config, queryFixture.requestFor(response), () => now + 200);
+  const recover = () => queryPayment(pool, p.id, queryFixture.config, queryFixture.requestFor(response), () => now + 200);
   const outcomes = await Promise.all(Array.from({ length: 10 }, recover));
   assert.equal(outcomes.filter((item) => !item.duplicate).length, 1);
   assert.equal((await order()).version, 2);
@@ -267,7 +322,7 @@ test("invalid signature never writes, failed commit path can recover from a sign
   assert.equal((await payments())[0].transaction_id, null);
   assert.equal((await order()).version, 1);
   const query = notificationFixture.sign(JSON.stringify(transaction), now + 200);
-  assert.equal((await acceptSuccessfulQuery(pool, query, notificationFixture.config, p.id, now + 200)).status, "PAID");
+  assert.equal((await acceptPaymentQuery(pool, query, notificationFixture.config, p.id, now + 200)).status, "PAID");
   assert.equal((await acceptPaymentNotification(pool, request, notificationFixture.config, now + 200)).statusCode, 204);
   assert.equal((await order()).payload.events.length, 1);
 });
