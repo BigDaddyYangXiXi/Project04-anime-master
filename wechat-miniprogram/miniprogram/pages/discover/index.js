@@ -7,7 +7,7 @@ const cloudAvailability = require("../../services/cloud-availability");
 const cloudAccount = require("../../services/cloud-account");
 const calendarModel = require("../../data/calendar-model");
 const { mapCloudCatalog } = require("../../data/cloud-public-catalog");
-const { fuzzyLocation, locationPreference, pickerRegion } = require("../../utils/discovery-region");
+const { locationPreference, pickerRegion } = require("../../utils/discovery-region");
 const { serverFilters } = require("../../utils/discovery-query");
 const { setDiscoveryContext } = require("../../data/discovery-context");
 
@@ -87,8 +87,8 @@ Page({
     city: "",
     cityCode: "",
     regionValue: [],
-    locationState: "pending",
-    locationMessage: "正在确定你所在的城市",
+    locationState: "manual",
+    locationMessage: "选择服务城市后，为你展示当地可合作的人与作品",
     date: "",
     mode: "works",
     searchOpen: false,
@@ -131,8 +131,8 @@ Page({
       city: this.auditMode ? "杭州" : "",
       cityCode: this.auditMode ? "330100" : "",
       regionValue: this.auditMode ? ["浙江省", "杭州市", ""] : [],
-      locationState: this.auditMode ? "ready" : "pending",
-      locationMessage: this.auditMode ? "" : "正在确定你所在的城市",
+      locationState: this.auditMode ? "ready" : "manual",
+      locationMessage: this.auditMode ? "" : "选择服务城市后，为你展示当地可合作的人与作品",
       date: this.auditMode ? "2026-08-16" : tomorrowKey(),
       mode,
       searchQuery,
@@ -180,7 +180,7 @@ Page({
   async initializeDiscovery() {
     if (this.discoveryInitializing || this.cloudCatalogLoaded) return;
     this.discoveryInitializing = true;
-    this.setData({ catalogLoading: true, catalogError: "", locationState: "pending", locationMessage: "正在确定你所在的城市" });
+    this.setData({ catalogLoading: true, catalogError: "", locationState: "pending", locationMessage: "正在读取已保存的服务城市" });
     try {
       const { preference } = await cloudAccount.getDiscoveryPreference();
       this.discoveryPreferenceVersion = preference ? preference.version : 0;
@@ -188,14 +188,10 @@ Page({
       if (usable) {
         await this.applyDiscoveryRegion(usable, false);
       } else {
-        const location = await fuzzyLocation();
-        const resolved = await cloudAccount.resolveDiscoveryLocation(this.discoveryPreferenceVersion, location.latitude, location.longitude);
-        this.discoveryPreferenceVersion = resolved.preference.version;
-        await this.applyDiscoveryRegion(resolved.preference, false);
+        this.setData({ catalogLoading: false, locationState: "manual", locationMessage: "选择服务城市后，为你展示当地可合作的人与作品" });
       }
-    } catch (error) {
-      const notConfigured = error && error.code === "LOCATION_SERVICE_NOT_CONFIGURED";
-      this.setData({ catalogLoading: false, locationState: "manual", locationMessage: notConfigured ? "城市解析服务尚未配置，请手动选择服务城市" : "未能读取城市，请手动选择服务城市" });
+    } catch (_) {
+      this.setData({ catalogLoading: false, locationState: "manual", locationMessage: "选择服务城市后，为你展示当地可合作的人与作品" });
     } finally {
       this.discoveryInitializing = false;
     }

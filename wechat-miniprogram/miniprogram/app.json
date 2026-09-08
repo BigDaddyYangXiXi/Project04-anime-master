@@ -51,12 +51,6 @@
     "main-bottom-nav": "/components/main-bottom-nav/index",
     "app-top-nav": "/components/app-top-nav/index"
   },
-  "permission": {
-    "scope.userFuzzyLocation": {
-      "desc": "用于优先展示当前城市可合作的服务方和作品"
-    }
-  },
-  "requiredPrivateInfos": ["getFuzzyLocation"],
   "sitemapLocation": "sitemap.json",
   "style": "v2",
   "lazyCodeLoading": "requiredComponents"

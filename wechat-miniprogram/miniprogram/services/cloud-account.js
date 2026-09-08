@@ -17,5 +17,4 @@ async function getMine() { return withAvatarUrl(await call({ action: "getMine" }
 async function updateMine(expectedVersion, nickname, avatarAssetId) { return withAvatarUrl(await call({ action: "updateMine", expectedVersion, nickname, avatarAssetId })); }
 async function getDiscoveryPreference() { return call({ action: "getDiscoveryPreference" }); }
 async function saveDiscoveryPreference(expectedVersion, region, source = "MANUAL") { return call({ action: "saveDiscoveryPreference", expectedVersion, region, source }); }
-async function resolveDiscoveryLocation(expectedVersion, latitude, longitude) { return call({ action: "resolveDiscoveryLocation", expectedVersion, latitude, longitude }); }
-module.exports = { getDiscoveryPreference, getMine, isAvailable, resolveDiscoveryLocation, saveDiscoveryPreference, updateMine };
+module.exports = { getDiscoveryPreference, getMine, isAvailable, saveDiscoveryPreference, updateMine };

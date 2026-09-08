@@ -29,13 +29,4 @@ function locationPreference(preference, maximumAgeMs, now = Date.now()) {
   return Number.isSafeInteger(preference.locatedAt) && now - preference.locatedAt <= maximumAgeMs ? preference : null;
 }
 
-function fuzzyLocation() {
-  return new Promise((resolve, reject) => {
-    if (typeof wx === "undefined" || typeof wx.getFuzzyLocation !== "function") {
-      const error = new Error("当前微信版本不支持城市定位"); error.code = "LOCATION_UNAVAILABLE"; reject(error); return;
-    }
-    wx.getFuzzyLocation({ type: "gcj02", success: resolve, fail: reject });
-  });
-}
-
-module.exports = { canonicalCityCode, fuzzyLocation, locationPreference, normalizeCityName, pickerRegion };
+module.exports = { canonicalCityCode, locationPreference, normalizeCityName, pickerRegion };
