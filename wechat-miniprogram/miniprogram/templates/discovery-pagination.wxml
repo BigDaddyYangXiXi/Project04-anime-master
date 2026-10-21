@@ -1,0 +1,4 @@
+<view wx:if="{{!catalogLoading && catalogNextCursor}}">
+  <text wx:if="{{catalogMoreError}}">{{catalogMoreError}}</text>
+  <button hover-class="none" class="secondary-button am-action am-action-secondary" loading="{{catalogMoreLoading}}" aria-disabled="{{catalogMoreLoading}}" data-am-disabled="{{catalogMoreLoading}}" bindtap="{{(catalogMoreLoading) ? '' : 'loadMoreCatalog'}}">{{catalogMoreLoading ? '正在加载' : catalogMoreError ? '重试加载' : '加载更多'}}</button>
+</view>

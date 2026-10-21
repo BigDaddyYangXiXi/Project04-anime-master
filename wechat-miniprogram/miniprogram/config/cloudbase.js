@@ -1,4 +1,5 @@
 module.exports = Object.freeze({
-  enabled: true,
-  env: "quest-band-d1gem4bxt3fa17720"
+  // Company AppID migration: enable only after its CloudBase environment is configured.
+  enabled: false,
+  env: "cloudbase-d2g65rqbvee0bd978"
 });

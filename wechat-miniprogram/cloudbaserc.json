@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.cloudbase.net/cli/cloudbaserc.schema.json",
-  "envId": "quest-band-d1gem4bxt3fa17720",
+  "envId": "cloudbase-d2g65rqbvee0bd978",
   "functionRoot": "cloudfunctions",
   "functions": [
     {
@@ -107,6 +107,13 @@
       "handler": "index.main",
       "timeout": 20,
       "description": "Anime Master 本人付款结果核对，未配置时拒绝渠道请求"
+    },
+    {
+      "name": "support-api",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 15,
+      "description": "万匠屋本人申请与反馈，版本化补充及撤回"
     }
   ]
 }

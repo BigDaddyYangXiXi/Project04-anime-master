@@ -1,0 +1,8 @@
+<template name="publication-stage">
+  <view class="am-publication-stage {{stage === 'draft' ? 'am-publication-stage-draft' : 'am-publication-stage-emphasis'}}">
+    <image wx:if="{{stage === 'queued' || stage === 'published'}}" class="publication-expression" src="/assets/brand/expression-{{stage === 'published' ? 'happy' : 'focus'}}.png"/>
+    <text class="am-publication-step">{{stage === 'queued' ? '已提交发布任务' : stage === 'published' ? '✓ 发布完成' : stage === 'draft' ? '第 1 步 / 2 · 编辑与保存' : visitor ? '草稿访客预览 · 尚未发布' : '第 2 步 / 2 · 确认公开'}}</text>
+    <text class="am-publication-title">{{publishError ? '本次发布尚未确认' : stage === 'queued' ? '检测通过后自动公开' : stage === 'published' ? '本次内容已公开发布' : stage === 'draft' ? '保存草稿 ≠ 公开发布' : '本次内容尚未公开'}}</text>
+    <text class="am-publication-description">{{publishError ? publishError : stage === 'queued' ? '任务已保存，可离开此页。图片检测通过后公开；若继续编辑并保存，新草稿会替代本次任务。' : stage === 'published' ? '其他用户现在可以查看已发布的橱窗内容。' : stage === 'draft' ? '保存仅保留修改。请到管理橱窗完成预览，并点击「确认并公开发布」。' : visitor ? '你看到的是草稿效果。请返回管理橱窗，进入发布预览并确认发布。' : '请检查下方内容，再点击页面底部「确认并公开发布」。离开预览不会自动发布。'}}</text>
+  </view>
+</template>

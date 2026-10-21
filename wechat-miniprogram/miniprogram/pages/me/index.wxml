@@ -1,52 +1,13 @@
 <app-top-nav class="app-navigation" title="我的" show-back="{{false}}" show-role-switch="{{true}}" role-text="{{role === 'provider' ? '服务方' : '需求方'}}" bindroleswitch="switchIdentity"/>
 <view class="me-shell">
-  <view wx:if="{{dashboardLoading}}" class="empty-state"><text>正在读取个人中心</text></view>
-  <view wx:if="{{dashboardError}}" class="empty-state"><text>{{dashboardError}}</text></view>
-  <view class="profile-card">
-    <view class="profile-head" role="button" bindtap="editAccount" aria-label="修改头像和昵称">
-      <view class="avatar-wrap">
-        <image wx:if="{{account.avatar}}" class="avatar" src="{{account.avatar}}" mode="aspectFill"/><view wx:else class="avatar avatar-fallback">{{initial}}</view>
-        <view class="avatar-wink" aria-hidden="true"></view>
-      </view>
-      <view class="profile-copy">
-        <view class="profile-name-row"><text class="profile-name">{{account.nickname}}</text><text class="identity-chip">{{role === 'provider' ? '服务方' : '需求方'}}</text></view>
-        <text>{{role === 'provider' ? '公开橱窗身份 · 资料对需求方可见' : '个人合作身份 · 收藏与项目在此归集'}}</text>
-      </view>
-      <view class="profile-edit"><text>编辑</text><view class="chevron"></view></view>
-    </view>
-    <view class="profile-business">
-      <view class="profile-business-head"><text>{{role === 'provider' ? '经营数据' : '合作数据'}}</text><text wx:if="{{role === 'provider'}}">{{storefrontStatusText}}</text></view>
-      <view class="stats-grid {{role === 'provider' ? 'provider-stats' : 'buyer-stats'}}"><view wx:for="{{role === 'provider' ? providerStats : buyerStats}}" wx:key="label"><text>{{item.value}}</text><text>{{item.label}}</text></view></view>
-      <text class="data-note">“—”表示后端数据尚未同步。</text>
-      <view wx:if="{{role === 'provider'}}" class="funds-entry" role="button" bindtap="openFunds"><text class="action-mark">¥</text><view><text>资金管理</text><text>充值、提现、交易记录、账单与支付安全</text></view><view class="chevron"></view></view>
-    </view>
+  <button hover-class="none" class="profile-head" bindtap="editAccount" aria-label="修改头像和昵称"><image wx:if="{{account.avatar}}" class="avatar" src="{{account.avatar}}" mode="aspectFill"/><view wx:else class="avatar avatar-fallback">{{initial}}</view><view class="profile-copy"><text class="profile-name">{{account.nickname || '我的账号'}}</text><text wx:if="{{account.username}}" class="profile-role">@{{account.username}}</text></view><view class="profile-edit"><text>编辑资料</text><image class="chevron" src="/assets/me/chevron.svg"/></view></button>
+  <view wx:if="{{dashboardError}}" class="me-error" role="alert"><text>{{dashboardError}}</text><button hover-class="none" class="me-retry" aria-disabled="{{dashboardLoading}}" data-am-disabled="{{dashboardLoading}}" bindtap="{{(dashboardLoading) ? '' : 'retryDashboard'}}">重试</button></view>
+  <view class="me-panel"><view class="stats-grid"><button hover-class="none" wx:for="{{role === 'buyer' ? buyerHighlights : providerHighlights}}" wx:key="key" class="stat collection-entry" data-type="{{item.key}}" bindtap="openHighlight"><text class="stat-value">{{item.value}}</text><text class="stat-label">{{item.label}}</text></button></view></view>
+  <view class="me-panel business-panel">
+    <button hover-class="none" class="utility-row" bindtap="openBusiness"><image class="row-icon" src="{{role === 'buyer' ? '/assets/me/projects.svg' : '/assets/me/storefront.svg'}}"/><view class="row-copy"><text class="entry-title">{{role === 'buyer' ? '项目管理' : '橱窗管理'}}</text><text class="row-note">{{role === 'buyer' ? projectText : (previewMeta || (dashboardError ? '橱窗暂不可用' : '正在读取橱窗'))}}</text></view><text wx:if="{{role === 'provider'}}" class="row-note">{{storefrontStatusText}}</text><image class="chevron" src="/assets/me/chevron.svg"/></button>
+    <view class="asset-footer" wx:if="{{role === 'buyer'}}"><button hover-class="none" class="utility-row" bindtap="openRecentProject"><text class="row-note">{{recentProject ? '最近编辑' : '开始整理'}}</text><text class="row-copy recent-title">{{recentProject ? recentProject.title : (projectReady ? '创建第一个项目' : '查看项目')}}</text><image class="chevron" src="/assets/me/chevron.svg"/></button></view>
+    <view class="asset-footer paired-footer" wx:else><button hover-class="none" class="footer-action" bindtap="openCalendar">档期管理</button><button hover-class="none" class="footer-action" bindtap="previewStorefront">橱窗预览</button></view>
   </view>
-
-  <block wx:if="{{role === 'provider'}}">
-    <view class="hero-card">
-      <image class="hero-logo" src="/assets/brand/peach-slime-main-768.jpg" mode="aspectFill" aria-hidden="true"/>
-      <view class="hero-copy"><text class="hero-title">把作品与服务保持在最佳状态</text><text class="hero-desc">这里发布的内容会同步到需求方看到的作品详情和个人橱窗。</text></view>
-      <view class="primary-actions">
-        <view class="main-action storefront-action" role="button" bindtap="editStorefront"><text class="action-mark">店</text><view class="action-copy"><text>编辑橱窗</text><text>资料、服务与须知</text></view></view>
-        <view class="main-action work-action selected-action" role="button" bindtap="uploadWork"><view class="upload-mark"><view></view><view></view></view><view class="action-copy"><text>上传作品</text><text>编辑作品详情</text></view></view>
-      </view>
-      <button class="preview-button" bindtap="previewStorefront"><view><text>橱窗预览</text><text>{{previewMeta}}</text></view><view class="chevron"></view></button>
-    </view>
-  </block>
-
-  <block wx:else>
-    <view class="hero-card buyer-hero">
-      <image class="hero-logo" src="/assets/brand/peach-slime-main-768.jpg" mode="aspectFill" aria-hidden="true"/>
-      <view class="hero-copy"><text class="hero-title">从收藏灵感到项目落地</text><text class="hero-desc">订单与项目各自流转，个人资产统一在这里查找。</text></view>
-      <view class="primary-actions">
-        <view class="main-action selected-action" role="button" bindtap="openBuyerOrders"><text class="action-mark">单</text><view class="action-copy"><text>查看订单</text><text>跟进预约与执行</text></view></view>
-        <view class="main-action" role="button" bindtap="openBuyerProjects"><text class="action-mark">项</text><view class="action-copy"><text>我的项目</text><text>整理角色与订单</text></view></view>
-      </view>
-    </view>
-  </block>
-
-  <view class="section-card asset-card">
-    <view class="section-head"><view><text>我的内容资产</text><text>供需身份共用，切换身份不会丢失</text></view></view>
-    <view class="asset-list"><button wx:for="{{assets}}" wx:key="key" data-type="{{item.key}}" bindtap="openAssets"><view><text>{{item.label}}</text><text>{{item.value}}</text></view><view class="chevron"></view></button></view>
-  </view>
+  <view class="me-panel"><view class="trade-tools"><button hover-class="none" class="buyer-tool" bindtap="openFunds"><image class="row-icon" src="/assets/me/funds.svg"/><text>资金</text></button><button hover-class="none" class="buyer-tool" bindtap="openBuyerOrders"><image class="row-icon" src="/assets/me/orders.svg"/><text>订单</text></button><button hover-class="none" class="buyer-tool" data-mode="coops" bindtap="openActivity"><image class="row-icon" src="/assets/me/cooperation.svg"/><text>合作</text></button><button hover-class="none" class="buyer-tool" bindtap="openReviews"><image class="row-icon" src="/assets/me/reviews.svg"/><text>评价</text></button></view><button hover-class="none" class="utility-row attention-row" data-mode="todo" bindtap="openTodo"><text class="row-copy row-note">{{todoText}}</text><image class="chevron" src="/assets/me/chevron.svg"/></button></view>
+  <view class="me-panel utilities-panel"><button hover-class="none" wx:if="{{role === 'buyer'}}" class="utility-row" bindtap="openHomePreferences"><image class="row-icon" src="/assets/me/preferences.svg"/><text class="row-copy row-title">广场偏好</text><image class="chevron" src="/assets/me/chevron.svg"/></button><button hover-class="none" wx:else class="utility-row" data-type="liked" bindtap="openAssets"><image class="row-icon" src="/assets/me/liked.svg"/><text class="row-copy row-title">喜欢与关注</text><image class="chevron" src="/assets/me/chevron.svg"/></button><button hover-class="none" class="utility-row" bindtap="openHelp"><image class="row-icon" src="/assets/me/help.svg"/><text class="row-copy row-title">帮助与反馈</text><image class="chevron" src="/assets/me/chevron.svg"/></button><button hover-class="none" class="utility-row" bindtap="openSettings"><image class="row-icon" src="/assets/me/settings.svg"/><text class="row-copy row-title">设置</text><image class="chevron" src="/assets/me/chevron.svg"/></button></view>
 </view>

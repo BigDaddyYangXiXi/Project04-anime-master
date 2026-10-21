@@ -1,0 +1,14 @@
+/* Native inputs retain their binding, picker and keyboard behavior. */
+.am-input, .am-textarea, .am-picker {
+  box-sizing: border-box;
+  min-height: var(--am-touch-min);
+  padding: var(--am-space-2) var(--am-space-3); border: var(--am-border-control);
+  border-radius: var(--am-radius-control); color: var(--am-color-text); background: var(--am-color-surface);
+  font-size: var(--am-type-body);
+  font-weight: var(--am-weight-regular);
+  line-height: var(--am-line-body);
+}
+.am-input { padding-top: var(--am-space-none); padding-bottom: var(--am-space-none); }
+.am-textarea { width: 100%; }
+
+input.am-input, textarea.am-textarea { font-size: var(--am-type-label); font-weight: var(--am-weight-regular); line-height: var(--am-booking-line-primary); }

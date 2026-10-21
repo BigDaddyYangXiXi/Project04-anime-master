@@ -1,8 +1,11 @@
+const { nativeBrandColor } = require("../../data/design-theme");
+const localPreview = require("../../utils/local-preview");
 const store = require("../../data/v063-store");
 const projectModel = require("../../data/project-model");
 const { stageLabels, stageFlows } = require("../../data/v063");
 const cloudProjects = require("../../services/cloud-projects");
 const cloudOrders = require("../../services/cloud-orders");
+const projectImagePreview = require("../../utils/project-image-preview");
 
 function flowFor(stage) { return Object.keys(stageFlows).find((flow) => stageFlows[flow].includes(stage)) || "booking"; }
 function destinationFor(stage) { if (flowFor(stage) === "acceptance") return "fulfillment"; if (flowFor(stage) === "booking") return "booking-status"; return "order-detail"; }
@@ -19,16 +22,23 @@ Page({
     project: null, descriptionRows: [], linkedOrders: [], availableOrders: [], selectingOrder: false,
     orderCount: 0, ndaPending: 0, total: 0, loading: false, loadError: "", actionPending: false
   },
-  onLoad(options) { this.projectId = options.id; this.cloudMode = options.audit !== "1"; },
+  onLoad(options) { this.unloaded = false; this.projectId = options.id; this.cloudMode = !localPreview.isAudit(options); },
+  onUnload() { this.unloaded = true; this.loadSequence = (this.loadSequence || 0) + 1; },
   onShow() { this.load(); },
   async load() {
+    if (this.unloaded) return;
     if (this.cloudMode) {
+      const request = this.loadSequence = (this.loadSequence || 0) + 1;
+      const projectId = this.projectId, owner = getApp().globalData.account?.id;
+      const current = () => !this.unloaded && this.loadSequence === request && this.projectId === projectId && owner === getApp().globalData.account?.id;
       this.setData({ loading: true, loadError: "" });
       try {
-        const [project, orders] = await Promise.all([cloudProjects.getProject(this.projectId), cloudOrders.listOrders()]);
+        const [project, orders] = await Promise.all([cloudProjects.getProject(projectId), cloudOrders.listOrders()]);
+        if (!current()) return;
         this.renderProject(project, orders.filter((order) => order.viewerRole === "BUYER"));
         this.setData({ loading: false });
       } catch (error) {
+        if (!current()) return;
         this.setData({ project: null, loading: false, loadError: error && error.code === "PROJECT_NOT_FOUND" ? "没有找到这个项目。" : "项目读取失败，请稍后重试。" });
       }
       return;
@@ -48,7 +58,7 @@ Page({
       service: item.service || item.title || "服务内容待确认", state: stageLabels[item.stage] || item.stage
     }));
     this.setData({
-      project, descriptionRows: formatProjectDescription(project.description), linkedOrders, availableOrders,
+      project, targetImageRows: projectImagePreview.rows(project.targetImages || [], project.targetImageAssets), descriptionRows: formatProjectDescription(project.description), linkedOrders, availableOrders,
       orderCount: linkedOrders.length,
       ndaPending: linkedOrders.filter((item) => ["NDA_BUYER_PENDING", "NDA_PROVIDER_PENDING"].includes(item.stage)).length,
       total: linkedOrders.reduce((sum, item) => sum + item.amount, 0)
@@ -61,29 +71,35 @@ Page({
   },
   async linkOrder(event) {
     const order = this.data.availableOrders[Number(event.currentTarget.dataset.index)];
-    if (!order || this.data.actionPending) return;
+    if (!order || this.unloaded || this.data.actionPending || !this.data.project) return;
+    const projectId = this.projectId;
     if (this.cloudMode) {
       this.setData({ actionPending: true });
-      try { await cloudProjects.linkOrder(this.projectId, this.data.project.version, order.orderId); this.setData({ selectingOrder: false, actionPending: false }); await this.load(); }
-      catch (error) { this.setData({ actionPending: false }); wx.showToast({ title: error && error.code === "VERSION_CONFLICT" ? "项目已变化，正在刷新" : "订单暂时不能加入项目", icon: "none" }); await this.load(); }
+      try { await cloudProjects.linkOrder(projectId, this.data.project.version, order.orderId); if (this.unloaded || this.projectId !== projectId) return; this.setData({ selectingOrder: false, actionPending: false }); await this.load(); }
+      catch (error) { if (this.unloaded || this.projectId !== projectId) return; this.setData({ actionPending: false }); wx.showToast({ title: error && error.code === "VERSION_CONFLICT" ? "项目已变化，正在刷新" : "订单暂时不能加入项目", icon: "none" }); await this.load(); }
       return;
     }
     if (!projectModel.linkOrder(this.projectId, order.orderId)) return wx.showToast({ title: "订单状态已变化，请刷新后重试", icon: "none" });
     this.setData({ selectingOrder: false }); this.load();
   },
   unlinkOrder(event) {
+    if (this.unloaded || this.data.actionPending || !this.data.project) return;
+    const projectId = this.projectId, version = this.data.project.version;
     const order = this.data.linkedOrders[Number(event.currentTarget.dataset.index)]; if (!order) return;
-    wx.showModal({ title: "移出项目？", content: "只解除项目归组，不会取消订单或改变订单执行状态。", confirmText: "确认移出", confirmColor: "#c6536b", success: async ({ confirm }) => {
-      if (!confirm || this.data.actionPending) return;
+    wx.showModal({ title: "移出项目？", content: "只解除项目归组，不会取消订单或改变订单执行状态。", confirmText: "确认移出", confirmColor: nativeBrandColor, success: async ({ confirm }) => {
+      if (!confirm || this.unloaded || this.data.actionPending) return;
+      if (this.projectId !== projectId || !this.data.project || this.data.project.version !== version) {
+        wx.showToast({ title: "项目已更新，请重新核对后移出", icon: "none" }); return;
+      }
       if (this.cloudMode) {
         this.setData({ actionPending: true });
-        try { await cloudProjects.unlinkOrder(this.projectId, this.data.project.version, order.orderId); this.setData({ actionPending: false }); await this.load(); }
-        catch { this.setData({ actionPending: false }); wx.showToast({ title: "项目已变化，正在刷新", icon: "none" }); await this.load(); }
+        try { await cloudProjects.unlinkOrder(projectId, version, order.orderId); if (this.unloaded || this.projectId !== projectId) return; this.setData({ actionPending: false }); await this.load(); }
+        catch { if (this.unloaded || this.projectId !== projectId) return; this.setData({ actionPending: false }); wx.showToast({ title: "项目已变化，正在刷新", icon: "none" }); await this.load(); }
       } else if (projectModel.unlinkOrder(this.projectId, order.orderId)) this.load();
     } });
   },
   openBrief() { wx.navigateTo({ url: `/pages/brief/index?id=${this.projectId}` }); },
-  previewTargetImage(event) { const images = this.data.project && this.data.project.targetImages || []; const current = images[Number(event.currentTarget.dataset.index)]; if (current) wx.previewImage({ current, urls: images }); },
+  previewTargetImage: projectImagePreview,
   retryLoad() { this.load(); }
 });
 

@@ -2,12 +2,12 @@
 <view wx:if="{{role === 'buyer'}}" class="projects-shell">
   <view class="page-intro">
     <text class="intro-title">我的项目</text>
-    <text class="intro-copy">项目用于组织不同职业订单，不覆盖任何订单自己的合作状态。</text>
+    <text class="intro-copy">把妆造、摄影与后期安排在一起，随时查看合作进度。</text>
   </view>
 
   <view class="project-list">
-    <view wx:if="{{loading}}" class="empty-state"><text>正在读取项目</text></view>
-    <view wx:elif="{{loadError}}" class="empty-state"><text>{{loadError}}</text></view>
+    <block wx:if="{{loading}}"></block>
+    <view wx:elif="{{loadError}}" class="empty-state"><text>{{loadError}}</text><button hover-class="none" class="am-action am-action-secondary" bindtap="loadProjects">重新读取项目</button></view>
     <view wx:for="{{projects}}" wx:key="id" class="project-row" role="button" aria-label="打开项目 {{item.title}}" data-id="{{item.id}}" bindtap="openProject">
       <view class="project-copy">
         <view class="project-heading"><text class="project-title">{{item.title}}</text><text class="order-status">进行中</text></view>
@@ -20,22 +20,22 @@
 
   <view wx:if="{{!loading && !loadError && !projects.length}}" class="empty-state"><text>还没有项目</text><text>新建项目后，可把执行中的订单加入同一项目。</text></view>
 
-  <button class="dashed-button" disabled="{{actionPending}}" bindtap="createProject">{{actionPending ? '正在创建' : '＋ 新建项目'}}</button>
+  <button aria-disabled="{{actionPending}}" hover-class="none" class="dashed-button am-action am-action-primary" data-am-disabled="{{actionPending}}" bindtap="{{(actionPending) ? '' : 'createProject'}}">{{actionPending ? '正在创建' : '＋ 新建项目'}}</button>
   <text wx:if="{{navigationError}}" class="calendar-message">{{navigationError}}</text>
 </view>
 <view wx:else class="calendar-shell">
   <view class="calendar-intro"><text>公开档期用于筛选</text><text>{{monthTitle}}</text><text>点击日期切换公开状态；执行中订单会锁定对应日期。</text></view>
-  <view wx:if="{{calendarLoading}}" class="empty-state"><text>正在读取档期</text></view>
+  <block wx:if="{{calendarLoading}}"></block>
   <view wx:elif="{{calendarError}}" class="empty-state"><text>{{calendarError}}</text></view>
   <view wx:else class="calendar-card">
     <view class="week-row"><text wx:for="{{weekdays}}" wx:key="*this">{{item}}</text></view>
     <view class="calendar-grid">
-      <button wx:for="{{days}}" wx:key="key" disabled="{{!item.valid || item.past || item.locked}}" class="{{!item.valid ? 'placeholder' : item.past ? 'past' : item.locked ? 'locked' : item.open ? 'open' : 'unknown'}}" data-day="{{item.value}}" data-date="{{item.date}}" bindtap="toggle">
+      <button aria-disabled="{{!item.valid || item.past || item.locked}}" hover-class="none" wx:for="{{days}}" wx:key="key" data-am-disabled="{{!item.valid || item.past || item.locked}}" class="{{!item.valid ? 'placeholder' : item.past ? 'past' : item.locked ? 'locked' : item.open ? 'open' : 'unknown'}}" data-day="{{item.value}}" data-date="{{item.date}}" bindtap="{{(!item.valid || item.past || item.locked) ? '' : 'toggle'}}">
         <text>{{item.value}}</text><text wx:if="{{item.open}}">可约</text><text wx:if="{{item.locked}}">已锁</text>
       </button>
     </view>
     <view class="calendar-legend"><view><view class="calendar-dot open"></view><text>公开可约</text></view><view><view class="calendar-dot unknown"></view><text>未公开</text></view><view><view class="calendar-dot locked"></view><text>订单锁定</text></view></view>
   </view>
-  <view class="calendar-actions"><button class="secondary-button" disabled="{{!changed || actionPending}}" bindtap="reset">撤销修改</button><button class="primary-button" disabled="{{!changed || actionPending}}" bindtap="save">{{actionPending ? '正在保存' : '保存档期'}}</button></view>
+  <view class="calendar-actions"><button aria-disabled="{{!changed || actionPending}}" hover-class="none" class="secondary-button am-action am-action-secondary" data-am-disabled="{{!changed || actionPending}}" bindtap="{{(!changed || actionPending) ? '' : 'reset'}}">撤销修改</button><button aria-disabled="{{!changed || actionPending}}" hover-class="none" class="primary-button am-action am-action-primary" data-am-disabled="{{!changed || actionPending}}" bindtap="{{(!changed || actionPending) ? '' : 'save'}}">{{actionPending ? '正在保存' : '保存档期'}}</button></view>
   <text wx:if="{{message}}" class="calendar-message">{{message}}</text>
 </view>

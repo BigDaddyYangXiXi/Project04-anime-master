@@ -1,15 +1,14 @@
 <app-top-nav class="app-navigation" title="{{role === 'provider' ? '订单管理' : '订单'}}" workspace="{{role}}" show-back="{{false}}"/>
 <view class="list-shell">
-  <view class="flow-tabs"><button wx:for="{{tabs}}" wx:key="id" class="{{group === item.id ? 'active' : ''}}" data-group="{{item.id}}" bindtap="choose">{{item.label}}</button></view>
-  <view wx:if="{{loading}}" class="empty-state"><text>正在读取订单</text><text>订单状态不会在加载过程中改变。</text></view>
-  <view wx:elif="{{loadError}}" class="empty-state"><text>{{loadError}}</text><button class="empty-retry" bindtap="retryLoad">重新加载</button></view>
-  <view wx:elif="{{orders.length}}" class="order-list">
-    <button wx:for="{{orders}}" wx:key="id" class="order-row" data-id="{{item.id}}" bindtap="open">
+  <view class="flow-tabs"><button hover-class="none" wx:for="{{tabs}}" wx:key="id" class="{{group === item.id ? 'active' : ''}}" data-group="{{item.id}}" bindtap="choose">{{item.label}}</button></view>
+  <view wx:if="{{loadError}}" class="empty-state"><text>{{loadError}}</text><button hover-class="none" class="empty-retry am-action am-action-secondary" bindtap="retryLoad">重新加载</button></view>
+  <view wx:if="{{ready && orders.length}}" class="order-list">
+    <button hover-class="none" wx:for="{{orders}}" wx:key="id" class="order-row" data-id="{{item.id}}" bindtap="open">
       <view class="row-head"><text class="status {{item.statusTone}}">{{item.statusLabel}}</text><text>{{item.id}}</text></view>
-      <text class="order-title">{{item.service}}</text><text class="identity-line">{{item.counterpart.nickname}} · {{item.counterpart.uid}}</text>
+      <text class="order-title">{{item.service}}</text><text class="am-identity-full identity-line">{{item.counterpart.nickname}}</text>
       <view class="where-when"><text>{{item.city}}</text><view><text wx:for="{{item.scheduleLines}}" wx:for-item="slot" wx:key="label">{{slot.label}} · {{slot.text}}</text></view></view>
-      <view class="row-foot"><text>￥{{item.finalPrice}}</text><text>{{role === 'provider' ? '查看并处理 →' : '查看订单 →'}}</text></view>
+      <view class="row-foot"><text class="am-money am-money-list">￥{{item.finalPrice}}</text><text>{{role === 'provider' ? '查看并处理 →' : '查看订单 →'}}</text></view>
     </button>
   </view>
-  <view wx:else class="empty-state"><text>当前分类没有订单</text><text>订单状态更新后会自动归入对应分类。</text></view>
+  <view wx:elif="{{ready && !loadError}}" class="empty-state"><text>当前分类没有订单</text><text>订单状态更新后会自动归入对应分类。</text></view>
 </view>

@@ -1,40 +1,58 @@
 <app-top-nav title="" show-back="{{false}}"/>
-<view class="auth-shell">
+<view class="auth-shell {{checking || success ? 'auth-opening' : ''}}">
   <view class="brand-scene">
-    <image class="brand-visual" src="/assets/brand/peach-slime-main-768.jpg" mode="aspectFill" aria-label="动漫高手桃色品牌角色"/>
-    <view class="brand-signature"><text class="brand-name">动漫高手</text><text class="brand-caption">让热爱，遇见高手。</text></view>
+    <image class="brand-visual" src="/assets/brand/arsviora-compact-v04.png" mode="aspectFit" aria-label="ArsViora 万匠屋"/>
+    <text class="brand-caption">好手艺，遇见好主意。</text>
   </view>
   <view class="auth-content">
     <view wx:if="{{checking}}" class="status-block" role="status">
       <view class="loading-mark"><view></view><view></view><view></view></view>
-      <text class="auth-title">正在为你连接</text><text class="auth-subtitle">马上就好</text>
+
     </view>
     <view wx:elif="{{success}}" class="status-block" role="status">
       <view class="success-mark"><view></view></view>
-      <text class="auth-title">{{successTitle}}</text><text class="auth-subtitle">一起开始新的创作</text>
+      <text class="auth-title">{{successTitle}}</text>
+      <text class="auth-subtitle">一起开始新的创作</text>
     </view>
     <view wx:else class="auth-form">
-      <text class="auth-eyebrow">{{mode === 'login' ? '欢迎回来' : '很高兴认识你'}}</text>
-      <text class="auth-title">{{mode === 'login' ? '登录动漫高手' : '创建你的账号'}}</text>
-      <text class="auth-subtitle">{{mode === 'login' ? (sessionRegistered ? account.nickname + '，继续你的创作旅程' : '找到合拍的人，把作品做好。') : '取一个你喜欢的名字，让大家认识你。'}}</text>
+      <text class="auth-title">{{mode === 'login' ? '欢迎来到万匠屋' : '创建你的账号'}}</text>
+      <text class="am-identity-full auth-subtitle">{{mode === 'login' ? (sessionRegistered ? account.nickname + '，继续你的创作旅程' : '找到合拍的人，把作品做好。') : '取一个你喜欢的名字，让大家认识你。'}}</text>
       <view wx:if="{{mode === 'register'}}" class="register-fields">
-        <view class="field-label"><text>你的昵称</text><text class="field-count">{{nicknameLength}} / 20</text></view>
-        <input type="nickname" class="nickname-input {{fieldError ? 'invalid' : ''}}" value="{{nickname}}" maxlength="20" placeholder="想让大家怎么称呼你？" placeholder-class="nickname-placeholder" aria-label="昵称，1 至 20 个字符" disabled="{{processing}}" bindinput="updateNickname"/>
+        <view class="field-label"><text>你的昵称</text><text class="field-count">{{nicknameLength}} / 12</text></view>
+        <input type="text" class="nickname-input {{fieldError ? 'invalid' : ''}} am-input" value="{{nickname}}" maxlength="144" placeholder="想让大家怎么称呼你？" placeholder-class="nickname-placeholder" aria-label="昵称，1 至 12 个字符" disabled="{{processing}}" bindinput="updateNickname"/>
         <text wx:if="{{fieldError}}" class="field-error" role="alert">先告诉我们你的昵称吧</text>
+        <view class="field-label username-label"><text>用户名</text><text class="field-count">2—12位</text></view>
+        <input type="text" class="nickname-input {{usernameError ? 'invalid' : ''}} am-input" value="{{username}}" maxlength="12" placeholder="英文字母、数字、英文标点" placeholder-class="nickname-placeholder" aria-label="用户名，2至12个字符" disabled="{{processing}}" bindinput="updateUsername"/>
+        <text wx:if="{{usernameError}}" class="field-error" role="alert">请填写2—12位英文字母、数字或英文标点</text>
         <view class="notice-line">
-          <button class="notice-row {{acceptedNotice ? 'checked' : ''}}" role="checkbox" aria-checked="{{acceptedNotice}}" disabled="{{processing}}" bindtap="toggleNotice"><view class="check-box"><view></view></view><text>我已阅读并同意</text></button>
-          <button class="notice-link" bindtap="showNotice">《账号使用说明》</button>
+          <button aria-disabled="{{processing}}" hover-class="none" class="notice-row {{acceptedNotice ? 'checked' : ''}}" role="checkbox" aria-label="我已阅读并同意协议" aria-checked="{{acceptedNotice}}" data-am-disabled="{{processing}}" bindtap="{{(processing) ? '' : 'toggleNotice'}}"><view class="check-box"><view></view></view></button>
+          <text class="notice-links"><text bindtap="toggleNotice">我已阅读并同意</text><text class="notice-link" role="link" bindtap="showNotice">《用户服务协议与账号规范》</text>和<text class="notice-link" role="link" bindtap="showPrivacy">《隐私保护指引》</text>。</text>
         </view>
-        <text wx:if="{{noticeError}}" class="field-error" role="alert">请先阅读并同意账号使用说明</text>
+        <text wx:if="{{noticeError}}" class="field-error" role="alert">请先阅读并同意用户服务协议与账号规范</text>
       </view>
-      <view wx:if="{{errorMessage}}" class="error-panel" role="alert"><text class="error-message">{{errorMessage}}</text><button wx:if="{{sessionCheckFailed}}" class="retry-button" bindtap="checkSession" disabled="{{processing}}">重新连接</button></view>
+      <view wx:if="{{errorMessage}}" class="error-panel" role="alert"><text class="error-message">{{errorMessage}}</text><button aria-disabled="{{processing}}" hover-class="none" wx:if="{{sessionCheckFailed}}" class="retry-button" bindtap="{{(processing) ? '' : 'checkSession'}}" data-am-disabled="{{processing}}">重新连接</button></view>
+      <view wx:if="{{authMethod === 'phone'}}" class="register-fields">
+        <text class="field-label">手机号</text>
+        <input class="nickname-input am-input" type="number" maxlength="11" value="{{phone}}" bindinput="updatePhone" placeholder="请输入中国大陆手机号" disabled="{{processing}}"/>
+        <text class="field-label">短信验证码</text>
+        <input class="nickname-input am-input" type="number" maxlength="6" value="{{verificationCode}}" bindinput="updateVerificationCode" placeholder="请输入短信验证码" disabled="{{processing}}"/>
+        <button aria-disabled="{{processing}}" hover-class="none" class="notice-link" bindtap="{{(processing) ? '' : 'requestSmsCode'}}" data-am-disabled="{{processing}}">获取验证码</button>
+        <text class="auth-subtitle">短信注册暂未开放，可先使用微信注册。</text>
+      </view>
       <view class="auth-actions">
-        <button wx:if="{{phoneSupported && (mode === 'login' || canRegister)}}" class="primary-button" open-type="getRealtimePhoneNumber" phone-number-no-quota-toast="{{true}}" disabled="{{processing}}" loading="{{processing}}" bindgetrealtimephonenumber="submitPhone">{{mode === 'login' ? '微信一键登录' : '微信一键注册'}}</button>
-        <button wx:else class="primary-button" disabled="{{processing}}" bindtap="preparePhone">{{mode === 'login' ? '微信一键登录' : '微信一键注册'}}</button>
-        <button wx:if="{{mode === 'login'}}" class="identity-button" disabled="{{processing}}" bindtap="submitLogin">使用微信身份登录</button>
-        <button wx:else class="identity-button" disabled="{{processing}}" bindtap="submitRegister">使用微信身份注册</button>
+        <block wx:if="{{authMethod === 'wechat'}}">
+          <button aria-disabled="{{processing}}" hover-class="none" wx:if="{{mode === 'register'}}" class="primary-button am-action am-action-primary" data-am-disabled="{{processing}}" loading="{{processing}}" open-type="{{(processing) ? '' : (canRegister ? 'getRealtimePhoneNumber' : '')}}" bindtap="{{(processing) ? '' : 'submitRegister'}}" bindgetrealtimephonenumber="authorizeRegistrationPhone">注册</button>
+          <button aria-disabled="{{processing}}" hover-class="none" wx:else class="primary-button am-action am-action-primary" data-am-disabled="{{processing}}" loading="{{processing}}" bindtap="{{(processing) ? '' : 'submitLogin'}}">微信登录</button>
+          <button aria-disabled="{{processing}}" hover-class="none" class="identity-button" data-am-disabled="{{processing}}" data-method="phone" bindtap="{{(processing) ? '' : 'chooseMethod'}}">{{mode === 'register' ? '手机号注册' : '手机号登录'}}</button>
+        </block>
+        <block wx:else>
+          <button aria-disabled="{{processing}}" hover-class="none" class="primary-button am-action am-action-primary" data-am-disabled="{{processing}}" bindtap="{{(processing) ? '' : 'submitSms'}}">{{mode === 'register' ? '注册' : '登录'}}</button>
+          <button aria-disabled="{{processing}}" hover-class="none" class="identity-button" data-am-disabled="{{processing}}" data-method="wechat" bindtap="{{(processing) ? '' : 'chooseMethod'}}">返回微信方式</button>
+        </block>
       </view>
-      <view class="auth-footer"><text>{{mode === 'login' ? '还没有账号？' : '已经有账号？'}}</text><button class="switch-button" disabled="{{processing}}" data-mode="{{mode === 'login' ? 'register' : 'login'}}" bindtap="switchMode">{{mode === 'login' ? '创建账号' : '去登录'}}</button></view>
+      <view class="auth-footer"><text>{{mode === 'login' ? '还没有账号？' : '已经有账号？'}}</text><button aria-disabled="{{processing}}" hover-class="none" class="switch-button" data-am-disabled="{{processing}}" data-mode="{{mode === 'login' ? 'register' : 'login'}}" bindtap="{{(processing) ? '' : 'switchMode'}}">{{mode === 'login' ? '创建账号' : '去登录'}}</button></view>
     </view>
   </view>
 </view>
+
+<first-use-consent/>

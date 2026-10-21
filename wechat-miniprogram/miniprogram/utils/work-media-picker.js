@@ -8,8 +8,8 @@ function needsPermission(error) {
 
 function guideToSettings() {
   wx.showModal({
-    title: "需要照片权限",
-    content: "请在设置中允许动漫高手访问照片，返回后再次点击上传作品。",
+    title: "需要图片选择权限",
+    content: "请在设置中检查照片或相机权限，返回后再次选择图片。",
     confirmText: "去设置",
     success({ confirm }) {
       if (confirm && wx.openSetting) wx.openSetting({});
@@ -20,7 +20,7 @@ function guideToSettings() {
 function guidePrivacy(retry) {
   wx.showModal({
     title: "需要隐私授权",
-    content: "上传作品需要使用你选择的照片。授权后才会打开相册。",
+    content: "添加图片需要使用你选择的照片。授权后才会打开图片选择。",
     confirmText: "重新授权",
     success({ confirm }) {
       if (confirm) retry();
@@ -28,19 +28,23 @@ function guidePrivacy(retry) {
   });
 }
 
-function chooseWorkMedia({ count = 5, success }) {
+function chooseImageMedia({ count = 5, sourceType, sizeType, success }) {
   const openAlbum = () => wx.chooseMedia({
     count,
     mediaType: ["image"],
-    sourceType: ["album"],
-    sizeType: ["compressed"],
-    success,
+    ...(sourceType ? { sourceType } : {}),
+    ...(sizeType ? { sizeType } : {}),
+    success(result) {
+      if (result.tempFiles && result.tempFiles.length) success(result);
+    },
     fail(error) {
       if (isCancelled(error)) return;
+      if (/privacy/i.test(String(error && error.errMsg || ""))) return guidePrivacy(retry);
       if (needsPermission(error)) return guideToSettings();
-      wx.showToast({ title: "无法打开相册，请稍后重试", icon: "none" });
+      wx.showToast({ title: "无法选择图片，请稍后重试", icon: "none" });
     }
   });
+  const retry = () => chooseImageMedia({ count, sourceType, sizeType, success });
 
   if (!wx.getPrivacySetting || !wx.requirePrivacyAuthorize) {
     openAlbum();
@@ -49,10 +53,14 @@ function chooseWorkMedia({ count = 5, success }) {
   wx.getPrivacySetting({
     success({ needAuthorization }) {
       if (!needAuthorization) return openAlbum();
-      wx.requirePrivacyAuthorize({ success: openAlbum, fail: () => guidePrivacy(() => chooseWorkMedia({ count, success })) });
+      wx.requirePrivacyAuthorize({ success: openAlbum, fail: () => guidePrivacy(retry) });
     },
-    fail: openAlbum
+    fail: () => wx.showToast({ title: "授权状态读取失败，请重试", icon: "none" })
   });
 }
 
-module.exports = { chooseWorkMedia, isCancelled, needsPermission };
+function chooseWorkMedia({ count = 5, success }) {
+  return chooseImageMedia({ count, sourceType: ["album"], sizeType: ["compressed"], success });
+}
+
+module.exports = { chooseWorkMedia, chooseImageMedia, isCancelled, needsPermission };

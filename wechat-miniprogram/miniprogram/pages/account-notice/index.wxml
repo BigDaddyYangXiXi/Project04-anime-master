@@ -1,0 +1,14 @@
+<app-top-nav title="{{title}}" custom-back="{{true}}" bindback="goBack"/>
+<view class="notice-document">
+  <text class="document-title">{{title}}</text>
+  <text class="document-version">{{version}}</text>
+  <view class="document-toc">
+    <text class="section-title">目录</text>
+    <button hover-class="none" wx:for="{{sections}}" wx:key="title" class="toc-link" data-index="{{index}}" bindtap="jumpToSection">{{item.title}}</button>
+  </view>
+  <view wx:for="{{sections}}" wx:key="title" class="document-section" id="notice-section-{{index}}">
+    <text class="section-title">{{item.title}}</text>
+    <text wx:for="{{item.paragraphs}}" wx:for-item="paragraph" wx:key="*this" class="document-paragraph" user-select="{{true}}">{{paragraph}}</text>
+  </view>
+  <button hover-class="none" class="am-action am-action-secondary" bindtap="goBack">返回</button>
+</view>

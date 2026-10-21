@@ -3,8 +3,13 @@
   "version": "0.7.0-native.16",
   "private": true,
   "scripts": {
-    "cloudbase": "node scripts/cloudbase-cli.js",
-    "cloudbase:envs": "node scripts/cloudbase-cli.js env:list"
+    "release:check": "node scripts/check-release-config.js",
+    "cloudbase": "node scripts/cloudbase-company-cli.js",
+    "cloudbase:envs": "node scripts/cloudbase-company-cli.js env:list",
+    "design:check": "node automation/design-system-audit.js check",
+    "design:inventory": "node automation/design-system-audit.js inventory",
+    "design:impact": "node automation/design-system-audit.js impact",
+    "design:tokens": "node automation/design-system-audit.js tokens"
   },
   "devDependencies": {
     "@cloudbase/cli": "3.8.1"

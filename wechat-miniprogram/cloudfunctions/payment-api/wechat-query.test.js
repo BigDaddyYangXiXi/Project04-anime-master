@@ -48,12 +48,32 @@ test("fixed TLS transport retains split response bytes until verified and then e
     assert.equal(options.hostname, "api.mch.weixin.qq.com"); assert.equal(options.protocol, "https:"); assert.equal(options.port, 443);
     assert.equal(options.rejectUnauthorized, true); assert.equal(options.agent, false); assert.equal(options.minVersion, "TLSv1.2");
     assert.equal(options.method, "GET"); assert.equal(options.headers["Accept-Encoding"], "identity");
+    assert.equal(options.headers["User-Agent"], "Wanjiangwu-Payment/1.0");
   }, (incoming) => { incoming.write(response.body.subarray(0, 11)); incoming.end(response.body.subarray(11)); });
   await assert.rejects(queryPayment(pool, id, { ...fixture.config, hostname: "evil.example" }, request, () => now), /verified_database_boundary/);
 });
 
 test("redirects and non-200 responses never infer payment failure or close a payment", async () => {
   for (const statusCode of [204, 301, 302, 400, 401, 404, 429, 500]) await assert.rejects(query({ ...signed(), statusCode }), code("PAYMENT_QUERY_FAILED"));
+});
+
+test('only a signed ORDERNOTEXIST is classified as absent without changing the reservation', async () => {
+  const missing = { ...notification.sign(JSON.stringify({code:'ORDERNOTEXIST',message:'private upstream message'}),now),statusCode:404 };
+  await assert.rejects(query(missing),code('PAYMENT_CHANNEL_ORDER_NOT_FOUND'));
+  await assert.rejects(query({...missing,headers:{}}));
+  const tampered={...missing,body:Buffer.from('{"code":"OTHER"}')};
+  await assert.rejects(query(tampered),code('PAYMENT_SIGNATURE_INVALID'));
+  for(const body of ['{','null','{"code":"NOAUTH"}']) {
+    await assert.rejects(query({...notification.sign(body,now),statusCode:404}),code('PAYMENT_QUERY_FAILED'));
+  }
+});
+
+test('DIRECT recognizes the documented ORDER_NOT_EXIST only after signature verification', async () => {
+  const directPool = { execute: async () => [[{ platform_mchid: fixture.config.platformMchid, payment_mode: 'DIRECT' }]],
+    getConnection: async () => assert.fail('absence must not mutate the reservation') };
+  const missing = { ...notification.sign(JSON.stringify({ code: 'ORDER_NOT_EXIST' }), now), statusCode: 404 };
+  await assert.rejects(queryPayment(directPool, id, fixture.config, fixture.requestFor(missing), () => now), code('PAYMENT_CHANNEL_ORDER_NOT_FOUND'));
+  await assert.rejects(queryPayment(directPool, id, fixture.config, fixture.requestFor({ ...missing, headers: {} }), () => now), code('PAYMENT_SIGNATURE_INVALID'));
 });
 
 test("duplicate signature headers, altered bytes and encoded bodies cannot reach the database", async () => {

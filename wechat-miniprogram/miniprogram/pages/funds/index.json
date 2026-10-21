@@ -1,1 +1,5 @@
-{"navigationBarTitleText":"资金管理","enablePullDownRefresh":true}
+{
+  "navigationBarTitleText": "资金管理",
+  "enablePullDownRefresh": true,
+  "backgroundColorContent": "#171514"
+}

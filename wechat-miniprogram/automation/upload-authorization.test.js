@@ -18,13 +18,18 @@ function javascriptFiles(directory) {
   });
 }
 
-test("upload package does not declare or call an unauthorized fuzzy-location API", () => {
+test("approved fuzzy location is declared and confined to consent and authorized startup", () => {
   const appConfig = JSON.parse(source("miniprogram/app.json"));
-  assert.equal(appConfig.requiredPrivateInfos, undefined);
-  assert.equal(appConfig.permission && appConfig.permission["scope.userFuzzyLocation"], undefined);
+  assert.deepEqual(appConfig.requiredPrivateInfos, ["getFuzzyLocation"]);
+  assert.ok(appConfig.permission["scope.userFuzzyLocation"].desc.trim());
+  assert.equal(appConfig.permission["scope.userLocation"], undefined);
 
   const callers = javascriptFiles(miniprogramRoot).filter((file) => fs.readFileSync(file, "utf8").includes("getFuzzyLocation"));
-  assert.deepEqual(callers, []);
+  assert.deepEqual(callers.map(file => path.relative(miniprogramRoot, file).split(path.sep).join("/")).sort(), [
+    "components/first-use-consent/index.js", "services/startup-location.js"
+  ]);
+  const preciseCallers = javascriptFiles(miniprogramRoot).filter(file => /\b(?:wx|wxApi)\.getLocation\s*\(/.test(fs.readFileSync(file, "utf8")));
+  assert.deepEqual(preciseCallers, []);
 });
 
 test("discovery keeps a complete manual-city path while automatic location is unavailable", () => {

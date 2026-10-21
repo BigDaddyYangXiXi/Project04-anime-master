@@ -1,58 +1,18 @@
-const assert = require("node:assert/strict");
-const Module = require("node:module");
-const path = require("node:path");
-
-const probePath = path.resolve(__dirname, "../cloudfunctions/auth-probe/index.js");
-const originalLoad = Module._load;
-let wxContext = {};
-
-Module._load = function load(request, parent, isMain) {
-  if (request === "wx-server-sdk") {
-    return {
-      DYNAMIC_CURRENT_ENV: "dynamic-current-env",
-      init(options) {
-        assert.equal(options.env, "dynamic-current-env");
-      },
-      getWXContext() {
-        return wxContext;
-      }
-    };
-  }
-  return originalLoad.call(this, request, parent, isMain);
-};
-
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const entry = process.argv[2] ? path.resolve(process.argv[2]) : path.resolve(__dirname, '../cloudfunctions/auth-probe/index.js');
 async function run() {
-  try {
-    const probe = require(probePath);
-
-    wxContext = {};
-    const missing = await probe.main({ OPENID: "forged-client-value" });
-    assert.equal(missing.ok, false);
-    assert.equal(missing.error.code, "AUTH_CONTEXT_MISSING");
-
-    wxContext = {
-      OPENID: "trusted-openid",
-      APPID: "trusted-appid",
-      UNIONID: "trusted-unionid"
-    };
-    const verified = await probe.main({ OPENID: "forged-client-value" });
-    assert.deepEqual(verified, {
-      ok: true,
-      data: {
-        authenticated: true,
-        hasUnionId: true
-      }
-    });
-    assert.equal(JSON.stringify(verified).includes("trusted-openid"), false);
-    assert.equal(JSON.stringify(verified).includes("trusted-unionid"), false);
-
-    console.log("CloudBase auth probe audit passed: 2/2");
-  } finally {
-    Module._load = originalLoad;
+  const probe = require(entry);
+  const context = identity => ({environment:JSON.stringify(identity)});
+  for(const caller of [undefined, context({}), context({WX_OPENID:'trusted-openid',WX_APPID:'other-app'})]) {
+    const rejected = await probe.main({OPENID:'forged',APPID:'wxc94e1c1b38944511'},caller);
+    assert.equal(rejected.ok,false);assert.equal(rejected.error.code,'AUTH_CONTEXT_MISSING');
   }
+  const verified = await probe.main({OPENID:'forged'},context({WX_OPENID:'trusted-openid',WX_APPID:'wxc94e1c1b38944511',WX_UNIONID:'trusted-unionid'}));
+  assert.deepEqual(verified,{ok:true,data:{authenticated:true,appId:'wxc94e1c1b38944511',hasUnionId:true}});
+  assert.equal(JSON.stringify(verified).includes('trusted-openid'),false);
+  assert.equal(JSON.stringify(verified).includes('trusted-unionid'),false);
+  assert.equal((await probe.main({},context({}))).error.code,'AUTH_CONTEXT_MISSING');
+  console.log('Auth probe: current invocation identity, foreign app, privacy and sequential rejection passed.');
 }
-
-run().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+run().catch(()=>{console.error('AUTH_PROBE_AUDIT_FAILED');process.exitCode=1;});

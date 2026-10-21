@@ -1,1 +1,3 @@
 @import "../../styles/order-list.wxss";
+
+@import "../../styles/money.wxss";

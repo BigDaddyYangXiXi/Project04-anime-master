@@ -1,0 +1,12 @@
+<view wx:if="{{visible}}" class="first-use-mask" catchtouchmove="noop">
+ <view class="first-use-card" role="dialog" aria-label="发现身边的创作者">
+  <text class="first-use-title">发现身边的创作者</text>
+  <text class="first-use-copy">万匠屋希望使用以下信息，为你找到当地作品与服务。</text>
+  <view class="first-use-item"><text>大致位置</text><text>识别所在城市，优先展示附近作品。</text></view>
+  <view class="first-use-item"><text>头像与昵称</text><text>由你主动选择或填写，用于展示账号身份。</text></view>
+  <view class="first-use-links"><button hover-class="none" bindtap="agreement">用户服务协议</button><button hover-class="none" bindtap="privacy">隐私保护指引</button></view>
+  <text wx:if="{{error}}" class="first-use-error">{{error}}</text>
+  <button hover-class="none" class="am-action am-action-primary am-action-block" loading="{{busy}}" aria-disabled="{{busy}}" data-am-disabled="{{busy}}" bindtap="{{(busy) ? '' : 'authorize'}}">允许定位，查看附近</button>
+  <button hover-class="none" class="first-use-manual" aria-disabled="{{busy}}" data-am-disabled="{{busy}}" bindtap="{{(busy) ? '' : 'manual'}}">手动选择城市</button>
+ </view>
+</view>

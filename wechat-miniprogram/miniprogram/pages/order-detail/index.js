@@ -1,3 +1,4 @@
+const localPreview = require("../../utils/local-preview");
 const store = require("../../data/v063-store");
 const { stageLabels } = require("../../data/v063");
 const presentation = require("../../data/order-presentation");
@@ -9,6 +10,7 @@ const AUDIT_STAGES = {
 };
 
 Page({
+  openReference: require("../../utils/order-reference-preview"),
   data: {
     order: null, statusLabel: "", ndaText: "未确认",
     canBuyerSign: false, signIssues: [], waitingProvider: false, canConfirm: false, confirmIssues: [],
@@ -17,8 +19,8 @@ Page({
   },
   onLoad(options) {
     this.orderId = options.id;
-    this.auditStage = options.audit === "1" ? AUDIT_STAGES[options.state] : "";
-    this.cloudMode = options.audit !== "1";
+    this.auditStage = localPreview.isAudit(options) ? AUDIT_STAGES[options.state] : "";
+    this.cloudMode = !localPreview.isAudit(options);
   },
   onShow() { this.load(); },
   onUnload() { this.loadRequest = (this.loadRequest || 0) + 1; },
@@ -61,8 +63,8 @@ Page({
     }
     const signIssues = [];
     if (order.stage === "NDA_BUYER_PENDING") {
-      if (!order.communicationDone) signIssues.push("等待双方确认沟通完毕");
-      if (!order.executable) signIssues.push("等待服务方确认可以履约");
+      if (order.ndaFlowVersion !== 2 && !order.communicationDone) signIssues.push("等待双方确认沟通完毕");
+      if (order.ndaFlowVersion !== 2 && !order.executable) signIssues.push("等待服务方确认可以履约");
       if (order.ndaRequired !== true) signIssues.push("订单尚未确认需要保密协议");
     }
     const confirmIssues = [];
@@ -99,6 +101,11 @@ Page({
     this.goBookingStatus();
   },
   goBookingStatus() { wx.redirectTo({ url: `/pages/booking-status/index?id=${this.orderId}` }); },
+  goRefund() {
+    const order = this.data.order;
+    if (order?.cloudOrder && order.viewerRole === 'BUYER' && order.paymentStatus === 'PAID') wx.navigateTo({url:`/pages/order-refund/index?id=${encodeURIComponent(this.orderId)}`});
+  },
   goReview() { wx.navigateTo({ url: `/pages/review/index?id=${this.orderId}` }); },
+  goDelivery() { wx.navigateTo({ url: `/pages/fulfillment/index?id=${this.orderId}` }); },
   goProject() { wx.switchTab({ url: "/pages/projects/index" }); }
 });

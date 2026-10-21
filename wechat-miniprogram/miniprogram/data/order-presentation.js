@@ -56,6 +56,7 @@ function groupForStage(stage) {
 function toneForStage(stage) { return groupMeta[groupForStage(stage)].tone; }
 
 function enrichOrder(order, counterpart) {
+  if (counterpart === "buyer") order = providerOrderView(order);
   const schedule = scheduleFor(order);
   return Object.assign({}, order, {
     statusLabel: stageLabels[order.stage] || "订单状态",
@@ -76,4 +77,12 @@ function groupCards(orders) {
   ];
 }
 
-module.exports = { orderGroups, groupMeta, scheduleFor, buyerIdentity, providerIdentity, groupForStage, toneForStage, enrichOrder, groupCards };
+function providerOrderView(order) {
+  if (!order || order.ndaRequired !== true || order.buyerNdaSigned && order.providerNdaSigned) return order;
+  return { ...order, privateFieldsHidden: true, requirement: "", location: "", referenceAssetId: null,
+    referenceImage: "", reference: order.referenceWorkId || "", supplementNote: "",
+    bookingDraft: { ...order.bookingDraft, note: "", referenceFile: null },
+    events: (order.events || []).map(event => ({ ...event, detail: "" })) };
+}
+
+module.exports = { orderGroups, groupMeta, scheduleFor, buyerIdentity, providerIdentity, groupForStage, toneForStage, enrichOrder, groupCards, providerOrderView };

@@ -1,16 +1,22 @@
 const { readCatalog } = require("./catalog-core");
+const { resolveCities } = require("./nearby-cities");
 
 exports.main = async (event) => {
   let stage = "LOAD_SDK";
+  const started = Date.now();
   try {
     const cloudbase = require("@cloudbase/node-sdk");
+    const loaded = Date.now();
     stage = "INIT_SDK";
     const app = cloudbase.init({ env: cloudbase.SYMBOL_CURRENT_ENV });
     stage = "INIT_RDB";
     const db = app.rdb();
+    const initialized = Date.now();
     stage = "READ_CATALOG";
-    const data = await readCatalog(db, event);
-    return { ok: true, data };
+    const data = await readCatalog(db, event, { resolveCities });
+    return { ok: true, data, serverTiming: {
+      sdkLoadMs: loaded - started, initMs: initialized - loaded, readMs: Date.now() - initialized
+    } };
   } catch (error) {
     const publicCodes = new Set(["INVALID_ACTION", "INVALID_ARGUMENT"]);
     const code = publicCodes.has(error && error.code) ? error.code : "CATALOG_READ_FAILED";
@@ -18,7 +24,7 @@ exports.main = async (event) => {
       scope: "catalog-read",
       code,
       stage,
-      cause: error && error.code ? error.code : "UNEXPECTED"
+      cause: publicCodes.has(code) ? code : "UNEXPECTED"
     }));
     return {
       ok: false,

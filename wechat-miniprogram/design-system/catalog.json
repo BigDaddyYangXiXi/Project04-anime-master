@@ -1,0 +1,1604 @@
+{
+  "version": 1,
+  "scope": "微信小程序；模块关系是语义影响面，不等于已经共享实现",
+  "modules": [
+    {
+      "id": "navigation",
+      "name": "导航与返回",
+      "status": "shared",
+      "components": [
+        "components/app-top-nav/index",
+        "components/main-bottom-nav/index"
+      ],
+      "logic": [
+        "components/app-top-nav/index.js",
+        "components/main-bottom-nav/index.js"
+      ]
+    },
+    {
+      "id": "identity",
+      "name": "作者／账号身份",
+      "status": "partial",
+      "components": [],
+      "logic": [
+        "data/v063-store.js",
+        "services/cloud-account.js",
+        "data/creator-profile.js",
+        "templates/creator-profile.wxml",
+        "styles/creator-profile.wxss",
+        "styles/identity.wxss"
+      ]
+    },
+    {
+      "id": "search",
+      "name": "搜索、职业和筛选",
+      "status": "partial",
+      "components": [],
+      "logic": [
+        "utils/discovery-query.js",
+        "data/discovery-context.js",
+        "data/discovery-controls.js",
+        "styles/discovery-controls.wxss",
+        "styles/search-dialog.wxss",
+        "utils/discovery-pagination.js",
+        "templates/discovery-pagination.wxml",
+        "utils/display-cache.js",
+        "utils/screen-performance.js"
+      ]
+    },
+    {
+      "id": "work-card",
+      "name": "作品列表卡",
+      "status": "partial",
+      "components": [
+        "components/work-card/index"
+      ],
+      "logic": [
+        "data/catalog.js",
+        "templates/creator-content.wxml",
+        "styles/creator-profile.wxss"
+      ]
+    },
+    {
+      "id": "work-content",
+      "name": "作品正文与图集",
+      "status": "local",
+      "components": [],
+      "logic": [
+        "data/catalog.js",
+        "services/cloud-catalog.js"
+      ]
+    },
+    {
+      "id": "follow",
+      "name": "关注创作者",
+      "status": "partial",
+      "components": [],
+      "logic": [
+        "services/cloud-saved-items.js",
+        "styles/creator-follow.wxss"
+      ]
+    },
+    {
+      "id": "like",
+      "name": "喜欢作品",
+      "status": "local",
+      "components": [],
+      "logic": [
+        "services/cloud-saved-items.js"
+      ]
+    },
+    {
+      "id": "services",
+      "name": "服务项目选择／编辑",
+      "status": "local",
+      "components": [],
+      "logic": [
+        "services/cloud-catalog.js",
+        "templates/creator-content.wxml",
+        "styles/creator-profile.wxss"
+      ]
+    },
+    {
+      "id": "calendar",
+      "name": "城市、日期与档期",
+      "status": "partial",
+      "components": [
+        "components/availability-strip/index"
+      ],
+      "logic": [
+        "styles/availability-calendar.wxss",
+        "data/calendar-model.js",
+        "services/cloud-availability.js",
+        "data/preview-order-slots.js"
+      ]
+    },
+    {
+      "id": "form",
+      "name": "表单字段与校验",
+      "status": "partial",
+      "components": [],
+      "logic": [
+        "utils/input-normalization.js",
+        "styles/fields.wxss",
+        "utils/sheet-keyboard.js",
+        "styles/sheet-keyboard.wxss",
+        "styles/editor-form.wxss",
+        "templates/creator-management.wxml",
+        "styles/creator-management.wxss",
+        "styles/storefront-editor.wxss",
+        "data/storefront-changes.js",
+        "templates/storefront-guide.wxml",
+        "assets/icons/storefront-hint.svg"
+      ]
+    },
+    {
+      "id": "media",
+      "name": "图片与附件选择／预览",
+      "status": "partial",
+      "components": [],
+      "logic": [
+        "utils/work-media-picker.js",
+        "services/cloud-catalog.js",
+        "services/cloud-orders.js",
+        "utils/order-reference-preview.js",
+        "styles/media-placeholder.wxss",
+        "utils/work-image-edit.js",
+        "utils/banner-crop.js"
+      ]
+    },
+    {
+      "id": "order-list",
+      "name": "订单列表／工作台待办",
+      "status": "partial",
+      "components": [],
+      "logic": [
+        "styles/order-list.wxss",
+        "styles/order-overview.wxss",
+        "data/order-presentation.js",
+        "templates/provider-workbench.wxml",
+        "styles/provider-workbench.wxss"
+      ]
+    },
+    {
+      "id": "order-facts",
+      "name": "订单事实、状态与进度",
+      "status": "partial",
+      "components": [],
+      "logic": [
+        "styles/order-facts.wxss",
+        "data/order-presentation.js",
+        "data/order-machine.js",
+        "data/booking-status-view.js"
+      ]
+    },
+    {
+      "id": "agreement",
+      "name": "合作确认与 NDA",
+      "status": "local",
+      "components": [],
+      "logic": [
+        "services/cloud-orders.js"
+      ]
+    },
+    {
+      "id": "payment",
+      "name": "付款、验收与资金记录",
+      "status": "local",
+      "components": [],
+      "logic": [
+        "data/payment-gateway.js",
+        "services/cloud-orders.js"
+      ]
+    },
+    {
+      "id": "project",
+      "name": "项目资料与订单关联",
+      "status": "partial",
+      "components": [],
+      "logic": [
+        "data/project-model.js",
+        "services/cloud-projects.js",
+        "utils/project-image-preview.js"
+      ]
+    },
+    {
+      "id": "review",
+      "name": "评分、评价与回复",
+      "status": "partial",
+      "components": [
+        "components/rating-stars/index"
+      ],
+      "logic": [
+        "services/cloud-orders.js"
+      ]
+    },
+    {
+      "id": "page-state",
+      "name": "加载／空／错误／成功",
+      "status": "partial",
+      "components": [
+        "components/brand-success-card/index",
+        "components/first-use-consent/index"
+      ],
+      "logic": []
+    },
+    {
+      "id": "actions",
+      "name": "主次按钮、固定操作区",
+      "status": "partial",
+      "components": [],
+      "logic": [
+        "app.wxss",
+        "styles/actions.wxss",
+        "utils/order-confirmation.js"
+      ]
+    },
+    {
+      "id": "money",
+      "name": "金额展示",
+      "status": "shared",
+      "components": [],
+      "logic": [
+        "styles/money.wxss"
+      ]
+    },
+    {
+      "id": "order-subscription",
+      "name": "订单通知订阅",
+      "status": "shared",
+      "components": [
+        "components/order-subscription/index"
+      ],
+      "logic": [
+        "components/order-subscription/index.js",
+        "services/order-subscription.js"
+      ]
+    },
+    {
+      "id": "publication-stage",
+      "name": "草稿保存与公开发布阶段",
+      "status": "shared",
+      "components": [],
+      "logic": [
+        "templates/publication-stage.wxml",
+        "styles/publication-stage.wxss"
+      ]
+    },
+    {
+      "id": "personal-center",
+      "name": "个人中心与支持内页",
+      "status": "partial",
+      "components": [],
+      "logic": [
+        "styles/me-interiors.wxss",
+        "data/me-activity.js",
+        "data/help-content.js"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "route": "pages/auth/index",
+      "name": "登录／注册",
+      "roles": [
+        "shared"
+      ],
+      "variants": [
+        "登录",
+        "注册",
+        "成功／失败",
+        "品牌开屏／连接中",
+        "注册缺项与错误重试",
+        "微信隐私授权检查／拒绝重试／隐私指引阅读",
+        "手填手机号与短信验证码（未开放）",
+        "品牌开屏无读取文案",
+        "唯一昵称／用户名；微信手机号授权后注册",
+        "用户名2—12位大小写英文／数字／英文标点；协议为带连接词和句号的连续文本、自然换行；新注册默认未同意",
+        "单次点击注册直接微信手机号授权；注册成功固定需求方信息广场",
+        "已注册会话自动继续，无需再次点击登录；恢复失败可重试",
+        "首次用途弹窗；点击后微信模糊定位授权；拒绝/不支持可手选；头像昵称主动填写"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "form",
+        "identity"
+      ],
+      "actions": [
+        "authorizeRegistrationPhone",
+        "checkSession",
+        "chooseMethod",
+        "requestSmsCode",
+        "showNotice",
+        "showPrivacy",
+        "submitLogin",
+        "submitRegister",
+        "submitSms",
+        "switchMode",
+        "toggleNotice",
+        "updateNickname",
+        "updatePhone",
+        "updateUsername",
+        "updateVerificationCode"
+      ]
+    },
+    {
+      "route": "pages/discover/index",
+      "name": "发现／工作台",
+      "roles": [
+        "buyer",
+        "provider"
+      ],
+      "variants": [
+        "按作品",
+        "按人",
+        "搜索层",
+        "筛选层",
+        "服务方工作台",
+        "已保存城市即时回显／后台核对",
+        "工作台身份先显示／统计随后更新",
+        "圆形头像／昵称与辅助文字分层",
+        "已注册冷启动静默恢复微信会话并进入作品列表；未注册/身份失败回账号入口",
+        "公开结果分页／触底与按钮加载／失败保留列表重试／筛选或离页丢弃迟到结果；作品模式按作品计数、同作者跨页合并、发布版本变化重读首页",
+        "工作台读取失败清除失效待办与统计、不显示无待办结论；原页重试恢复，重复点击/离页不启动重试",
+        "工作台切账号先清旧身份/待办/统计；读取途中换账号丢弃旧结果，旧订单入口核对账号",
+        "共用工作台：真实待办优先、紧凑订单分类、经营入口；未公开且无待办时引导搭建，不伪造草稿完成率",
+        "发现返回：五分钟内复用；发布失效或过期后刷新；同账号同查询刷新保留已有列表，失败可重试",
+        "工作台进入橱窗后未变更返回复用原画面；账号/发布状态失效或十五分钟到期再更新，搭建入口不随读取隐藏",
+        "已验证同账号最近五分钟缓存先显示，后台刷新；按身份/检索范围隔离；退出清除，不作为交易事实",
+        "会话明确草稿版本及公开状态；确认空橱窗不读草稿或公开目录，本人统计与草稿十五分钟复用，保存发布失效",
+        "首页即时显示并默认选择设备当天日期，未手选时跨日回前台更新，手选日期返回保留；授权所在城市、本人首选职业；无作品切最近有作品城市并说明；无匹配/定位拒绝手选；已授权每次前台开启重新定位，与会话并行；手选/退出丢弃迟到定位",
+        "首次用途弹窗；点击后微信模糊定位授权；拒绝/不支持可手选；头像昵称主动填写",
+        "正片设计稿：城市日期／原横滑职业卡片／搜索／自然比例作品卡；批准的hello及curious品牌表情按有内容与空结果展示"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "identity",
+        "search",
+        "work-card",
+        "calendar",
+        "order-list",
+        "services",
+        "review",
+        "money"
+      ],
+      "actions": [
+        "applyFilters",
+        "chooseCareer",
+        "chooseMode",
+        "clearRecent",
+        "closeFilters",
+        "closeSearch",
+        "completeFirstUse",
+        "loadMoreCatalog",
+        "noop",
+        "onNavigationLayout",
+        "openFilters",
+        "openFlow",
+        "openPriority",
+        "openProviderCalendar",
+        "openProviderOrders",
+        "openProviderProfile",
+        "openProviderReviews",
+        "openProviderWork",
+        "openSearch",
+        "removeRecent",
+        "resetFilters",
+        "retryDashboard",
+        "showProvider",
+        "submitSearch",
+        "toggleFilter",
+        "updateCity",
+        "updateDate",
+        "updateSearchDraft"
+      ]
+    },
+    {
+      "route": "pages/search-results/index",
+      "name": "搜索结果",
+      "roles": [
+        "buyer"
+      ],
+      "variants": [
+        "结果",
+        "搜索层",
+        "公开结果分页／触底与按钮加载／失败保留列表重试／筛选或离页丢弃迟到结果；作品模式按作品计数、同作者跨页合并、发布版本变化重读首页",
+        "已验证同账号最近五分钟缓存先显示，后台刷新；按身份/检索范围隔离；退出清除，不作为交易事实"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "search",
+        "work-card",
+        "money"
+      ],
+      "actions": [
+        "clearRecent",
+        "closeSearch",
+        "loadMoreCatalog",
+        "noop",
+        "onNavigationLayout",
+        "openSearch",
+        "removeRecent",
+        "submitSearch",
+        "updateSearchDraft"
+      ]
+    },
+    {
+      "route": "pages/work-detail/index",
+      "name": "作品详情",
+      "roles": [
+        "buyer",
+        "provider"
+      ],
+      "variants": [
+        "作品浏览",
+        "作者橱窗预览",
+        "草稿预览",
+        "收藏读取失败仍可浏览作品；关注/喜欢待同步禁用并独立重试",
+        "图片无链接使用共用不可用提示，不以原型装饰冒充图片",
+        "批准的正片系列阅读顺序：图片优先、作者服务分组、同一草稿预览与公开展示复用"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "identity",
+        "work-content",
+        "follow",
+        "like",
+        "media",
+        "services",
+        "money"
+      ],
+      "actions": [
+        "copyCode",
+        "openProvider",
+        "openRelatedService",
+        "previewGallery",
+        "retryLoad",
+        "retrySocial",
+        "startBooking",
+        "toggleFollow",
+        "toggleLike"
+      ]
+    },
+    {
+      "route": "pages/provider-detail/index",
+      "name": "服务者详情",
+      "roles": [
+        "buyer",
+        "provider"
+      ],
+      "variants": [
+        "需求方公开主页与预约",
+        "本人草稿与公开主页",
+        "案例服务须知档期切换",
+        "服务详情及关联案例",
+        "独立发布进度、成功、失败、未知结果及撤回",
+        "完整合作偏好与评价阅读分支及来源返回",
+        "档期页签按需读取真实月历、失败重试、切月及账号隔离"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "identity",
+        "services",
+        "calendar",
+        "review",
+        "work-card",
+        "money",
+        "follow",
+        "publication-stage"
+      ],
+      "actions": [
+        "backStorefrontPage",
+        "cancelPublication",
+        "changeStorefrontMonth",
+        "chooseProfileTab",
+        "continueEditing",
+        "editStorefront",
+        "loadStorefrontCalendar",
+        "openOwnerCalendar",
+        "openReviews",
+        "openServiceDetail",
+        "openWork",
+        "queryOriginalPublication",
+        "retryLoad",
+        "retrySocial",
+        "returnToStorefrontManager",
+        "showPublishedStorefront",
+        "startBooking",
+        "toggleFollow",
+        "togglePreferences",
+        "toggleService",
+        "toggleServiceInfo"
+      ]
+    },
+    {
+      "route": "pages/provider-schedule/index",
+      "name": "公开档期",
+      "roles": [
+        "buyer",
+        "provider"
+      ],
+      "variants": [
+        "选日期",
+        "服务方预览",
+        "预约按钮与日历可选状态一致；无效或过期入口日期恢复当天；跨日点击复核",
+        "档期读取失败按原入口重试；旧请求及离页结果不回写"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "calendar",
+        "identity"
+      ],
+      "actions": [
+        "changePreviewMonth",
+        "chooseDate",
+        "retryLoad",
+        "returnToPreview",
+        "startBooking"
+      ]
+    },
+    {
+      "route": "pages/booking/index",
+      "name": "发起预约",
+      "roles": [
+        "buyer"
+      ],
+      "variants": [
+        "全天",
+        "连续时段",
+        "多时段",
+        "再次预约",
+        "摘要核对",
+        "服务选择抽屉",
+        "地点编辑抽屉",
+        "时间编辑抽屉",
+        "需求编辑抽屉",
+        "联系信息抽屉",
+        "参考资料抽屉",
+        "输入弹层键盘展开／收起与字段滚动",
+        "提交时声明保密要求",
+        "资料读取失败与预约发送失败分别提示，保留具体服务不可用原因"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "identity",
+        "calendar",
+        "services",
+        "form",
+        "media",
+        "money",
+        "agreement"
+      ],
+      "actions": [
+        "addSegment",
+        "cancelEditor",
+        "changeNda",
+        "chooseReference",
+        "chooseReferenceFile",
+        "chooseTimeMode",
+        "clearReference",
+        "openEditor",
+        "preventSheetBackgroundScroll",
+        "removeSegment",
+        "retryLoad",
+        "saveEditor",
+        "sheetInputFocus",
+        "sheetKeyboardChange",
+        "submitBooking",
+        "toggleService",
+        "updateCity",
+        "updateContact",
+        "updateDate",
+        "updateEndDate",
+        "updateEndTime",
+        "updateNote",
+        "updateSegment",
+        "updateStartDate",
+        "updateStartTime"
+      ]
+    },
+    {
+      "route": "pages/booking-status/index",
+      "name": "预约状态",
+      "roles": [
+        "buyer"
+      ],
+      "variants": [
+        "待回应",
+        "已接受预约",
+        "补充信息",
+        "沟通",
+        "合作确认",
+        "保密约定",
+        "等待对方签署",
+        "待付款",
+        "付款待核对",
+        "合作已生效",
+        "未达成",
+        "补充信息抽屉",
+        "合作核对抽屉",
+        "加载失败",
+        "输入弹层键盘展开／收起与字段滚动",
+        "按订单权限查看私人参考图",
+        "微信订阅同意／拒绝／失败；不影响订单操作",
+        "确认弹窗绑定原订单版本；过期及离页不提交"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "order-facts",
+        "agreement",
+        "payment",
+        "form",
+        "money",
+        "media",
+        "order-subscription"
+      ],
+      "actions": [
+        "closePanel",
+        "confirmReviewed",
+        "copyCode",
+        "goMarket",
+        "goOrder",
+        "openPanel",
+        "openReference",
+        "preventSheetBackgroundScroll",
+        "refreshStatus",
+        "retryBooking",
+        "retryLoad",
+        "sheetInputFocus",
+        "sheetKeyboardChange",
+        "signNda",
+        "startPayment",
+        "stopTap",
+        "submitSupplement",
+        "toggleDetails",
+        "updateAgreementRead",
+        "updateSupplement",
+        "viewProvider"
+      ]
+    },
+    {
+      "route": "pages/order-detail/index",
+      "name": "订单详情",
+      "roles": [
+        "buyer"
+      ],
+      "variants": [
+        "合作确认",
+        "NDA",
+        "付款后执行确认",
+        "执行中",
+        "已完成订单查看交付结果",
+        "按订单权限查看私人参考图",
+        "微信订阅同意／拒绝／失败；不影响订单操作",
+        "已付款需求方退款入口",
+        "交易完成后退款入口转记录与争议反馈",
+        "后台刷新保留已有订单画面；首次读取保持空白"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "order-facts",
+        "agreement",
+        "project",
+        "money",
+        "media",
+        "order-subscription"
+      ],
+      "actions": [
+        "confirmExecution",
+        "goBookingStatus",
+        "goDelivery",
+        "goProject",
+        "goRefund",
+        "goReview",
+        "openReference",
+        "retryLoad",
+        "signNda"
+      ]
+    },
+    {
+      "route": "pages/order-refund/index",
+      "name": "退款申请与记录",
+      "roles": [
+        "buyer",
+        "provider"
+      ],
+      "variants": [
+        "本人已付款订单",
+        "金额和原因校验",
+        "未知结果沿用原申请",
+        "已提交与后续退款",
+        "记录分页与失败重试",
+        "账号变化清除画面",
+        "服务方只读退款记录／无申请表单；顶栏返回与底栏沿用订单身份",
+        "同版本返回保留退款输入；刷新失败保留表单并单独重试",
+        "交易完成关闭普通申请／保留退款记录与微信原生特殊争议反馈"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "order-facts",
+        "payment",
+        "form",
+        "money"
+      ],
+      "actions": [
+        "inputAmount",
+        "inputReason",
+        "load",
+        "moreRecords",
+        "refreshRecords",
+        "startNext",
+        "submit"
+      ]
+    },
+    {
+      "route": "pages/provider-home/index",
+      "name": "服务方工作台（兼容入口）",
+      "roles": [
+        "provider"
+      ],
+      "variants": [
+        "概览",
+        "紧急待办",
+        "共用工作台：真实待办优先、紧凑订单分类、经营入口；未公开且无待办时引导搭建，不伪造草稿完成率"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "identity",
+        "order-list",
+        "services"
+      ],
+      "actions": [
+        "openFlow",
+        "openPriority",
+        "openProviderCalendar",
+        "openProviderOrders",
+        "openProviderProfile",
+        "openProviderReviews",
+        "openProviderWork",
+        "retryDashboard"
+      ]
+    },
+    {
+      "route": "pages/provider-request/index",
+      "name": "预约与执行处理",
+      "roles": [
+        "provider"
+      ],
+      "variants": [
+        "意向／补充／拒绝",
+        "联系方式",
+        "合作条件",
+        "报价",
+        "执行进度",
+        "交付",
+        "按订单权限查看私人参考图",
+        "微信订阅同意／拒绝／失败；不影响订单操作",
+        "已付款服务方退款记录入口",
+        "同版本返回保留报价、合作确认、进度与交付草稿；新版本重新核对",
+        "后台刷新保留已有订单画面；首次读取保持空白",
+        "预约补充说明仅同版本原阶段保留；进入沟通清除隐藏旧输入",
+        "拒绝/报价/结束沟通/交付确认绑定弹窗时订单版本；更新或离页不提交"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "identity",
+        "order-facts",
+        "agreement",
+        "form",
+        "media",
+        "services",
+        "order-subscription"
+      ],
+      "actions": [
+        "callBuyer",
+        "chooseDeliveryFiles",
+        "chooseNda",
+        "commitProgress",
+        "copyContact",
+        "decline",
+        "failCommunication",
+        "finishCommunication",
+        "goNda",
+        "goRefund",
+        "interested",
+        "openReference",
+        "retryLoad",
+        "savePrice",
+        "saveProgress",
+        "submitDelivery",
+        "supplement",
+        "toggleConfirm",
+        "updateDelivery",
+        "updateNote",
+        "updateQuoteItem"
+      ]
+    },
+    {
+      "route": "pages/provider-profile/index",
+      "name": "橱窗／作品编辑",
+      "roles": [
+        "provider"
+      ],
+      "variants": [
+        "首次引导与管理进度",
+        "服务与案例列表及空态",
+        "表单与折叠补充项",
+        "正文子页",
+        "图片管理与水印",
+        "独立头图取景",
+        "双向关联",
+        "完整发布变更与缺项",
+        "读取保存失败、冲突及离开选择",
+        "独立头图空态与已设置取景",
+        "文件工具与单选多选分型",
+        "水印同页实时叠加示意，完成时生成一次",
+        "作品集母页：80方图、独立图钉置顶及整行编辑热区、置顶排序、真实状态未知时显示已保存、首次添加空态"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "identity",
+        "services",
+        "work-card",
+        "work-content",
+        "form",
+        "media",
+        "calendar",
+        "money",
+        "publication-stage"
+      ],
+      "actions": [
+        "addService",
+        "addServiceArea",
+        "applyWatermark",
+        "changeEditorKeyboard",
+        "chooseBanner",
+        "chooseNoticeImage",
+        "chooseWorkImages",
+        "closeBannerEditor",
+        "confirmWorkPicker",
+        "confirmWorkService",
+        "continueSavedSection",
+        "continueWorkEditing",
+        "createAssociatedService",
+        "deleteService",
+        "editReviewChange",
+        "finishSavedSection",
+        "finishTextEditor",
+        "fixPublicationIssue",
+        "focusEditorField",
+        "loadPublicationReview",
+        "manageSavedWork",
+        "navigateEditorBack",
+        "openAccount",
+        "openBannerEditor",
+        "openCalendar",
+        "openNewWorkEditor",
+        "openPublicationCheck",
+        "openPublicationProgress",
+        "openSection",
+        "openSetupStep",
+        "openTextEditor",
+        "openWorkEditor",
+        "openWorkPicker",
+        "previewBuyer",
+        "previewOriginalImage",
+        "removeCasePendingImage",
+        "removeNoticeImage",
+        "removeServiceArea",
+        "requestRemoveBanner",
+        "requestRemoveWorkImage",
+        "retryCloudLoad",
+        "retryWorkImages",
+        "saveAndPreview",
+        "saveSection",
+        "saveWork",
+        "selectCaseWatermark",
+        "selectWorkService",
+        "submitPublication",
+        "toggleOptional",
+        "togglePortfolioPin",
+        "toggleServiceEditor",
+        "toggleWorkPickerWork",
+        "updateBannerFocus",
+        "updateCareer",
+        "updateEditorText",
+        "updateProfile",
+        "updateProfileRegion",
+        "updateService",
+        "updateServiceMode",
+        "updateWatermark",
+        "updateWork"
+      ]
+    },
+    {
+      "route": "pages/provider-calendar/index",
+      "name": "档期管理（兼容入口）",
+      "roles": [
+        "provider"
+      ],
+      "variants": [
+        "真实本人档期独立页面，不再跳转项目Tab",
+        "月份切换、暂停接单、日期锁定、版本冲突、保存立即生效",
+        "未保存返回确认、离页及账号变化忽略迟到结果"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "calendar"
+      ],
+      "actions": [
+        "back",
+        "changeAccepting",
+        "changeMonth",
+        "load",
+        "reset",
+        "save",
+        "toggle"
+      ]
+    },
+    {
+      "route": "pages/provider-task/index",
+      "name": "服务方 NDA",
+      "roles": [
+        "provider"
+      ],
+      "variants": [
+        "待对方签署",
+        "可签署",
+        "已签署",
+        "签署完成后继续沟通",
+        "确认弹窗绑定原订单版本；过期及离页不提交"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "agreement",
+        "order-facts"
+      ],
+      "actions": [
+        "continueCommunication",
+        "retryLoad",
+        "sign"
+      ]
+    },
+    {
+      "route": "pages/orders/index",
+      "name": "订单列表",
+      "roles": [
+        "buyer",
+        "provider"
+      ],
+      "variants": [
+        "需求方分类",
+        "服务方分类",
+        "快速切分类丢弃旧请求；离页后不回写列表",
+        "账号变化清除旧列表；读取结果及详情入口核对账号",
+        "同账号身份分类刷新保留画面；切范围清除旧结果",
+        "传输失败保留上次列表并提示重试；明确服务错误清除私有结果"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "order-list",
+        "money"
+      ],
+      "actions": [
+        "choose",
+        "open",
+        "retryLoad"
+      ]
+    },
+    {
+      "route": "pages/projects/index",
+      "name": "项目／档期",
+      "roles": [
+        "buyer",
+        "provider"
+      ],
+      "variants": [
+        "需求方项目列表",
+        "服务方日历",
+        "同账号版本档期刷新保留草稿；锁定变化重新核对；旧读取不覆盖保存",
+        "档期保存/创建项目隐藏或换账号后不回写跳转；返回恢复操作",
+        "项目读取失败可重试；隐藏/跨账号/旧请求不覆盖列表",
+        "切账号清项目/档期/提示及创建重试键；同账号保留草稿"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "project",
+        "calendar"
+      ],
+      "actions": [
+        "createProject",
+        "loadProjects",
+        "openProject",
+        "reset",
+        "save",
+        "toggle"
+      ]
+    },
+    {
+      "route": "pages/project-detail/index",
+      "name": "项目详情",
+      "roles": [
+        "buyer"
+      ],
+      "variants": [
+        "成员订单",
+        "关联／移除订单",
+        "项目资料",
+        "目标图片私有链接刷新与不可用状态",
+        "归组操作离页不回写；移出确认绑定原项目版本",
+        "项目读取期间切账号丢弃原账号返回结果"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "project",
+        "order-list",
+        "order-facts",
+        "media",
+        "money"
+      ],
+      "actions": [
+        "addOrder",
+        "linkOrder",
+        "openBrief",
+        "openOrder",
+        "previewTargetImage",
+        "retryLoad",
+        "unlinkOrder"
+      ]
+    },
+    {
+      "route": "pages/brief/index",
+      "name": "项目资料编辑",
+      "roles": [
+        "buyer"
+      ],
+      "variants": [
+        "草稿",
+        "编辑",
+        "目标图",
+        "目标图片私有链接刷新与不可用状态",
+        "保存及城市偏好使用提交快照；离页/换账号不继续同步或返回",
+        "图片选择、上传与审核结果核对页面/账号；处理中禁止删除",
+        "图片处理与项目保存分别提示；处理中删除入口呈禁用状态",
+        "项目读取期间切账号丢弃原账号返回结果"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "project",
+        "form",
+        "media",
+        "calendar"
+      ],
+      "actions": [
+        "chooseTargetImages",
+        "previewTargetImage",
+        "removeTargetImage",
+        "retryLoad",
+        "save",
+        "updateCity",
+        "updateDate",
+        "updateDescription",
+        "updateLocation",
+        "updateProjectName"
+      ]
+    },
+    {
+      "route": "pages/fulfillment/index",
+      "name": "交付验收",
+      "roles": [
+        "buyer"
+      ],
+      "variants": [
+        "现场服务",
+        "文件交付",
+        "申请修改",
+        "确认验收",
+        "图片和PDF预览",
+        "ZIP或TXT确认后转发到聊天",
+        "已完成订单只读交付内容",
+        "微信订阅同意／拒绝／失败；不影响订单操作",
+        "验收前明确普通退款关闭／退款争议未结不得验收",
+        "后台刷新保留已有订单画面；首次读取保持空白",
+        "同版本返回保留未提交修改意见；版本或阶段变化重新核对"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "order-facts",
+        "payment",
+        "form",
+        "media",
+        "money",
+        "order-subscription"
+      ],
+      "actions": [
+        "accept",
+        "goOrders",
+        "goReview",
+        "openDeliveryFile",
+        "retryLoad",
+        "revise",
+        "updateRevision"
+      ]
+    },
+    {
+      "route": "pages/review/index",
+      "name": "订单评价",
+      "roles": [
+        "buyer"
+      ],
+      "variants": [
+        "不可评价",
+        "填写",
+        "已评价",
+        "评价确认绑定原订单；旧读取不覆盖已评结果；离页后不回写"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "review",
+        "form",
+        "order-facts"
+      ],
+      "actions": [
+        "chooseRating",
+        "goOrders",
+        "retryLoad",
+        "submit",
+        "updateText"
+      ]
+    },
+    {
+      "route": "pages/provider-orders/index",
+      "name": "服务方订单列表（兼容入口）",
+      "roles": [
+        "provider"
+      ],
+      "variants": [
+        "分类",
+        "查看处理",
+        "快速切分类丢弃旧请求；离页后不回写列表",
+        "账号变化清除旧列表；读取结果及详情入口核对账号",
+        "同账号身份分类刷新保留画面；切范围清除旧结果",
+        "传输失败保留上次列表并提示重试；明确服务错误清除私有结果"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "order-list",
+        "money"
+      ],
+      "actions": [
+        "choose",
+        "open",
+        "retryLoad"
+      ]
+    },
+    {
+      "route": "pages/provider-reviews/index",
+      "name": "服务方评价管理",
+      "roles": [
+        "provider"
+      ],
+      "variants": [
+        "评分概览",
+        "评价列表",
+        "回复",
+        "回复确认核对原评价；旧刷新与离页结果不回写"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "review",
+        "form"
+      ],
+      "actions": [
+        "reply",
+        "retryLoad",
+        "toggleReply",
+        "update"
+      ]
+    },
+    {
+      "route": "pages/me/index",
+      "name": "个人中心",
+      "roles": [
+        "buyer",
+        "provider"
+      ],
+      "variants": [
+        "需求方资产",
+        "服务方经营",
+        "切换身份",
+        "当前会话资料先显示／统计随后更新",
+        "个人中心失败原身份重试；真实橱窗预览等账号就绪，禁止使用示例ID",
+        "切账号/身份先清旧统计；迟到账号结果不回写，预览核对当前账号",
+        "已验证同账号最近五分钟缓存先显示，后台刷新；按身份/检索范围隔离；退出清除，不作为交易事实",
+        "会话明确草稿版本及公开状态；确认空橱窗不读草稿或公开目录，本人统计与草稿十五分钟复用，保存发布失效",
+        "需求方广场偏好入口",
+        "2026-10-07个人中心重做：紧凑资料头、合作概况、主要入口、三列收藏、偏好置后；供需共用16px内距/12px组距与细线图标；未知计数不伪造零",
+        "需求方昵称下显示用户名；首位喜欢/关注/合作；项目管理后接资金/订单/已完成合作，下方仅广场偏好；服务方保持原布局",
+        "双身份镜像：核心数据/项目或橱窗/资金订单合作评价/辅助入口",
+        "所有英文账号展示@；合作计数与明细同口径"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "identity",
+        "follow",
+        "like",
+        "work-card",
+        "order-list",
+        "payment",
+        "money",
+        "personal-center"
+      ],
+      "actions": [
+        "editAccount",
+        "openActivity",
+        "openAssets",
+        "openBusiness",
+        "openBuyerOrders",
+        "openCalendar",
+        "openFunds",
+        "openHelp",
+        "openHighlight",
+        "openHomePreferences",
+        "openRecentProject",
+        "openReviews",
+        "openSettings",
+        "openTodo",
+        "previewStorefront",
+        "retryDashboard",
+        "switchIdentity"
+      ]
+    },
+    {
+      "route": "pages/account-profile/index",
+      "name": "账号资料编辑",
+      "roles": [
+        "buyer",
+        "provider"
+      ],
+      "variants": [
+        "头像",
+        "昵称",
+        "保存",
+        "读取/保存迟到结果不影响已离页或新账号",
+        "头像读取/上传/审核跨账号不继续或回写",
+        "头像即时本地预览、上传检测与昵称保存分离；有界查询和账号隔离恢复；后端启用后明确提交待检测保存任务"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "identity",
+        "form",
+        "media"
+      ],
+      "actions": [
+        "back",
+        "chooseAvatar",
+        "save",
+        "updateNickname"
+      ]
+    },
+    {
+      "route": "pages/me-assets/index",
+      "name": "我的内容资产",
+      "roles": [
+        "buyer",
+        "provider"
+      ],
+      "variants": [
+        "关注",
+        "喜欢",
+        "参考作品",
+        "关注/喜欢/参考读取失败原分类重试；重复点击与离页不重新发起",
+        "关注/喜欢不读取订单，参考不读取收藏；无关接口失败不阻断列表",
+        "关注/喜欢/参考列表确认空时不读公开目录；有条目才加载内容"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "identity",
+        "follow",
+        "like",
+        "work-card",
+        "money"
+      ],
+      "actions": [
+        "openItem",
+        "retryLoad"
+      ]
+    },
+    {
+      "route": "pages/funds/index",
+      "name": "资金管理",
+      "roles": [
+        "provider"
+      ],
+      "variants": [
+        "待开通",
+        "付款记录",
+        "分页",
+        "付款待核对",
+        "订单总额／平台服务费／税前预计收益（非可提现余额）",
+        "提现指南／未开放",
+        "部分退款金额／退款后平台费用／全额退款状态",
+        "本人税务资料状态／独立失败重试／未开放隐藏／离页清除",
+        "隐藏/离页使资金首屏及分页请求失效；返回重新读取，不接收旧结果",
+        "同一资金页按当前身份展示：需求方订单款项→原订单付款/退款；服务方原收益与结算，不混用权限或余额"
+      ],
+      "modules": [
+        "navigation",
+        "page-state",
+        "actions",
+        "payment",
+        "order-facts",
+        "money"
+      ],
+      "actions": [
+        "load",
+        "loadMore",
+        "loadTaxStatus",
+        "openOrder",
+        "showWithdrawalGuide"
+      ]
+    },
+    {
+      "route": "pages/account-notice/index",
+      "name": "账号说明与规范阅读",
+      "roles": [
+        "buyer",
+        "provider"
+      ],
+      "variants": [
+        "现行v5正文；取消人工入驻要求，须随注册后端版本协调上线",
+        "目录跳转",
+        "返回保留注册状态"
+      ],
+      "modules": [
+        "navigation",
+        "identity",
+        "actions"
+      ],
+      "actions": [
+        "goBack",
+        "jumpToSection"
+      ]
+    },
+    {
+      "route": "pages/home-preferences/index",
+      "name": "广场偏好",
+      "roles": [
+        "buyer"
+      ],
+      "variants": [
+        "默认职业",
+        "四职业排序",
+        "保存/返回/账号变化",
+        "账号隔离本地保存、页面重建与冷启动恢复"
+      ],
+      "modules": [
+        "navigation",
+        "form",
+        "actions",
+        "search",
+        "page-state"
+      ],
+      "actions": [
+        "makeFirst",
+        "move",
+        "save"
+      ]
+    },
+    {
+      "route": "pages/me-activity/index",
+      "name": "合作与评价汇总",
+      "roles": [
+        "buyer",
+        "provider"
+      ],
+      "variants": [
+        "加载/空/失败",
+        "需求方发起/服务方承接",
+        "待办/待评价/已评价",
+        "账号变化/返回重读",
+        "返回保留进入时身份；同身份内页逐层返回，跨身份不返回旧页面"
+      ],
+      "modules": [
+        "order-list",
+        "identity",
+        "page-state",
+        "navigation",
+        "actions",
+        "personal-center"
+      ],
+      "actions": [
+        "filter",
+        "open",
+        "openOrders",
+        "refresh"
+      ]
+    },
+    {
+      "route": "pages/help/index",
+      "name": "帮助与反馈",
+      "roles": [
+        "buyer",
+        "provider"
+      ],
+      "variants": [
+        "双身份指南",
+        "8篇帮助正文",
+        "真实业务跳转",
+        "电话/复制/申请记录入口",
+        "返回保留进入时身份；同身份内页逐层返回，跨身份不返回旧页面"
+      ],
+      "modules": [
+        "navigation",
+        "actions",
+        "page-state",
+        "personal-center"
+      ],
+      "actions": [
+        "call",
+        "contact",
+        "copy",
+        "feedback",
+        "history",
+        "openArticle",
+        "openRelated"
+      ]
+    },
+    {
+      "route": "pages/settings/index",
+      "name": "设置",
+      "roles": [
+        "buyer",
+        "provider"
+      ],
+      "variants": [
+        "账号/权限/隐私/关于",
+        "原生权限拒绝/失败",
+        "明确退出与再次登录",
+        "信息查询/更正/注销申请",
+        "返回保留进入时身份；同身份内页逐层返回，跨身份不返回旧页面"
+      ],
+      "modules": [
+        "navigation",
+        "identity",
+        "actions",
+        "page-state",
+        "personal-center"
+      ],
+      "actions": [
+        "agreement",
+        "contact",
+        "edit",
+        "loadAccount",
+        "logout",
+        "open",
+        "openPermission",
+        "privacy",
+        "request",
+        "subscribe"
+      ]
+    },
+    {
+      "route": "pages/support/index",
+      "name": "申请与反馈",
+      "roles": [
+        "buyer",
+        "provider"
+      ],
+      "variants": [
+        "表单/本人记录/详情/补充",
+        "未确认结果同键重试",
+        "版本冲突/关闭/注销撤回",
+        "错误/空/分页/账号隔离",
+        "最多三张本人审核截图；上传/审核/失败保留；后台返回与账号隔离",
+        "补充/撤回未知结果按账号和申请持久化；重进核对；确认弹窗绑定原版本",
+        "64px固定缩略图任务行；原生大图预览；审核/拒绝/链接失效保留槽位",
+        "返回保留进入时身份；同身份内页逐层返回，跨身份不返回旧页面"
+      ],
+      "modules": [
+        "navigation",
+        "form",
+        "actions",
+        "page-state",
+        "personal-center",
+        "media"
+      ],
+      "actions": [
+        "append",
+        "chooseImages",
+        "contact",
+        "history",
+        "imageUnavailable",
+        "input",
+        "load",
+        "open",
+        "previewDraft",
+        "previewImage",
+        "refreshImages",
+        "removeImage",
+        "retryMutation",
+        "submit"
+      ]
+    },
+    {
+      "route": "pages/me-social/index",
+      "name": "收到的互动",
+      "roles": [
+        "buyer",
+        "provider"
+      ],
+      "variants": [
+        "作品获赞/关注我的",
+        "公开字段最小展示",
+        "分页/空/错误/账号变化",
+        "返回保留进入时身份；同身份内页逐层返回，跨身份不返回旧页面"
+      ],
+      "modules": [
+        "navigation",
+        "like",
+        "follow",
+        "identity",
+        "actions",
+        "page-state",
+        "personal-center"
+      ],
+      "actions": [
+        "load",
+        "openWork"
+      ]
+    }
+  ]
+}

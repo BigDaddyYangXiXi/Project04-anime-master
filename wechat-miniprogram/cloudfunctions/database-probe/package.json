@@ -1,0 +1,1 @@
+{"name":"anime-master-database-probe","version":"1.0.0","private":true,"main":"index.js","dependencies":{"mysql2":"3.24.3"}}

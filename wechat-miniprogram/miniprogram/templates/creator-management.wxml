@@ -1,0 +1,16 @@
+<template name="creator-management">
+ <view class="am-creator-management storefront-manager">
+  <view class="am-creator-management-identity"><image wx:if="{{profileDraft.avatar}}" src="{{profileDraft.avatar}}" mode="aspectFill"/><view wx:else class="am-creator-management-avatar">{{profileDraft.nickname ? profileDraft.nickname[0] : '匠'}}</view><view><text>{{profileDraft.nickname || '设置账号昵称'}}</text><text>{{career}} · {{profileDraft.city || '待设置城市'}}</text></view></view>
+  <view wx:if="{{!serviceDrafts.length && !workDrafts.length}}" class="storefront-intro"><image src="/assets/brand/expression-hello.png"/><text class="storefront-heading">让别人了解你的服务</text><text class="creator-caption">先添加案例展示效果，再配置服务与报价并关联案例。保存的草稿仅自己可见。</text></view>
+  <view wx:if="{{publicationStatusLabel}}" class="storefront-progress"><text class="storefront-section-heading">{{publicationStatusLabel}}</text><text class="creator-caption">{{publicationStatusHint}}</text><button class="storefront-link" bindtap="openPublicationProgress"><text>查看发布进度</text><text>›</text></button></view>
+  <view class="storefront-steps">
+   <button class="storefront-step {{!workDrafts.length ? 'current' : ''}}" data-step="work" disabled="{{saving || cloudLoading}}" bindtap="openSetupStep"><text class="step-number">{{workDrafts.length && publicationReadiness.worksReady ? '✓' : '1'}}</text><view><text>配置案例</text><text>{{workDrafts.length ? workDrafts.length + ' 件草稿 · ' + (publicationReadiness.worksReady ? '查看效果与对应服务' : '还有必要信息待完善') : '选填 · 图片帮助需求方了解你的风格'}}</text></view><text>›</text></button>
+   <button class="storefront-step {{workDrafts.length && !publicationReadiness.servicesReady ? 'current' : ''}}" data-step="service" disabled="{{saving || cloudLoading}}" bindtap="openSetupStep"><text class="step-number">{{publicationReadiness.servicesReady ? '✓' : '2'}}</text><view><text>配置服务与报价</text><text>{{serviceDrafts.length ? serviceDrafts.length + ' 项草稿 · ' + (publicationReadiness.servicesReady ? '查看内容、城市与报价' : '还有必要信息待完善') : '例如：角色妆造 · ￥520 / 次'}}</text></view><text>›</text></button>
+   <button class="storefront-step" disabled="{{saving || cloudLoading}}" bindtap="openPublicationCheck"><text class="step-number">{{hasPublicVersion && reviewKnown && !reviewChanges.length ? '✓' : '3'}}</text><view><text>预览并发布</text><text>先确认展示内容，通过检测后公开</text></view><text>›</text></button>
+  </view>
+  <button class="storefront-link" data-section="profile" disabled="{{saving || cloudLoading}}" bindtap="openSection"><text>橱窗资料</text><text>头图与个人介绍 ›</text></button>
+  <button class="storefront-link" data-section="notice" disabled="{{saving || cloudLoading}}" bindtap="openSection"><text>合作须知</text><text>选填 ›</text></button>
+  <button class="storefront-link" disabled="{{saving || cloudLoading}}" bindtap="openCalendar"><text>档期与接单</text><text>{{profileDraft.accepting === false ? '暂停接单' : '开放接单'}} ›</text></button>
+  <button wx:if="{{hasPublicVersion}}" class="storefront-link" bindtap="previewBuyer"><text>查看公开主页</text><text>需求方当前看到的内容 ›</text></button>
+ </view>
+</template>

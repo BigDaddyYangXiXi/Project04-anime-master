@@ -1,0 +1,1 @@
+.am-media-unavailable { display: flex; width: 100%; height: 100%; min-height: var(--am-touch-min); align-items: center; justify-content: center; color: var(--am-color-text-secondary); background: var(--am-color-control-surface); font-size: var(--am-type-caption); line-height: var(--am-line-caption); }

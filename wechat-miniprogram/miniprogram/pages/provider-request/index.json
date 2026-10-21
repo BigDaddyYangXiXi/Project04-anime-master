@@ -1,1 +1,7 @@
-{ "navigationBarTitleText": "预约请求" }
+{
+  "navigationBarTitleText": "预约请求",
+  "backgroundColorContent": "#171514",
+  "usingComponents": {
+    "order-subscription": "/components/order-subscription/index"
+  }
+}

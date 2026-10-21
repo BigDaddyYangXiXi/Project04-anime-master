@@ -1,3 +1,7 @@
 {
-  "navigationBarTitleText": "登录与注册"
+  "navigationBarTitleText": "登录与注册",
+  "backgroundColorContent": "#171514",
+  "usingComponents": {
+    "first-use-consent": "/components/first-use-consent/index"
+  }
 }

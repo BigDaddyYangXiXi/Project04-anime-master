@@ -1,7 +1,7 @@
 {
   "pages": [
-    "pages/auth/index",
     "pages/discover/index",
+    "pages/auth/index",
     "pages/search-results/index",
     "pages/work-detail/index",
     "pages/provider-detail/index",
@@ -9,6 +9,7 @@
     "pages/booking/index",
     "pages/booking-status/index",
     "pages/order-detail/index",
+    "pages/order-refund/index",
     "pages/provider-home/index",
     "pages/provider-request/index",
     "pages/provider-profile/index",
@@ -25,26 +26,56 @@
     "pages/me/index",
     "pages/account-profile/index",
     "pages/me-assets/index",
-    "pages/funds/index"
+    "pages/funds/index",
+    "pages/account-notice/index",
+    "pages/home-preferences/index",
+    "pages/me-activity/index",
+    "pages/help/index",
+    "pages/settings/index",
+    "pages/support/index",
+    "pages/me-social/index"
   ],
   "window": {
-    "navigationBarTitleText": "动漫高手",
-    "navigationBarBackgroundColor": "#ffffff",
-    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "万匠屋",
+    "navigationBarBackgroundColor": "#171514",
+    "navigationBarTextStyle": "white",
     "navigationStyle": "custom",
-    "backgroundColor": "#f6f3f0",
-    "backgroundTextStyle": "dark"
+    "backgroundColor": "#171514",
+    "backgroundTextStyle": "dark",
+    "backgroundColorTop": "#171514",
+    "backgroundColorBottom": "#171514",
+    "backgroundColorContent": "#171514"
   },
   "tabBar": {
-    "color": "#9b8d9a",
-    "selectedColor": "#ff6f71",
-    "backgroundColor": "#ffffff",
-    "borderStyle": "white",
+    "color": "#b9aaa0",
+    "selectedColor": "#ff946b",
+    "backgroundColor": "#171514",
+    "borderStyle": "black",
     "list": [
-      { "pagePath": "pages/discover/index", "text": "找高手", "iconPath": "assets/nav/market-tab.png", "selectedIconPath": "assets/nav/market-tab.png" },
-      { "pagePath": "pages/orders/index", "text": "订单", "iconPath": "assets/nav/order-tab.png", "selectedIconPath": "assets/nav/order-tab.png" },
-      { "pagePath": "pages/projects/index", "text": "项目", "iconPath": "assets/nav/project-tab.png", "selectedIconPath": "assets/nav/project-tab.png" },
-      { "pagePath": "pages/me/index", "text": "我的", "iconPath": "assets/nav/profile-tab.png", "selectedIconPath": "assets/nav/profile-tab.png" }
+      {
+        "pagePath": "pages/discover/index",
+        "text": "找高手",
+        "iconPath": "assets/nav/market-line.png",
+        "selectedIconPath": "assets/nav/market-line-active.png"
+      },
+      {
+        "pagePath": "pages/orders/index",
+        "text": "订单",
+        "iconPath": "assets/nav/order-line.png",
+        "selectedIconPath": "assets/nav/order-line-active.png"
+      },
+      {
+        "pagePath": "pages/projects/index",
+        "text": "项目",
+        "iconPath": "assets/nav/project-line.png",
+        "selectedIconPath": "assets/nav/project-line-active.png"
+      },
+      {
+        "pagePath": "pages/me/index",
+        "text": "我的",
+        "iconPath": "assets/nav/profile-line.png",
+        "selectedIconPath": "assets/nav/profile-line-active.png"
+      }
     ]
   },
   "usingComponents": {
@@ -53,5 +84,13 @@
   },
   "sitemapLocation": "sitemap.json",
   "style": "v2",
-  "lazyCodeLoading": "requiredComponents"
+  "lazyCodeLoading": "requiredComponents",
+  "permission": {
+    "scope.userFuzzyLocation": {
+      "desc": "用于识别所在城市，展示本地及附近的作品与服务"
+    }
+  },
+  "requiredPrivateInfos": [
+    "getFuzzyLocation"
+  ]
 }

@@ -1,3 +1,4 @@
+const localPreview = require("../../utils/local-preview");
 const store = require("../../data/v063-store");
 const { providers, stageLabels, stageFlows } = require("../../data/v063");
 
@@ -12,12 +13,12 @@ function countFlow(orders, flow) {
 
 Page({
   data: {
-    profile: null, profileInitial: "南", career: "妆娘", metrics: [],
+    profile: null, storefrontPublished: null, profileInitial: "南", career: "妆娘", metrics: [],
     priorityOrders: [], priorityTotal: 0, remainingPriority: 0, overview: []
   },
 
   onLoad(options = {}) {
-    this.auditMode = options.audit === "1";
+    this.auditMode = localPreview.isAudit(options);
     if (this.auditMode) return;
     this.redirecting = true;
     wx.setStorageSync("animeMasterRole", "provider");
@@ -73,8 +74,10 @@ Page({
     wx.navigateTo({ url: `/pages/${page}/index?id=${order.id}` });
   },
 
-  openProfile() { wx.navigateTo({ url: "/pages/provider-profile/index" }); },
-  openCalendar() { wx.switchTab({ url: "/pages/projects/index" }); },
-  openOrders() { wx.switchTab({ url: "/pages/orders/index" }); },
-  openReviews() { wx.navigateTo({ url: "/pages/provider-reviews/index" }); }
+  retryDashboard() { return this.onShow(); },
+  openProviderWork() { wx.navigateTo({ url: "/pages/provider-profile/index?edit=1&section=works&audit=1" }); },
+  openProviderProfile() { wx.navigateTo({ url: "/pages/provider-profile/index" }); },
+  openProviderCalendar() { wx.switchTab({ url: "/pages/projects/index" }); },
+  openProviderOrders() { wx.switchTab({ url: "/pages/orders/index" }); },
+  openProviderReviews() { wx.navigateTo({ url: "/pages/provider-reviews/index" }); }
 });

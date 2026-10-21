@@ -1,0 +1,4 @@
+<view class="subscription-row">
+  <button aria-disabled="{{pending}}" hover-class="none" class="am-action am-action-secondary" data-am-disabled="{{pending}}" bindtap="{{(pending) ? '' : 'subscribe'}}">{{pending ? '正在请求…' : '订阅订单提醒'}}</button>
+  <text class="subscription-copy">{{resultText || '由微信确认订阅，可在小程序设置中调整。'}}</text>
+</view>

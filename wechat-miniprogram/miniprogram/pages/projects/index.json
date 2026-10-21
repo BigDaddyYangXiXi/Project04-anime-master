@@ -1,1 +1,4 @@
-{ "navigationBarTitleText": "项目" }
+{
+  "navigationBarTitleText": "项目",
+  "backgroundColorContent": "#171514"
+}

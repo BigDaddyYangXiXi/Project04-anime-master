@@ -1,0 +1,5 @@
+/* Monetary values opt in by semantic role; action labels keep action contrast. */
+text.am-money { color: var(--am-color-price); font-variant-numeric: tabular-nums; font-weight: var(--am-weight-semibold); }
+text.am-money.am-money-list { color: var(--am-color-price); font-size: var(--am-money-list-size); line-height: var(--am-money-list-line); font-weight: var(--am-weight-semibold); }
+text.am-money.am-money-detail { color: var(--am-color-price); font-size: var(--am-money-detail-size); line-height: var(--am-money-detail-line); font-weight: var(--am-weight-semibold); }
+text.am-money.am-money-inline { color: var(--am-color-price); font-size: var(--am-type-label); line-height: var(--am-line-label); font-weight: var(--am-weight-semibold); }

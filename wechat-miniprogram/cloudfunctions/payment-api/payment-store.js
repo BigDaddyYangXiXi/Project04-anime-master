@@ -1,4 +1,5 @@
 const crypto = require("node:crypto");
+const { VERSION: PLATFORM_FEE_VERSION, platformFee } = require('./fee-policy');
 
 function fail(code) { const error = new Error(code); error.code = code; throw error; }
 function token(value, max = 128) {
@@ -48,10 +49,12 @@ async function lockedOrder(connection, orderId) {
 }
 
 // Internal persistence API. Callers must resolve identity and fee policy on the server.
-// Public payment creation remains unavailable until channel preparation and slot reservation are implemented.
+// Channel preparation is separate and must recheck the current order before returning payment arguments.
 async function reservePayment(pool, input, now = Date.now(), randomId = () => crypto.randomBytes(16).toString("hex")) {
   const orderId = token(input.orderId, 64), buyerId = token(input.buyerId, 64), requestKey = token(input.requestKey);
   const appid = token(input.appid, 32), platformMchid = token(input.platformMchid, 32), openid = token(input.payerOpenid);
+  const mode = input.paymentMode || 'COMBINE';
+  if (!['DIRECT', 'COMBINE'].includes(mode)) fail('PAYMENT_INPUT_INVALID');
   if (requestKey.length < 16 || !Number.isSafeInteger(input.expectedVersion)) fail("PAYMENT_INPUT_INVALID");
   return inTransaction(pool, async (connection) => {
     const order = await lockedOrder(connection, orderId);
@@ -59,7 +62,8 @@ async function reservePayment(pool, input, now = Date.now(), randomId = () => cr
     const [existing] = await connection.execute("SELECT * FROM order_payments WHERE order_id = ? ORDER BY created_at, id FOR UPDATE", [orderId]);
     const same = existing.find((payment) => payment.request_key === requestKey);
     if (same) {
-      if (same.appid !== appid || same.platform_mchid !== platformMchid || same.payer_openid !== openid) fail("PAYMENT_IDEMPOTENCY_CONFLICT");
+      if (same.appid !== appid || same.platform_mchid !== platformMchid || same.payer_openid !== openid
+        || (same.payment_mode || 'COMBINE') !== mode) fail("PAYMENT_IDEMPOTENCY_CONFLICT");
       return same;
     }
     if (existing.some((payment) => payment.status !== "CLOSED")) fail("PAYMENT_ALREADY_EXISTS");
@@ -68,26 +72,34 @@ async function reservePayment(pool, input, now = Date.now(), randomId = () => cr
     const p = payloadOf(order).public;
     if (!["UNPAID", "FAILED"].includes(p.paymentStatus)) fail("PAYMENT_ALREADY_EXISTS");
     const amountFen = cents(Number(p.amountFen));
-    if (!input.fee || !input.fee.version || !Number.isSafeInteger(input.fee.amountFen)
-      || input.fee.amountFen <= 0 || input.fee.amountFen > amountFen) fail("PAYMENT_FEE_NOT_CONFIGURED");
-    const feeVersion = token(input.fee.version, 64);
-    const [merchants] = await connection.execute("SELECT * FROM provider_payment_merchants WHERE provider_id = ? FOR UPDATE", [order.provider_id]);
-    const merchant = merchants[0];
-    if (!merchant || merchant.status !== "READY" || Number(merchant.verified_at) <= 0 || merchant.platform_mchid !== platformMchid) fail("PAYMENT_MERCHANT_NOT_READY");
+    if (input.feeRuleVersion !== undefined && (input.feeRuleVersion !== PLATFORM_FEE_VERSION || input.fee !== undefined)) fail('PAYMENT_FEE_NOT_CONFIGURED');
+    const fee = input.feeRuleVersion === PLATFORM_FEE_VERSION ? platformFee(amountFen) : input.fee;
+    if (input.feeRuleVersion === PLATFORM_FEE_VERSION && fee.amountFen === 0) fail('PAYMENT_ZERO_FEE_UNSUPPORTED');
+    if (!fee || !fee.version || !Number.isSafeInteger(fee.amountFen)
+      || fee.amountFen <= 0 || fee.amountFen > amountFen) fail("PAYMENT_FEE_NOT_CONFIGURED");
+    const feeVersion = token(fee.version, 64);
+    let subMchid = null;
+    if (mode === 'COMBINE') {
+      const [merchants] = await connection.execute("SELECT * FROM provider_payment_merchants WHERE provider_id = ? FOR SHARE", [order.provider_id]);
+      const merchant = merchants[0];
+      if (!merchant || merchant.status !== "READY" || Number(merchant.verified_at) <= 0 || merchant.platform_mchid !== platformMchid) fail("PAYMENT_MERCHANT_NOT_READY");
+      subMchid = merchant.sub_mchid;
+    }
     const id = randomId();
     if (!/^[a-f0-9]{32}$/.test(id)) fail("PAYMENT_INPUT_INVALID");
     await connection.execute(`INSERT INTO order_payments
       (id, order_id, request_key, order_version, agreement_hash, appid, platform_mchid, sub_mchid, payer_openid,
-       amount_fen, currency, fee_rule_version, platform_fee_fen, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CNY', ?, ?, 'CREATED', ?, ?)`,
-    [id, orderId, requestKey, Number(order.version), agreementHash(order), appid, platformMchid, merchant.sub_mchid,
-      openid, amountFen, feeVersion, input.fee.amountFen, now, now]);
+       amount_fen, currency, fee_rule_version, platform_fee_fen, status, created_at, updated_at, payment_mode)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CNY', ?, ?, 'CREATED', ?, ?, ?)`,
+    [id, orderId, requestKey, Number(order.version), agreementHash(order), appid, platformMchid, subMchid,
+      openid, amountFen, feeVersion, fee.amountFen, now, now, mode]);
     const [[payment]] = await connection.execute("SELECT * FROM order_payments WHERE id = ?", [id]);
     return payment;
   });
 }
 
 function validateBinding(payment, result) {
+  if ((payment.payment_mode || 'COMBINE') !== (result.paymentMode || 'COMBINE')) fail('PAYMENT_RESULT_MISMATCH');
   const missingPayerAllowed = ["NOTPAY", "CLOSED", "PAYERROR"].includes(result.tradeState)
     || result.tradeState === "SUCCESS" && result.payerVerification === "MISSING";
   if (result.combineOutTradeNo !== payment.id || result.outTradeNo !== payment.id || result.appid !== payment.appid
@@ -137,12 +149,14 @@ async function recordPaymentSuccess(pool, result, now = Date.now()) {
       payer_paid_fen = ?, received_currency = ?, paid_at = ?, review_reason = ?, payer_verification = ?, updated_at = ? WHERE id = ?`,
     [status, transactionId, total, paid, result.currency, paidAt, reason, result.payerVerification, now, payment.id]);
     if (!reason) {
+      await require('./fund-ledger').postFunds(connection, payment, order.provider_id, null, null, now);
       p.paymentStatus = "PAID";
       p.paymentTransactionId = transactionId;
       p.paidAt = paidAt;
       p.paymentId = payment.id;
       payload.events.push({ id: `pay_${payment.id}`, event: "PAYMENT_VERIFIED", fromStage: order.stage, toStage: order.stage, createdAt: now });
     } else {
+      await require('./fund-ledger').postReviewFunds(connection,payment,order.provider_id,result,now);
       p.paymentStatus = "PAYMENT_REVIEW";
       payload.events.push({ id: `review_${payment.id}`, event: "PAYMENT_REVIEW_REQUIRED", fromStage: order.stage, toStage: order.stage, createdAt: now });
     }
@@ -158,7 +172,7 @@ async function recordPaymentClosed(pool, result, now = Date.now()) {
     if (payment.status !== "CREATED") return { status: payment.status };
     await connection.execute("UPDATE order_payments SET status = 'CLOSED', updated_at = ? WHERE id = ?", [now, payment.id]);
     const payload = payloadOf(order);
-    if (order.stage === "BUYER_FINAL_CONFIRM" && payload.public.paymentStatus === "VERIFYING") {
+    if (order.stage === "BUYER_FINAL_CONFIRM" && ["UNPAID", "FAILED", "VERIFYING"].includes(payload.public.paymentStatus)) {
       const [other] = await connection.execute("SELECT id FROM order_payments WHERE order_id = ? AND id <> ? AND status <> 'CLOSED' FOR UPDATE", [order.id, payment.id]);
       if (!other.length) {
         payload.public.paymentStatus = "UNPAID";
@@ -176,4 +190,4 @@ async function readPendingPayment(pool, result) {
   return withPayment(pool, result, async (connection, order, payment) => ({ status: payment.status, channelStatus: result.tradeState }));
 }
 
-module.exports = { inTransaction, reservePayment, recordPaymentSuccess, recordPaymentClosed, readPendingPayment };
+module.exports = { inTransaction, reservePayment, recordPaymentSuccess, recordPaymentClosed, readPendingPayment, agreementHash, agreementReady };

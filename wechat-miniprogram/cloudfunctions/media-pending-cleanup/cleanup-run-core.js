@@ -1,5 +1,5 @@
 const crypto = require("node:crypto");
-const { cleanupExpiredMedia } = require("./cleanup-core");
+const { cleanupExpiredMedia, cleanupErrorCode } = require("./cleanup-core");
 const { cleanupReadyOrphans } = require("./ready-orphan-core");
 
 function fail(code, message) { const error = new Error(message); error.code = code; throw error; }
@@ -10,7 +10,7 @@ function source(event) {
   return "MANUAL";
 }
 function runStatus(pending, readyOrphans) {
-  return Number(pending && pending.failed || 0) + Number(readyOrphans && readyOrphans.failed || 0) > 0 ? "PARTIAL" : "SUCCESS";
+  return Number(pending && pending.failed || 0) + Number(readyOrphans && readyOrphans.failed || 0) + Number(readyOrphans && readyOrphans.deferred || 0) > 0 ? "PARTIAL" : "SUCCESS";
 }
 async function saveRun(db, value) {
   rows(await db.from("media_cleanup_runs").insert({
@@ -38,12 +38,12 @@ async function runCleanupJob(db, storage, context = {}, event = {}, clock = Date
       await saveRun(db, { id: runId, source: runSource, status, pending_summary: pending, ready_orphan_summary: readyOrphans, error_code: null, started_at: startedAt, finished_at: finishedAt });
     } catch (error) {
       saved = false;
-      console.error(JSON.stringify({ scope: "media-cleanup-run-audit", code: error && error.code || "UNEXPECTED" }));
+      console.error(JSON.stringify({ scope: "media-cleanup-run-audit", code: cleanupErrorCode(error) }));
     }
     return { pending, readyOrphans, audit: { runId, source: runSource, status, saved } };
   } catch (error) {
     const finishedAt = clock();
-    await saveRun(db, { id: runId, source: runSource, status: "FAILED", pending_summary: pending, ready_orphan_summary: readyOrphans, error_code: String(error && error.code || "UNEXPECTED").slice(0, 64), started_at: startedAt, finished_at: finishedAt }).catch(() => null);
+    await saveRun(db, { id: runId, source: runSource, status: "FAILED", pending_summary: pending, ready_orphan_summary: readyOrphans, error_code: cleanupErrorCode(error), started_at: startedAt, finished_at: finishedAt }).catch(() => null);
     throw error;
   }
 }

@@ -6,6 +6,14 @@ const {
   verifyPlainSignature
 } = require("./callback-core");
 
+const LOG_CODES = new Set([
+  "WX_CALLBACK_TOKEN_INVALID", "WX_APP_ID_INVALID", "WX_CALLBACK_AES_KEY_INVALID",
+  "DATABASE_OPERATION_FAILED", "SECURITY_CHECK_NOT_READY", "MEDIA_ASSET_NOT_FOUND",
+  "SECURITY_RESULT_CONFLICT", "SECURITY_CHECK_STATE_CONFLICT",
+  "INVALID_PADDING", "INVALID_AES_KEY", "INVALID_ENCRYPTED_MESSAGE", "APP_ID_MISMATCH", "TRACE_ID_MISSING",
+  "SUBSCRIPTION_EVENT_INVALID"
+]);
+
 function response(statusCode, body) {
   return {
     statusCode,
@@ -20,8 +28,8 @@ function requiredEnv(name, pattern) {
   return value;
 }
 
-function rows(result, operation) {
-  if (result && result.error) throw new Error(`${operation}: ${result.error.message || result.error}`);
+function rows(result) {
+  if (result && result.error) throw new Error("DATABASE_OPERATION_FAILED");
   return result && Array.isArray(result.data) ? result.data : [];
 }
 
@@ -29,40 +37,31 @@ async function persistMediaResult(db, result, now = Date.now()) {
   const check = rows(
     await db.from("media_security_checks")
       .select("asset_id,status")
-      .eq("trace_id", result.traceId),
-    "read media security check"
+      .eq("trace_id", result.traceId)
   )[0];
   if (!check) throw new Error("SECURITY_CHECK_NOT_READY");
 
   const asset = rows(
-    await db.from("media_assets").select("id,status").eq("id", check.asset_id),
-    "read media asset"
+    await db.from("media_assets").select("id,status").eq("id", check.asset_id)
   )[0];
   if (!asset) throw new Error("MEDIA_ASSET_NOT_FOUND");
 
-  if (asset.status === "PENDING") {
-    rows(
-      await db.from("media_assets")
-        .update({ status: result.assetStatus })
-        .eq("id", check.asset_id)
-        .eq("status", "PENDING"),
-      "update media asset status"
-    );
+  if (["PASS", "REVIEW", "RISKY", "ERROR"].includes(check.status)) {
+    if (check.status !== result.status) throw new Error("SECURITY_RESULT_CONFLICT");
+  } else {
+    if (!["PENDING", "SUBMITTING"].includes(check.status)) throw new Error("SECURITY_CHECK_STATE_CONFLICT");
+    const persisted = rows(await db.from("media_security_checks")
+      .update({ status: result.status, label: result.label, detail_json: JSON.stringify(result.detail), resolved_at: now, updated_at: now })
+      .eq("asset_id", check.asset_id).eq("trace_id", result.traceId).eq("status", check.status).select("asset_id"));
+    if (!persisted.length) throw new Error("SECURITY_CHECK_STATE_CONFLICT");
   }
 
-  rows(
-    await db.from("media_security_checks")
-      .update({
-        status: result.status,
-        label: result.label,
-        detail_json: JSON.stringify(result.detail),
-        resolved_at: now,
-        updated_at: now
-      })
-      .eq("asset_id", check.asset_id)
-      .eq("trace_id", result.traceId),
-    "update media security check"
-  );
+  // Persist the verdict first. A repeated callback can finish this write after
+  // interruption without replacing the original evidence or reviving a deletion.
+  if (asset.status === "PENDING") {
+    rows(await db.from("media_assets").update({ status: result.assetStatus })
+      .eq("id", check.asset_id).eq("status", "PENDING"));
+  }
 }
 
 exports.main = async (event, context) => {
@@ -82,20 +81,28 @@ exports.main = async (event, context) => {
     if (method !== "POST") return response(405, "method not allowed");
 
     const envelope = parseRequestBody(event);
-    let message = envelope;
-    if (envelope.Encrypt) {
-      const aesKey = requiredEnv("WX_CALLBACK_AES_KEY", /^[A-Za-z0-9]{43}$/);
-      const valid = verifyEncryptedSignature(
-        token,
-        query.timestamp,
-        query.nonce,
-        envelope.Encrypt,
-        query.msg_signature
-      );
-      if (!valid) return response(403, "forbidden");
-      message = JSON.parse(decryptWechatMessage(envelope.Encrypt, aesKey, appId));
-    } else if (!verifyPlainSignature(token, query.timestamp, query.nonce, query.signature)) {
-      return response(403, "forbidden");
+    // POST requires safe mode: the encrypted signature covers the message body.
+    if (!envelope || typeof envelope.Encrypt !== "string" || !envelope.Encrypt) return response(403, "forbidden");
+    const aesKey = requiredEnv("WX_CALLBACK_AES_KEY", /^[A-Za-z0-9]{43}$/);
+    const valid = verifyEncryptedSignature(
+      token,
+      query.timestamp,
+      query.nonce,
+      envelope.Encrypt,
+      query.msg_signature
+    );
+    if (!valid) return response(403, "forbidden");
+    const message = JSON.parse(decryptWechatMessage(envelope.Encrypt, aesKey, appId));
+
+    if (['subscribe_msg_popup_event', 'subscribe_msg_change_event'].includes(message && message.Event)) {
+      const { normalizeSubscriptionEvents, persistSubscriptionEvents } = require('./subscription-events');
+      const observations = normalizeSubscriptionEvents(message);
+      if (observations.length) {
+        const cloudbase = require('@cloudbase/node-sdk');
+        const app = cloudbase.init({ env: cloudbase.SYMBOL_CURRENT_ENV });
+        await persistSubscriptionEvents(app.rdb(), observations);
+      }
+      return response(200, 'success');
     }
 
     const result = normalizeMediaCheck(message);
@@ -104,11 +111,12 @@ exports.main = async (event, context) => {
     const cloudbase = require("@cloudbase/node-sdk");
     const app = cloudbase.init({ env: cloudbase.SYMBOL_CURRENT_ENV });
     await persistMediaResult(app.rdb(), result);
+    await require("./content-intents").wake(app);
     return response(200, "success");
   } catch (error) {
     console.error(JSON.stringify({
       scope: "wechat-message-callback",
-      code: error && error.message ? error.message : "UNEXPECTED"
+      code: LOG_CODES.has(error && error.message) ? error.message : "UNEXPECTED"
     }));
     return response(500, "retry");
   }

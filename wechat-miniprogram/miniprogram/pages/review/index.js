@@ -1,3 +1,5 @@
+const confirmAction = require("../../utils/order-confirmation");
+const localPreview = require("../../utils/local-preview");
 const store = require("../../data/v063-store");
 const presentation = require("../../data/order-presentation");
 const cloudOrders = require("../../services/cloud-orders");
@@ -10,20 +12,28 @@ Page({
 
   onLoad(options) {
     this.orderId = options.id;
-    this.auditFresh = options.audit === "1" && options.fresh === "1";
-    this.auditReply = options.audit === "1" && options.reply === "1";
-    this.auditDraft = options.audit === "1" && options.draft === "1";
-    this.cloudMode = options.audit !== "1";
+    this.auditFresh = localPreview.isAudit(options) && options.fresh === "1";
+    this.auditReply = localPreview.isAudit(options) && options.reply === "1";
+    this.auditDraft = localPreview.isAudit(options) && options.draft === "1";
+    this.cloudMode = !localPreview.isAudit(options);
     this.load();
   },
 
+  onUnload() { this.unloaded = true; this.loadRequest = (this.loadRequest || 0) + 1; },
   async load() {
+    if (this.unloaded) return;
+    const request = this.loadRequest = (this.loadRequest || 0) + 1;
+    const visibleOrder = this.data.order;
     if (this.cloudMode) {
       this.setData({ loading: true, loadError: "" });
       try {
-        this.renderOrder(await cloudOrders.getOrder(this.orderId));
+        const order = await cloudOrders.getOrder(this.orderId);
+        if (request !== this.loadRequest) return;
+        this.renderOrder(order);
         this.setData({ loading: false });
       } catch (error) {
+        if (request !== this.loadRequest) return;
+        if (this.data.order !== visibleOrder) { this.setData({ loading: false }); return; }
         this.setData({ order: null, loading: false, loadError: this.cloudErrorMessage(error) });
       }
       return;
@@ -32,6 +42,8 @@ Page({
   },
 
   renderOrder(savedOrder) {
+    if (savedOrder && savedOrder.cloudOrder && this.data.order && this.data.order.id === savedOrder.id
+      && Number(this.data.order.version) > Number(savedOrder.version)) return false;
     if (!savedOrder) return this.setData({ order: null });
     const order = Object.assign({}, savedOrder,
       this.auditFresh ? { rating: 0, reviewText: "", reviewReply: "" } : {},
@@ -60,12 +72,7 @@ Page({
 
   submit() {
     if (!this.data.order || this.data.order.stage !== "COMPLETED" || this.data.order.rating || !this.data.rating) return;
-    wx.showModal({
-      title: `确认提交 ${this.data.rating} 星评价`,
-      content: "评分和评价内容提交后不可修改；服务方可以公开回复。",
-      confirmColor: "#ff6f71",
-      success: ({ confirm }) => {
-        if (!confirm) return;
+    confirmAction(this, `确认提交 ${this.data.rating} 星评价`, "评分和评价内容提交后不可修改；服务方可以公开回复。", () => {
         if (this.cloudMode) return this.submitCloudReview();
         const order = store.findOrder(this.orderId);
         if (!order || order.stage !== "COMPLETED" || (order.rating && !this.auditFresh)) return this.load();
@@ -73,20 +80,21 @@ Page({
         this.auditFresh = false;
         this.auditDraft = false;
         this.load();
-      }
     });
   },
 
   async submitCloudReview() {
-    if (this.data.actionPending || !this.data.order) return;
+    if (this.unloaded || this.data.actionPending || !this.data.order) return;
     this.setData({ actionPending: true, loadError: "" });
     try {
       const order = await cloudOrders.transitionOrder(this.orderId, this.data.order.version, "BUYER_SUBMITS_REVIEW", {
         rating: this.data.rating, reviewText: this.data.text.trim()
       });
+      if (this.unloaded) return;
       this.renderOrder(order);
       this.setData({ actionPending: false, rating: 0, text: "", textCount: 0 });
     } catch (error) {
+      if (this.unloaded) return;
       this.setData({ actionPending: false, loadError: this.cloudErrorMessage(error) });
       if (error && ["VERSION_CONFLICT", "REVIEW_ALREADY_SUBMITTED"].includes(error.code)) this.load();
       else wx.showToast({ title: this.cloudErrorMessage(error), icon: "none" });

@@ -1,0 +1,19 @@
+name: Design system consistency
+on:
+  pull_request:
+  push:
+jobs:
+  design:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check page inventory, tokens and style debt
+        run: node wechat-miniprogram/automation/design-system-audit.js check
+      - name: Test dependency and impact checks
+        run: node --test wechat-miniprogram/automation/*.test.js
+      - name: Check shared action consumers
+        run: node wechat-miniprogram/automation/button-design-system-audit.js
+      - name: Check generated inventory is current
+        run: |
+          node wechat-miniprogram/automation/design-system-audit.js inventory
+          git diff --exit-code -- wechat-miniprogram/design-system/INVENTORY.md

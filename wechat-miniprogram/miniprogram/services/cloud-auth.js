@@ -1,3 +1,6 @@
+const cloudCall = require("../utils/cloud-call");
+const { current: accountNotice } = require("../data/account-notice");
+const localPreview = require("../utils/local-preview");
 const cloudbase = require("../config/cloudbase");
 
 function isAvailable() {
@@ -18,7 +21,8 @@ async function call(data) {
   }
   let response;
   try {
-    response = await wx.cloud.callFunction({ name: "account-bootstrap", data });
+    localPreview.assertCloudAllowed();
+    response = await cloudCall.call(wx, { name: "account-bootstrap", data });
   } catch (cause) {
     const details = String(cause && (cause.errMsg || cause.message) || "");
     if (cause && (cause.code === "EXCEED_REQUEST_LIMIT" || cause.errCode === -501003)
@@ -36,11 +40,8 @@ async function call(data) {
 function getSession() { return call({ action: "getSession" }); }
 function login() { return call({ action: "login" }); }
 function phoneLogin(phoneCode) { return call({ action: "phoneLogin", phoneCode }); }
-function register(nickname, acceptedNotice) {
-  return call({ action: "register", nickname, acceptedNotice });
-}
-function phoneRegister(phoneCode, nickname, acceptedNotice) {
-  return call({ action: "phoneRegister", phoneCode, nickname, acceptedNotice });
+function phoneRegister(phoneCode, nickname, username, acceptedNotice) {
+  return call({ action: "phoneRegister", phoneCode, nickname, username, acceptedNotice, noticeVersion: accountNotice.version });
 }
 
-module.exports = { getSession, isAvailable, login, phoneLogin, phoneRegister, register };
+module.exports = { getSession, isAvailable, login, phoneLogin, phoneRegister };

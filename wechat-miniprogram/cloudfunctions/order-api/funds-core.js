@@ -6,7 +6,7 @@ function integer(value, minimum = 0) {
   return number;
 }
 const RECEIPT_STATUSES = ["PAID", "PAID_REQUIRES_REVIEW"];
-const FIELDS = "id,order_id,status,transaction_id,amount_fen,received_total_fen,payer_paid_fen,received_currency,paid_at,order_aggregates!inner(provider_id)";
+const FIELDS = "id,order_id,status,transaction_id,amount_fen,platform_fee_fen,fee_rule_version,received_total_fen,payer_paid_fen,received_currency,paid_at,refunded_fen,platform_refunded_fen,provider_refunded_fen,order_aggregates!inner(provider_id)";
 
 async function readProviderFunds(db, actor, event) {
   if (!actor.roles.includes("PROVIDER")) fail("PROVIDER_ROLE_REQUIRED");
@@ -30,8 +30,21 @@ async function readProviderFunds(db, actor, event) {
     if (!row.order_aggregates || row.order_aggregates.provider_id !== actor.accountId || !RECEIPT_STATUSES.includes(row.status)
       || !row.transaction_id || !/^[a-f0-9]{32}$/.test(row.id) || !/^[A-Z]{3}$/.test(row.received_currency)) fail("DATABASE_OPERATION_FAILED");
     const amountFen = integer(row.amount_fen, 1), totalFen = integer(row.received_total_fen, 1), payerPaidFen = integer(row.payer_paid_fen);
+    const platformFeeFen = integer(row.platform_fee_fen);
+    if (platformFeeFen > amountFen || !row.fee_rule_version) fail('DATABASE_OPERATION_FAILED');
     if (payerPaidFen > totalFen || row.status === "PAID" && (totalFen !== amountFen || row.received_currency !== "CNY")) fail("DATABASE_OPERATION_FAILED");
+    const refundedFen = integer(row.refunded_fen), platformRefundedFen = integer(row.platform_refunded_fen), providerRefundedFen = integer(row.provider_refunded_fen);
+    if (refundedFen > amountFen || platformRefundedFen > platformFeeFen || providerRefundedFen > amountFen - platformFeeFen
+      || BigInt(platformRefundedFen) + BigInt(providerRefundedFen) !== BigInt(refundedFen)) fail('DATABASE_OPERATION_FAILED');
+    // Validate the persisted V1 snapshot and cumulative reversal before displaying net income.
+    // This read boundary never recalculates or overwrites historical monetary records.
+    if (row.fee_rule_version !== 'PLATFORM_20_PERCENT_V1'
+      || platformFeeFen !== Number((BigInt(amountFen) + 2n) / 5n)
+      || platformFeeFen - platformRefundedFen !== Number((BigInt(amountFen - refundedFen) + 2n) / 5n)) fail('DATABASE_OPERATION_FAILED');
     return { id: row.id, orderId: row.order_id, status: row.status, amountFen,
+      platformFeeFen, refundedFen, platformRefundedFen, providerRefundedFen,
+      retainedAmountFen: amountFen - refundedFen, retainedPlatformFeeFen: platformFeeFen - platformRefundedFen,
+      expectedIncomeFen: row.status === 'PAID' ? amountFen - platformFeeFen - providerRefundedFen : null,
       totalFen, payerPaidFen, currency: row.received_currency, paidAt: integer(row.paid_at, 1) };
   });
   const last = page[page.length - 1];

@@ -25,6 +25,15 @@ test("plain and base64 bodies preserve signatures and propagate database failure
   assert.equal(calls, 2);
 });
 
+test('HTTP diagnostics expose only whitelisted failure codes, never raw exceptions', async () => {
+  const missing = await run({ ...event(), body: {} });
+  assert.equal(missing.headers['X-Payment-Error'], 'PAYMENT_HTTP_BODY_INVALID');
+  const pool = { getConnection: async () => { throw new Error('private database and credentials'); } };
+  const failed = await run(event(), pool);
+  assert.equal(failed.headers['X-Payment-Error'], 'PAYMENT_INTERNAL_ERROR');
+  assert.ok(!JSON.stringify(failed).includes('private database'));
+});
+
 test("parsed objects, invalid encoding flags and noncanonical base64 fail before database", async () => {
   for (const body of [JSON.parse(signed.body), null, undefined, Buffer.from(signed.body)]) assert.equal((await run({ ...event(), body })).statusCode, 400);
   for (const isBase64Encoded of ["false", "true", null, 1]) assert.equal((await run({ ...event(), isBase64Encoded })).statusCode, 400);
@@ -34,8 +43,23 @@ test("parsed objects, invalid encoding flags and noncanonical base64 fail before
 test("body and headers are bounded, ambiguous headers and compressed content are rejected", async () => {
   assert.equal((await run({ ...event(), body: "a".repeat(2 * 1024 * 1024 + 1) })).statusCode, 413);
   assert.equal((await run({ ...event(true), body: Buffer.alloc(2 * 1024 * 1024 + 1).toString("base64") })).statusCode, 413);
-  for (const patch of [{ headers: null }, { headers: { ...signed.headers, "Wechatpay-Nonce": ["one", "two"] } }, { multiValueHeaders: {} },
+  for (const patch of [{ headers: null }, { headers: { ...signed.headers, "Wechatpay-Nonce": ["one", "two"] } }, { multiValueHeaders: null },
     { headers: { ...signed.headers, "Content-Encoding": "gzip" } }]) assert.equal((await run({ ...event(), ...patch })).statusCode, 400);
+});
+
+test("gateway multi-value headers preserve signed requests only when single values agree", async () => {
+  let calls = 0;
+  const pool = { getConnection: async () => { calls++; throw new Error("offline"); } };
+  const multi = Object.fromEntries(Object.entries(signed.headers).map(([key, value]) => [key.toLowerCase(), [value]]));
+  for (const multiValueHeaders of [{}, multi]) {
+    assert.equal((await run({ ...event(), multiValueHeaders }, pool)).statusCode, 500);
+  }
+  assert.equal(calls, 2);
+  for (const multiValueHeaders of [[], { unknown: ["one"] }, { "Wechatpay-Nonce": ["wrong"] },
+    { "Wechatpay-Nonce": [signed.headers["Wechatpay-Nonce"], "two"] },
+    { ...multi, "Wechatpay-Nonce": [signed.headers["Wechatpay-Nonce"]] }]) {
+    assert.equal((await run({ ...event(), multiValueHeaders })).statusCode, 400);
+  }
 });
 
 test("tampered bytes, duplicate signature names and stale signatures produce non-success HTTP responses", async () => {

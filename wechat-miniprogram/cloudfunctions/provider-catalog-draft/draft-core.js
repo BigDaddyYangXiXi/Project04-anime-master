@@ -1,3 +1,4 @@
+const intents = require("./content-intents");
 const CAREERS = new Set(["妆娘", "毛娘", "摄影", "后期"]);
 const TONES = new Set(["coral", "grape", "rose", "blue"]);
 const SERVICE_MODES = new Set(["ONSITE", "ONLINE", "BOTH"]);
@@ -72,9 +73,23 @@ function canonicalCityCode(value) {
     : `${value.slice(0, 4)}00`;
 }
 
+function normalizeWatermarks(value, display, sources) {
+  if (!Array.isArray(display) || !Array.isArray(sources) || display.length !== sources.length || !Array.isArray(value) || value.length !== display.length) fail('VALIDATION_ERROR', 'image settings must match images');
+  return value.map((item, index) => {
+    if (item == null) {
+      if (display[index] !== sources[index]) fail('VALIDATION_ERROR', 'unmarked image must use its source');
+      return null;
+    }
+    if (typeof item !== 'object' || item.enabled !== true || !['bottom-right','bottom-left','top-right','top-left','center'].includes(item.position)
+      || !Number.isFinite(item.size) || item.size < 2 || item.size > 6 || !Number.isFinite(item.opacity) || item.opacity < 20 || item.opacity > 90 || display[index] === sources[index]) fail('VALIDATION_ERROR', 'watermark settings are invalid');
+    return { enabled: true, text: text(item.text, 'watermark text', 40, true), position: item.position, size: item.size, opacity: item.opacity };
+  });
+}
+
 function normalizeDraft(input) {
   if (!input || typeof input !== "object" || Array.isArray(input)) fail("VALIDATION_ERROR", "draft is invalid");
   const profileInput = input.profile || {};
+  if (profileInput.accepting != null && typeof profileInput.accepting !== "boolean") fail("VALIDATION_ERROR", "profile.accepting must be boolean");
   const career = text(profileInput.career, "profile.career", 20);
   if (career && !CAREERS.has(career)) fail("VALIDATION_ERROR", "profile.career is invalid");
 
@@ -100,6 +115,9 @@ function normalizeDraft(input) {
       description: text(service && service.description, `services[${index}].description`, 1000),
       workIds: stringList(service && service.workIds, `services[${index}].workIds`, 50, 64, true),
       serviceMode,
+      includes: text(service && service.includes, `services[${index}].includes`, 1000),
+      extras: text(service && service.extras, `services[${index}].extras`, 1000),
+      preparation: text(service && service.preparation, `services[${index}].preparation`, 1000),
       serviceAreas: normalizedAreas
     };
   });
@@ -118,7 +136,9 @@ function normalizeDraft(input) {
       description: text(work && work.description, `works[${index}].description`, 2000),
       tone,
       tags: stringList(work && work.tags, `works[${index}].tags`, 10, 80),
-      imageAssetIds: stringList(work && work.imageAssetIds, `works[${index}].imageAssetIds`, 5, 64, true)
+      imageAssetIds: stringList(work && work.imageAssetIds, `works[${index}].imageAssetIds`, 5, 64, true),
+      ...Object.fromEntries(['creditCoser','creditPhoto','creditMakeup','creditRetouch','creditMine'].filter(key => work && work[key]).map(key => [key, text(work[key], `works[${index}].${key}`, 100)])),
+      ...(work && work.sourceImageAssetIds ? { sourceImageAssetIds: stringList(work.sourceImageAssetIds, `works[${index}].sourceImageAssetIds`, 5, 64, true), watermarks: normalizeWatermarks(work.watermarks, work.imageAssetIds, work.sourceImageAssetIds) } : {})
     };
   });
   if (new Set(works.map((item) => item.id)).size !== works.length) {
@@ -142,12 +162,22 @@ function normalizeDraft(input) {
   }
 
   const draft = {
+    schemaVersion: 2,
     profile: {
       career,
       city: text(profileInput.city, "profile.city", 120),
       cityCode: profileInput.cityCode ? text(profileInput.cityCode, "profile.cityCode", 6, true) : "",
+      district: text(profileInput.district, "profile.district", 120),
+      specialties: text(profileInput.specialties, "profile.specialties", 500),
+      declines: text(profileInput.declines, "profile.declines", 500),
+      contactHours: text(profileInput.contactHours, "profile.contactHours", 500),
+      accepting: profileInput.accepting !== false,
       bio: text(profileInput.bio, "profile.bio", 1000),
       notice: text(profileInput.notice, "profile.notice", 1000),
+      bannerSourceAssetId: profileInput.bannerSourceAssetId ? id(profileInput.bannerSourceAssetId, "profile.bannerSourceAssetId") : null,
+      bannerFocusX: Number.isFinite(profileInput.bannerFocusX) ? Math.max(0, Math.min(100, profileInput.bannerFocusX)) : 50,
+      bannerFocusY: Number.isFinite(profileInput.bannerFocusY) ? Math.max(0, Math.min(100, profileInput.bannerFocusY)) : 50,
+      bannerAssetId: profileInput.bannerAssetId ? id(profileInput.bannerAssetId, "profile.bannerAssetId") : null,
       noticeImageAssetId: profileInput.noticeImageAssetId
         ? id(profileInput.noticeImageAssetId, "profile.noticeImageAssetId")
         : null,
@@ -182,32 +212,47 @@ async function resolveProvider(db, context) {
   );
   if (!identities[0]) fail("ACCOUNT_NOT_FOUND", "account is not initialized");
   const accountId = identities[0].account_id;
-  const roles = rows(
-    await db.from("account_roles").select("role").eq("account_id", accountId).eq("role", "PROVIDER"),
-    "read provider role"
-  );
+  const account = rows(await db.from("accounts").select("id").eq("id", accountId).eq("status", "ACTIVE"), "read active account")[0];
+  if (!account) fail("ACCOUNT_NOT_FOUND", "account is not active");
+  const roles = rows(await db.from("account_roles").select("role").eq("account_id", accountId).eq("role", "PROVIDER"), "read provider role");
   if (!roles.length) fail("PROVIDER_ROLE_REQUIRED", "provider role is required");
   return accountId;
 }
 
 async function readDraftRow(db, providerId) {
   const row = rows(
-    await db.from("provider_catalog_drafts").select("payload,version,updated_at").eq("provider_id", providerId),
+    await db.from("provider_catalog_drafts").select("payload,version,updated_at" + (intents.enabled() ? ",pending_content_intent_id" : "")).eq("provider_id", providerId),
     "read provider draft"
   )[0] || null;
   return row ? { ...row, version: dbVersion(row.version), updated_at: dbTime(row.updated_at) } : null;
 }
 
-async function handleProviderDraft(db, event = {}, context = {}, now = Date.now()) {
+async function handleProviderDraft(db, event = {}, context = {}, now = Date.now(), dependencies = {}) {
   const action = event.action || "getDraft";
-  if (!new Set(["getDraft", "saveDraft"]).has(action)) fail("INVALID_ACTION", "action is not supported");
+  if (!new Set(["getDraft", "getWorkspaceReview", "saveDraft"]).has(action)) fail("INVALID_ACTION", "action is not supported");
   const providerId = await resolveProvider(db, context);
   const current = await readDraftRow(db, providerId);
 
+  if (action === 'getWorkspaceReview') {
+    const publication = rows(await db.from('provider_catalog_publications').select('payload,draft_version,publication_version').eq('provider_id', providerId), 'read owned publication review')[0];
+    return { providerId, draftVersion: current ? current.version : 0,
+      publication: publication ? parsePayload(publication.payload) : null,
+      publicationVersion: publication ? dbVersion(publication.publication_version) : 0,
+      publishedDraftVersion: publication ? dbVersion(publication.draft_version) : 0,
+      contentIntent: intents.enabled() ? await intents.status(db, providerId, current?.pending_content_intent_id) : null };
+  }
+
   if (action === "getDraft") {
+    const draft = current ? parsePayload(current.payload) : emptyDraft();
+    const availability = rows(await db.from("provider_availability").select("payload").eq("provider_id", providerId), "read independent accepting state")[0];
+    const accepting = availability && parsePayload(availability.payload).accepting;
+    if (typeof accepting === "boolean") draft.profile.accepting = accepting;
     return {
       providerId,
-      draft: current ? parsePayload(current.payload) : emptyDraft(),
+      imageEditingVersion: 1,
+      storefrontSchemaVersion: 2,
+      ...(intents.enabled() ? { deferredPublish: true, contentIntent: await intents.status(db, providerId, current?.pending_content_intent_id) } : {}),
+      draft,
       version: current ? current.version : 0,
       updatedAt: current ? current.updated_at : null
     };
@@ -218,7 +263,9 @@ async function handleProviderDraft(db, event = {}, context = {}, now = Date.now(
   }
   const currentVersion = current ? current.version : 0;
   if (event.expectedVersion !== currentVersion) fail("VERSION_CONFLICT", "draft version has changed");
+  if (current && parsePayload(current.payload).schemaVersion >= 2 && event.schemaVersion !== 2) fail("CLIENT_UPGRADE_REQUIRED", "update client before editing this draft");
   const draft = normalizeDraft(event.draft);
+  await (dependencies.reviewServiceNames || require('./service-name-security').reviewServiceNames)(draft.services, context.WX_OPENID || context.OPENID);
 
   if (!current) {
     rows(await db.from("provider_catalog_drafts").insert({
@@ -231,7 +278,7 @@ async function handleProviderDraft(db, event = {}, context = {}, now = Date.now(
   } else {
     const updated = rows(
       await db.from("provider_catalog_drafts")
-        .update({ payload: JSON.stringify(draft), version: currentVersion + 1, updated_at: now })
+        .update({ ...(intents.enabled() ? { pending_content_intent_id: null } : {}), payload: JSON.stringify(draft), version: currentVersion + 1, updated_at: now })
         .eq("provider_id", providerId)
         .eq("version", currentVersion)
         .select("version"),

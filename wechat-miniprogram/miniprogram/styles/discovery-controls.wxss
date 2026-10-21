@@ -1,0 +1,23 @@
+/* Shared browsing controls: option labels never inherit native button bold styling. */
+.modal-panel .modal-title { font-size: var(--am-type-section-title); line-height: var(--am-line-section-title); font-weight: var(--am-weight-medium); }
+.modal-panel .filter-group > text { color: var(--am-color-text-secondary); font-size: var(--am-type-caption); line-height: var(--am-line-caption); font-weight: var(--am-weight-regular); }
+.modal-panel .filter-options { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--am-space-2); }
+.modal-panel .filter-options button { width: 100%; min-width: 100%; max-width: 100%; min-height: var(--am-touch-min); margin: var(--am-space-none); padding: var(--am-space-2); color: var(--am-color-text-secondary); font-size: var(--am-type-label); line-height: var(--am-line-label); font-weight: var(--am-weight-regular); border: var(--am-border-control); border-radius: var(--am-radius-control); background: var(--am-color-control-surface); }
+.modal-panel .filter-options button.active { color: var(--am-color-brand); border-color: var(--am-color-brand); background: var(--am-color-selected-surface); font-weight: var(--am-weight-regular); }
+.modal-panel .check { width: var(--am-space-4); height: var(--am-space-4); flex: 0 0 var(--am-space-4); }
+.modal-panel .modal-search input { font-size: var(--am-type-label); line-height: var(--am-line-label); font-weight: var(--am-weight-regular); }
+.modal-panel .filter-options button.active .check { border-color: var(--am-color-brand); background: var(--am-color-brand); }
+.modal-panel .filter-options button.active .check-mark { border-color: var(--am-color-on-brand); }
+/* Shared search/filter row: identical label, surface and compact spacing. */
+.career-search, .where-when-row .filter-trigger { height: var(--am-touch-min); min-height: var(--am-touch-min); padding: var(--am-space-none) var(--am-space-3); margin: var(--am-space-none); border-radius: var(--am-radius-control); background: var(--am-color-control-surface); color: var(--am-browse-control-ink); font-size: var(--am-type-label); line-height: var(--am-line-label); font-weight: var(--am-weight-regular); }
+.career-search > text:nth-child(2) { color: var(--am-browse-control-ink); font-size: var(--am-type-label); line-height: var(--am-line-label); font-weight: var(--am-weight-regular); }
+.browse-chevron, .browse-context-icon { display: block; width: var(--am-browse-icon-size); height: var(--am-browse-icon-size); flex: 0 0 var(--am-browse-icon-size); }
+.where-when-row .filter-trigger { justify-content: center; gap: var(--am-space-2); }
+.where-when-row .filter-trigger.active { color: var(--am-color-brand); background: var(--am-color-selected-surface); }
+.browse-control.career-search, .where-when-row .browse-control.filter-trigger { position: relative; background: var(--am-color-transparent); }
+.browse-control::before { position: absolute; left: 0; right: 0; top: 50%; height: var(--am-browse-compact-height); transform: translateY(-50%); border-radius: var(--am-radius-control); background: var(--am-color-control-surface); content: ""; }
+.browse-control.active::before { background: var(--am-color-selected-surface); }
+.browse-control.career-search > .browse-control-label, .browse-control.filter-trigger > .browse-control-label { position: relative; color: var(--am-browse-control-ink); font-size: var(--am-type-caption); line-height: var(--am-line-caption); font-weight: var(--am-weight-regular); opacity: 1; }
+.browse-control.active .browse-control-label { color: var(--am-color-brand); }
+.browse-search-icon { position: relative; width: var(--am-browse-small-icon); height: var(--am-browse-small-icon); flex: 0 0 var(--am-browse-small-icon); }
+.browse-chevron { position: relative; width: var(--am-browse-arrow-size); height: var(--am-browse-arrow-size); flex: 0 0 var(--am-browse-arrow-size); }

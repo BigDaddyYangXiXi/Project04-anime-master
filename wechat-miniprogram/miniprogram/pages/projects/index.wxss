@@ -1,11 +1,9 @@
 @import "../../styles/availability-calendar.wxss";
 
-.projects-shell {
-  padding: 20rpx 32rpx 190rpx;
+.projects-shell { padding: var(--am-detail-nav-page-padding);
 }
 
-.page-intro {
-  padding: 16rpx 8rpx 24rpx;
+.page-intro { padding: var(--am-space-none) var(--am-space-none) var(--am-space-6);
 }
 
 .page-intro text,
@@ -15,34 +13,34 @@
 
 .intro-title {
   margin: 0 0 12rpx;
-  font-size: 52rpx;
-  font-weight: 800;
+  font-size: var(--am-type-page-title);
+  font-weight: var(--am-weight-semibold);
   line-height: 64rpx;
   letter-spacing: -1rpx;
 }
 
 .intro-copy {
-  color: #6f625d;
-  font-size: 26rpx;
-  line-height: 40rpx;
+  color: var(--am-color-text-secondary);
+  font-size: var(--am-type-label);
+  line-height: var(--am-line-label);
 }
 
 .project-list {
   overflow: hidden;
   margin-bottom: 20rpx;
-  border: 1rpx solid #eee3df;
+  border: 1rpx solid var(--am-color-border);
   border-radius: 28rpx;
-  background: #ffffff;
+  background: var(--am-color-surface);
 }
 
 .project-row {
   display: flex;
   width: 100%;
-  gap: 16rpx;
+  gap: var(--am-space-2);
   align-items: center;
   padding: 20rpx 22rpx;
   border: 0;
-  border-bottom: 1rpx solid #f1e6e1;
+  border-bottom: 1rpx solid var(--am-color-border);
   border-radius: 0;
   background: transparent;
   box-shadow: none;
@@ -63,10 +61,10 @@
   flex: 0 0 auto;
   padding: 2rpx 12rpx;
   border-radius: 999rpx;
-  color: #c6536b;
-  background: #fff0f1;
-  font-size: 20rpx;
-  font-weight: 700;
+  color: var(--am-color-brand);
+  background: var(--am-color-selected-surface);
+  font-size: var(--am-type-micro);
+  font-weight: var(--am-weight-semibold);
   line-height: 30rpx;
 }
 
@@ -74,7 +72,7 @@
   overflow: hidden;
   min-width: 0;
   font-size: 27rpx;
-  font-weight: 800;
+  font-weight: var(--am-weight-semibold);
   line-height: 38rpx;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -83,41 +81,26 @@
 .project-meta,
 .project-note {
   margin-top: 4rpx;
-  color: #6f625d;
-  font-size: 22rpx;
+  color: var(--am-color-text-secondary);
+  font-size: var(--am-type-micro);
   line-height: 32rpx;
 }
 
 .project-note {
-  font-size: 20rpx;
+  font-size: var(--am-type-caption);
   line-height: 30rpx;
 }
 .row-chevron { width: 16rpx; height: 16rpx; flex: 0 0 16rpx; margin-right: 4rpx; border-top: 3rpx solid #b9aaa4; border-right: 3rpx solid #b9aaa4; transform: rotate(45deg); }
 
-.dashed-button {
-  display: block;
-  width: 100%;
-  min-width: 100%;
-  min-height: 88rpx;
-  padding: 24rpx;
-  border: 4rpx solid transparent;
-  border-radius: 28rpx;
-  color: #c6536b;
-  background: linear-gradient(135deg, #fff9ed, #fff0e1) padding-box,
-    linear-gradient(135deg, #fbc5c4, #fce4ab, #c2e8d6, #c0caf8, #fbbfd2) border-box;
-  font-size: 24rpx;
-  font-weight: 600;
-  line-height: 36rpx;
-}
+.dashed-button { width: 100%; margin-top: var(--am-space-3); }
 
 .calendar-shell { padding: 28rpx 32rpx 190rpx; }
 .calendar-intro { padding: 18rpx 8rpx 28rpx; }
 .calendar-intro text { display: block; }
-.calendar-intro text:first-child { color: #c6536b; font-size: 20rpx; font-weight: 700; line-height: 30rpx; letter-spacing: 3rpx; }
-.calendar-intro text:nth-child(2) { margin-top: 8rpx; font-size: 48rpx; font-weight: 800; line-height: 60rpx; }
-.calendar-intro text:last-child { margin-top: 8rpx; color: #6f625d; font-size: 24rpx; line-height: 38rpx; }
-.calendar-actions { display: flex; gap: 18rpx; margin-top: 24rpx; }
-.calendar-actions button { width: 100%; min-height: 88rpx; border-radius: 28rpx; font-size: 24rpx; font-weight: 700; line-height: 38rpx; }
-.calendar-actions .primary-button { border: 2rpx solid rgba(255,255,255,.92); color: #fff; background: linear-gradient(135deg,#f0787e,#ee8f88 52%,#e77c90); }
-.calendar-actions button[disabled] { opacity: .4; }
-.calendar-message { display: block; margin-top: 18rpx; color: #208a66; text-align: center; font-size: 22rpx; line-height: 34rpx; }
+.calendar-intro text:first-child { color: var(--am-color-brand); font-size: var(--am-type-caption); font-weight: var(--am-weight-semibold); line-height: 30rpx; letter-spacing: 3rpx; }
+.calendar-intro text:nth-child(2) { margin-top: var(--am-space-1); font-size: 48rpx; font-weight: var(--am-weight-semibold); line-height: var(--am-line-page-title); }
+.calendar-intro text:last-child { margin-top: var(--am-space-1); color: var(--am-color-text-secondary); font-size: var(--am-type-caption); line-height: 38rpx; }
+.calendar-actions { display: flex; gap: 18rpx; margin-top: var(--am-space-3); }
+.calendar-actions button { width: 100%; min-height: 88rpx; border-radius: 28rpx; font-size: var(--am-type-caption); font-weight: var(--am-weight-semibold); line-height: 38rpx; }
+
+.calendar-message { display: block; margin-top: 18rpx; color: var(--am-color-success); text-align: center; font-size: var(--am-type-micro); line-height: 34rpx; }

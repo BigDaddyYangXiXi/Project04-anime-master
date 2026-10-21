@@ -1,0 +1,50 @@
+{
+  "type": "design",
+  "designSystems": [],
+  "primaryDesignSystem": null,
+  "assets": {
+    "index": {
+      "versions": [
+        {
+          "path": "index.html",
+          "createdAt": "2026-09-10T12:45:04.413Z",
+          "status": "approved"
+        }
+      ]
+    },
+    "作品详情设计方案": {
+      "versions": [
+        {
+          "path": "work-detail.html",
+          "createdAt": "2026-09-10T12:54:21.198Z",
+          "status": "needs-review"
+        },
+        {
+          "path": "work-detail-v2.html",
+          "createdAt": "2026-09-10T13:05:39.817Z",
+          "status": "needs-review"
+        }
+      ]
+    },
+    "确认预约设计方案": {
+      "versions": [
+        {
+          "path": "booking-confirm.html",
+          "createdAt": "2026-09-10T15:04:12.922Z",
+          "status": "approved"
+        }
+      ]
+    },
+    "预约状态设计方案": {
+      "versions": [
+        {
+          "path": "booking-status.html",
+          "createdAt": "2026-09-10T16:05:43.763Z",
+          "status": "needs-review"
+        }
+      ]
+    }
+  },
+  "createdAt": "2026-09-10T12:45:04.420Z",
+  "updatedAt": "2026-09-10T16:19:42.218Z"
+}

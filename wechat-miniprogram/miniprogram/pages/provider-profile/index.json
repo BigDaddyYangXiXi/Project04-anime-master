@@ -1,1 +1,7 @@
-{"navigationBarTitleText":"服务橱窗"}
+{
+  "navigationBarTitleText": "服务橱窗",
+  "backgroundColorContent": "#171514",
+  "usingComponents": {
+    "work-card": "/components/work-card/index"
+  }
+}

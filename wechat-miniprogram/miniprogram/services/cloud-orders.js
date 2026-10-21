@@ -1,3 +1,5 @@
+const cloudCall = require("../utils/cloud-call");
+const localPreview = require("../utils/local-preview");
 const cloudbase = require("../config/cloudbase");
 
 function isAvailable() {
@@ -17,7 +19,8 @@ async function call(data) {
     error.code = "CLOUD_UNAVAILABLE";
     throw error;
   }
-  const response = await wx.cloud.callFunction({ name: "order-api", data });
+  localPreview.assertCloudAllowed();
+  const response = await cloudCall.call(wx, { name: "order-api", data });
   if (!response || !response.result || !response.result.ok) throw cloudError(response && response.result);
   return response.result.data;
 }
@@ -28,7 +31,8 @@ async function callMedia(data) {
     error.code = "CLOUD_UNAVAILABLE";
     throw error;
   }
-  const response = await wx.cloud.callFunction({ name: "media-upload", data });
+  localPreview.assertCloudAllowed();
+  const response = await cloudCall.call(wx, { name: "media-upload", data });
   if (!response || !response.result || !response.result.ok) throw cloudError(response && response.result);
   return response.result.data;
 }
@@ -122,6 +126,7 @@ function toClientOrder(source) {
       cityCode: source.cityCode || "",
       contact: source.contact || { name: "", wechat: "", phone: "" },
       note: source.requirement,
+      ndaRequired: source.ndaRequired === true,
       referenceMode: source.referenceWorkId ? "work" : source.referenceAssetId ? "file" : "none",
       referenceFile: source.referenceAssetId ? { name: "已上传参考图片", assetId: source.referenceAssetId, status: "READY" } : null,
       ...schedule
@@ -135,15 +140,38 @@ function createOrder(input) {
 
 async function refreshPayment(orderId) {
   if (!isAvailable()) { const error = new Error('付款核对暂不可用'); error.code = 'CLOUD_UNAVAILABLE'; throw error; }
-  const response = await wx.cloud.callFunction({ name: 'payment-api', data: { action: 'refreshPayment', orderId } });
+  localPreview.assertCloudAllowed();
+  const response = await cloudCall.call(wx, { name: 'payment-api', data: { action: 'refreshPayment', orderId } });
   if (!response || !response.result || !response.result.ok) throw cloudError(response && response.result);
   const result = response.result.data;
   if (!result || !['QUERIED', 'FINAL', 'NOT_STARTED', 'THROTTLED'].includes(result.queryStatus)) throw cloudError(null);
   return result;
 }
 
+async function createPayment(orderId, expectedVersion) {
+  if (!isAvailable()) { const error = new Error('付款服务暂不可用'); error.code = 'CLOUD_UNAVAILABLE'; throw error; }
+  localPreview.assertCloudAllowed();
+  // Stable across page rebuilds and lost responses; the server still checks ownership and version.
+  const requestKey = `payment-${orderId}-version-${expectedVersion}`;
+  const response = await cloudCall.call(wx, { name: 'payment-api', data: {
+    action: 'createPayment', orderId, expectedVersion, requestKey
+  } });
+  if (!response || !response.result || !response.result.ok) throw cloudError(response && response.result);
+  const result = response.result.data;
+  if (!result || !['READY', 'BUSY', 'QUERY_REQUIRED', 'PAID', 'PAID_REQUIRES_REVIEW', 'CLOSED'].includes(result.status)) throw cloudError(null);
+  return result;
+}
+
 function getOrder(orderId) {
   return call({ action: "getOrder", orderId }).then(toClientOrder);
+}
+
+function getDeliveryDownload(orderId, assetId) {
+  return call({ action: "getDeliveryDownload", orderId, assetId });
+}
+
+function getReferenceDownload(orderId) {
+  return call({ action: "getReferenceDownload", orderId });
 }
 
 function listOrders() {
@@ -180,28 +208,39 @@ async function uploadDeliveryFiles(orderId, files) {
     error.code = "DELIVERY_FILES_REQUIRED";
     throw error;
   }
-  const uploaded = [];
-  const created = [];
-  try {
-    for (const file of files) {
+  const validatedFiles = Array.from(files, (input) => {
+      if (!input || typeof input !== "object") {
+        const error = new Error("交付文件无效，请重新选择文件");
+        error.code = "DELIVERY_FILE_INVALID";
+        throw error;
+      }
+      const file = { ...input };
       if (file.fileId && !file.path) {
         if (!file.assetId) {
           const error = new Error("交付文件缺少资产记录，请重新选择文件");
           error.code = "DELIVERY_FILE_INVALID";
           throw error;
         }
-        uploaded.push({ name: file.name, assetId: file.assetId, fileId: file.fileId });
-        continue;
+        return file;
       }
       if (!file.path || !Number.isSafeInteger(file.size) || file.size <= 0 || file.size > 20 * 1024 * 1024) {
-        const error = new Error("单个交付文件须小于 20 MB");
+        const error = new Error("单个交付文件须大于 0 且不超过 20 MB");
         error.code = "DELIVERY_FILE_SIZE_INVALID";
         throw error;
       }
-      const extension = deliveryExtension(file.name);
+      return { ...file, extension: deliveryExtension(file.name) };
+  });
+  const uploaded = [];
+  const created = [];
+  try {
+    for (const file of validatedFiles) {
+      if (file.fileId && !file.path) {
+        uploaded.push({ name: file.name, assetId: file.assetId, fileId: file.fileId });
+        continue;
+      }
       const prepared = await callMedia({
         action: "prepareUpload", purpose: "ORDER_DELIVERY", scopeId: orderId,
-        mimeType: DELIVERY_MIME_BY_EXTENSION[extension], sizeBytes: file.size, originalFilename: file.name
+        mimeType: DELIVERY_MIME_BY_EXTENSION[file.extension], sizeBytes: file.size, originalFilename: file.name
       });
       const tracked = { assetId: prepared.assetId, fileId: "" };
       created.push(tracked);
@@ -224,5 +263,5 @@ function idempotencyKey() {
 
 module.exports = {
   createOrder, getOrder, idempotencyKey, isAvailable, listOrders, scheduleFromSegments, toClientOrder,
-  transitionOrder, uploadDeliveryFiles, getProviderFunds, refreshPayment
+  transitionOrder, uploadDeliveryFiles, getProviderFunds, refreshPayment, createPayment, getDeliveryDownload, getReferenceDownload
 };

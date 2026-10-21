@@ -212,6 +212,7 @@ function normalizeCreate(event) {
     return { startsAt: segment.startsAt, endsAt: segment.endsAt };
   });
   const cityCode = String(event.cityCode || "").trim();
+  if (typeof event.ndaRequired !== "boolean") fail("VALIDATION_ERROR", "ndaRequired must be declared by the buyer");
   if (!/^\d{6}$/.test(cityCode) || cityCode !== canonicalCityCode(cityCode)) fail("VALIDATION_ERROR", "cityCode must identify a city");
   return {
     providerId: safeId(event.providerId, "providerId"),
@@ -223,6 +224,7 @@ function normalizeCreate(event) {
     location: event.location ? text(event.location, "location", 1, 255) : "",
     requirement: text(event.requirement, "requirement", 10, 500),
     timeSegments,
+    ndaRequired: event.ndaRequired,
     contact: event.contact,
     idempotencyKey: text(event.idempotencyKey, "idempotencyKey", 16, 128)
   };
@@ -254,14 +256,25 @@ function participantRole(row, accountId) {
 
 function publicOrder(row, keyValue, actorId) {
   const payload = parsePayload(row.payload);
+  const viewerRole = participantRole(row, actorId);
+  const privateFieldsHidden = viewerRole === "PROVIDER" && payload.public.ndaRequired === true
+    && !(payload.public.buyerNdaSigned === true && payload.public.providerNdaSigned === true);
+  const publicFields = { ...payload.public };
+  if (privateFieldsHidden) {
+    publicFields.requirement = "";
+    publicFields.location = "";
+    publicFields.referenceAssetId = null;
+    publicFields.supplementNote = "";
+  }
   const contactVisible = ["CONTACTING", "NDA_BUYER_PENDING", "NDA_PROVIDER_PENDING", "BUYER_FINAL_CONFIRM", "IN_PRODUCTION", "REVISION_REQUESTED", "DELIVERY_PENDING", "COMPLETED"].includes(row.stage);
   return {
     id: row.id, buyerId: row.buyer_id, providerId: row.provider_id,
-    viewerRole: actorId ? participantRole(row, actorId) : null,
+    viewerRole,
     stage: row.stage, version: dbVersion(row.version), createdAt: dbTime(row.created_at, "order createdAt"), updatedAt: dbTime(row.updated_at, "order updatedAt"),
-    ...payload.public,
+    ...publicFields,
+    privateFieldsHidden,
     contact: contactVisible ? decryptContact(payload.contactEncrypted, keyValue) : null,
-    events: payload.events
+    events: privateFieldsHidden ? payload.events.map((event) => ({ ...event, detail: "" })) : payload.events
   };
 }
 
@@ -269,11 +282,6 @@ async function createOrder(db, event, context, keyValue, now, uuid) {
   const actor = await resolveActor(db, context);
   if (!actor.roles.includes("BUYER")) fail("BUYER_ROLE_REQUIRED", "buyer role is required");
   const input = normalizeCreate(event);
-  const orderedSegments = input.timeSegments.slice().sort((left, right) => left.startsAt - right.startsAt);
-  if (orderedSegments.some((segment) => segment.startsAt < now)
-    || orderedSegments.some((segment, index) => index > 0 && segment.startsAt < orderedSegments[index - 1].endsAt)) {
-    fail("INVALID_TIME_SEGMENTS", "time segments must be future and non-overlapping");
-  }
   if (input.providerId === actor.accountId) fail("SELF_ORDER_NOT_ALLOWED", "buyer and provider must differ");
   const hash = requestHash(input);
   const existing = rows(await db.from("order_aggregates").select("*").eq("buyer_id", actor.accountId).eq("request_idempotency_key", input.idempotencyKey), "read idempotent order")[0];
@@ -281,14 +289,23 @@ async function createOrder(db, event, context, keyValue, now, uuid) {
     if (existing.request_hash !== hash) fail("IDEMPOTENCY_CONFLICT", "idempotency key payload differs");
     return publicOrder(existing, keyValue, actor.accountId);
   }
+  const orderedSegments = input.timeSegments.slice().sort((left, right) => left.startsAt - right.startsAt);
+  if (orderedSegments.some((segment) => segment.startsAt < now)
+    || orderedSegments.some((segment, index) => index > 0 && segment.startsAt < orderedSegments[index - 1].endsAt)) {
+    fail("INVALID_TIME_SEGMENTS", "time segments must be future and non-overlapping");
+  }
   const publication = rows(await db.from("provider_catalog_publications").select("provider_id,payload,publication_version").eq("provider_id", input.providerId), "read provider publication")[0];
   if (!publication) fail("PROVIDER_NOT_PUBLISHED", "provider is not published");
   const catalog = parsePayload(publication.payload);
+  const availabilityRow = rows(await db.from("provider_availability").select("payload").eq("provider_id", input.providerId), "read accepting state")[0];
+  const accepting = availabilityRow ? parsePayload(availabilityRow.payload).accepting : null;
+  if (typeof accepting === "boolean" ? !accepting : catalog.profile && catalog.profile.accepting === false) fail("PROVIDER_NOT_AVAILABLE", "provider has paused new bookings");
   const providerAccount = rows(
     await db.from("accounts").select("id,uid,nickname,status").eq("id", input.providerId).eq("status", "ACTIVE"),
     "read provider account"
   )[0];
   if (!providerAccount) fail("PROVIDER_NOT_AVAILABLE", "provider account is unavailable");
+  await requireProviderNotSuspended(db, input.providerId);
   const serviceById = new Map((catalog.services || []).map((item) => [item.id, item]));
   const services = input.serviceIds.map((id) => serviceById.get(id));
   if (services.some((item) => !item)) fail("SERVICE_NOT_PUBLISHED", "service is not published");
@@ -319,7 +336,7 @@ async function createOrder(db, event, context, keyValue, now, uuid) {
       timeSegments: input.timeSegments, items, amountFen,
       supplementNote: "", declinePhase: "", contactFirstCopiedAt: null,
       communicationDone: false, timePlaceConfirmed: false, serviceScopeConfirmed: false,
-      ndaRequired: null, amountConfirmed: false, executable: false,
+      ndaRequired: input.ndaRequired, ndaFlowVersion: 2, amountConfirmed: false, executable: false,
       buyerNdaSigned: false, providerNdaSigned: false, buyerAgreementConfirmedAt: null,
       priceEdited: false, paymentStatus: "UNPAID",
       progress: 0, deliveryNote: "", deliveryFiles: [], deliveryHistory: [],
@@ -330,7 +347,14 @@ async function createOrder(db, event, context, keyValue, now, uuid) {
     events: [{ id: `evt_${uuid().replace(/-/g, "")}`, event: "ORDER_CREATED", actorId: actor.accountId, fromStage: null, toStage: "REQUESTED", detail: "", createdAt: now }]
   };
   const row = { id, buyer_id: actor.accountId, provider_id: input.providerId, request_idempotency_key: input.idempotencyKey, request_hash: hash, stage: "REQUESTED", payload: JSON.stringify(payload), version: 1, created_at: now, updated_at: now };
-  rows(await db.from("order_aggregates").insert(row), "create order");
+  try {
+    rows(await db.from("order_aggregates").insert(row), "create order");
+  } catch (error) {
+    const persisted = rows(await db.from("order_aggregates").select("*").eq("buyer_id", actor.accountId).eq("request_idempotency_key", input.idempotencyKey), "recover created order")[0];
+    if (!persisted) throw error;
+    if (persisted.request_hash !== hash) fail("IDEMPOTENCY_CONFLICT", "idempotency key payload differs");
+    return publicOrder(persisted, keyValue, actor.accountId);
+  }
   return publicOrder(row, keyValue, actor.accountId);
 }
 
@@ -357,7 +381,13 @@ async function readOrder(db, orderId, actorId) {
   return { row: { ...row, version: dbVersion(row.version) }, role };
 }
 
-async function transition(db, event, context, keyValue, now, uuid, storage) {
+async function requireProviderNotSuspended(db, providerId) {
+  const qualification = rows(await db.from("provider_qualifications").select("status")
+    .eq("provider_id", providerId), "read provider qualification")[0];
+  if (qualification && qualification.status === "SUSPENDED") fail("PROVIDER_NOT_AVAILABLE", "provider is suspended");
+}
+
+async function transition(db, event, context, keyValue, now, uuid, storage, persistConfirmation) {
   const actor = await resolveActor(db, context);
   const { row, role } = await readOrder(db, event.orderId, actor.accountId);
   if (!Number.isSafeInteger(event.expectedVersion) || event.expectedVersion !== row.version) fail("VERSION_CONFLICT", "order version changed");
@@ -365,7 +395,12 @@ async function transition(db, event, context, keyValue, now, uuid, storage) {
   if (!rule) fail("ILLEGAL_TRANSITION", "order transition is not allowed");
   if (rule[1] !== role) fail("ORDER_ROLE_FORBIDDEN", "actor role cannot perform transition");
   const payload = parsePayload(row.payload);
+  if (["PROVIDER_INTERESTED", "PROVIDER_ENDS_COMMUNICATION"].includes(event.event)) {
+    await requireProviderNotSuspended(db, row.provider_id);
+  }
   let nextStage = rule[0];
+  if (event.event === "PROVIDER_INTERESTED" && payload.public.ndaRequired === true
+    && !(payload.public.buyerNdaSigned && payload.public.providerNdaSigned)) nextStage = "NDA_BUYER_PENDING";
   let detail = "";
   if (["PROVIDER_REQUESTS_SUPPLEMENT", "BUYER_SUPPLEMENTS", "PROVIDER_DECLINES", "PROVIDER_ENDS_COMMUNICATION_FAILED", "BUYER_REQUESTS_REVISION"].includes(event.event)) detail = text(event.detail, "detail", 4, 500);
   if (event.event === "PROVIDER_REQUESTS_SUPPLEMENT") payload.public.supplementNote = detail;
@@ -389,6 +424,9 @@ async function transition(db, event, context, keyValue, now, uuid, storage) {
   }
   if (event.event === "PROVIDER_RECORDS_CONTACT" && !payload.public.contactFirstCopiedAt) payload.public.contactFirstCopiedAt = now;
   if (event.event === "PROVIDER_ENDS_COMMUNICATION") {
+    if (payload.public.ndaRequired === true && event.ndaRequired !== true) fail("NDA_REQUIRED", "provider cannot waive buyer confidentiality");
+    if (payload.public.ndaFlowVersion === 2 && payload.public.ndaRequired === true
+      && !(payload.public.buyerNdaSigned === true && payload.public.providerNdaSigned === true)) fail("NDA_REQUIRED", "sign before confirming private requirements");
     if (typeof event.ndaRequired !== "boolean") fail("VALIDATION_ERROR", "ndaRequired is required");
     if (!payload.public.contactFirstCopiedAt) fail("CONTACT_NOT_ACCESSED", "provider must access contact before ending communication");
     if ([event.timePlaceConfirmed, event.serviceScopeConfirmed, event.amountConfirmed].some((value) => value !== true)) {
@@ -400,10 +438,14 @@ async function transition(db, event, context, keyValue, now, uuid, storage) {
     payload.public.serviceScopeConfirmed = true;
     payload.public.amountConfirmed = true;
     payload.public.executable = true;
-    nextStage = event.ndaRequired ? "NDA_BUYER_PENDING" : "BUYER_FINAL_CONFIRM";
+    nextStage = event.ndaRequired && !(payload.public.buyerNdaSigned && payload.public.providerNdaSigned) ? "NDA_BUYER_PENDING" : "BUYER_FINAL_CONFIRM";
   }
   if (event.event === "BUYER_SIGNS_NDA") payload.public.buyerNdaSigned = true;
-  if (event.event === "PROVIDER_SIGNS_NDA") payload.public.providerNdaSigned = true;
+  if (event.event === "PROVIDER_SIGNS_NDA") {
+    if (!payload.public.buyerNdaSigned || payload.public.ndaRequired !== true) fail("NDA_REQUIRED", "buyer signature is required");
+    payload.public.providerNdaSigned = true;
+    if (!payload.public.communicationDone) nextStage = "CONTACTING";
+  }
   if (event.event === "BUYER_CONFIRMS_AGREEMENT") {
     if (payload.public.buyerAgreementConfirmedAt) fail("AGREEMENT_ALREADY_CONFIRMED", "agreement was already confirmed");
     payload.public.buyerAgreementConfirmedAt = now;
@@ -431,9 +473,17 @@ async function transition(db, event, context, keyValue, now, uuid, storage) {
     payload.public.progress = Math.min(Number(payload.public.progress || 100), 99);
   }
   if (["BUYER_ACCEPTS_DELIVERY", "BUYER_ACCEPTS_AND_SETTLES"].includes(event.event)) {
+    if (payload.public.paymentStatus !== "PAID" || !/^[a-f0-9]{32}$/.test(payload.public.paymentId || "")
+      || !payload.public.paymentTransactionId) fail("PAYMENT_NOT_VERIFIED", "verified payment evidence is required");
     if (!String(payload.public.deliveryNote || "").trim()) fail("DELIVERY_INCOMPLETE", "delivery note is missing");
     if (!isOnsiteOrder(payload) && !(payload.public.deliveryFiles || []).length) fail("DELIVERY_INCOMPLETE", "delivery files are missing");
+    const holds = rows(await db.from("order_funds_interlocks").select("hold_reason").eq("order_id", row.id), "read acceptance hold");
+    if (holds.some(hold => hold.hold_reason)) fail("ORDER_FUNDS_HELD", "refund or dispute must be resolved before acceptance");
     payload.public.completedAt = now;
+    // Persist with COMPLETED in the same version-checked row update. This is not a channel settlement result.
+    // A future dispatcher must recheck the linked payment's fee snapshot, refunds and merchant eligibility.
+    payload.settlementIntent = { status: "PENDING", paymentId: payload.public.paymentId,
+      acceptedOrderVersion: row.version + 1, createdAt: now };
   }
   if (event.event === "BUYER_SUBMITS_REVIEW") {
     if (payload.public.rating) fail("REVIEW_ALREADY_SUBMITTED", "review was already submitted");
@@ -450,16 +500,59 @@ async function transition(db, event, context, keyValue, now, uuid, storage) {
   }
   payload.events.push({ id: `evt_${uuid().replace(/-/g, "")}`, event: event.event, actorId: actor.accountId, fromStage: row.stage, toStage: nextStage, detail, createdAt: now });
   const next = { payload: JSON.stringify(payload), stage: nextStage, version: row.version + 1, updated_at: now };
-  const updated = rows(await db.from("order_aggregates").update(next).eq("id", row.id).eq("version", row.version).select("id"), "update order");
-  if (!updated.length) fail("VERSION_CONFLICT", "order version changed");
+  if (event.event === "PROVIDER_ENDS_COMMUNICATION") {
+    if (typeof persistConfirmation !== "function") fail("SLOT_STORE_NOT_CONFIGURED", "atomic slot writer is unavailable");
+    await persistConfirmation(row, next);
+  } else {
+    const updated = rows(await db.from("order_aggregates").update(next).eq("id", row.id).eq("version", row.version).select("id"), "update order");
+    if (!updated.length) fail("VERSION_CONFLICT", "order version changed");
+  }
   return publicOrder({ ...row, ...next }, keyValue, actor.accountId);
 }
 
-async function handleOrder(db, event = {}, context = {}, keyValue, now = Date.now(), uuid = crypto.randomUUID, storage) {
+async function signedMediaUrl(storage, fileId) {
+  if (!storage || typeof storage.getTempFileURL !== "function") fail("SERVICE_CONFIGURATION_ERROR", "storage unavailable");
+  const result = await storage.getTempFileURL({ fileList: [{ fileID: fileId, maxAge: 300 }] });
+  const signed = ((result && result.fileList) || []).find((item) => item.fileID === fileId && item.code === "SUCCESS");
+  let url;
+  try { url = new URL(signed && signed.tempFileURL); } catch { fail("DELIVERY_FILE_INVALID", "download unavailable"); }
+  if (url.protocol !== "https:" || url.username || url.password) fail("DELIVERY_FILE_INVALID", "download unavailable");
+  return url.href;
+}
+
+async function handleOrder(db, event = {}, context = {}, keyValue, now = Date.now(), uuid = crypto.randomUUID, storage, persistConfirmation) {
   if (event.action === "createOrder") return createOrder(db, event, context, keyValue, now, uuid);
-  if (event.action === "transitionOrder") return transition(db, event, context, keyValue, now, uuid, storage);
+  if (event.action === "transitionOrder") return transition(db, event, context, keyValue, now, uuid, storage, persistConfirmation);
   const actor = await resolveActor(db, context);
   if (event.action === "getProviderFunds") return readProviderFunds(db, actor, event);
+  if (event.action === "getReferenceDownload") {
+    const { row, role } = await readOrder(db, event.orderId, actor.accountId);
+    const payload = parsePayload(row.payload);
+    if (role === "PROVIDER" && payload.public.ndaRequired === true
+      && !(payload.public.buyerNdaSigned === true && payload.public.providerNdaSigned === true)) fail("NDA_REQUIRED", "NDA is not complete");
+    const assetId = payload.public.referenceAssetId;
+    if (!assetId) fail("REFERENCE_MEDIA_NOT_READY", "reference unavailable");
+    const asset = rows(await db.from("media_assets").select("id,storage_key,mime_type")
+      .eq("id", assetId).eq("owner_account_id", row.buyer_id).eq("purpose", "PROJECT_REFERENCE")
+      .eq("status", "READY"), "read reference download asset")[0];
+    if (!asset || !String(asset.storage_key || "").startsWith("cloud://") || !String(asset.mime_type || "").startsWith("image/")) fail("REFERENCE_MEDIA_NOT_READY", "reference unavailable");
+    return { url: await signedMediaUrl(storage, asset.storage_key) };
+  }
+  if (event.action === "getDeliveryDownload") {
+    const { row } = await readOrder(db, event.orderId, actor.accountId);
+    if (!["DELIVERY_PENDING", "REVISION_REQUESTED", "COMPLETED"].includes(row.stage)) fail("ILLEGAL_TRANSITION", "delivery is not available");
+    const payload = parsePayload(row.payload);
+    if (payload.public.ndaRequired === true && !(payload.public.buyerNdaSigned === true && payload.public.providerNdaSigned === true)) fail("NDA_REQUIRED", "NDA is not complete");
+    const assetId = deliveryAssetId(event.assetId);
+    const file = (payload.public.deliveryFiles || []).find((item) => item.assetId === assetId);
+    if (!file) fail("DELIVERY_FILE_INVALID", "file is not in this delivery");
+    const fileId = deliveryFileId(file.fileId, row.id);
+    const asset = rows(await db.from("media_assets").select("id,storage_key,mime_type")
+      .eq("id", assetId).eq("owner_account_id", row.provider_id).eq("purpose", "ORDER_DELIVERY")
+      .eq("scope_id", row.id).eq("status", "READY"), "read delivery download asset")[0];
+    if (!asset || asset.storage_key !== fileId) fail("DELIVERY_FILE_INVALID", "delivery asset unavailable");
+    return { url: await signedMediaUrl(storage, fileId), name: file.name, mimeType: asset.mime_type };
+  }
   if (event.action === "getOrder") {
     const { row } = await readOrder(db, event.orderId, actor.accountId);
     return publicOrder(row, keyValue, actor.accountId);

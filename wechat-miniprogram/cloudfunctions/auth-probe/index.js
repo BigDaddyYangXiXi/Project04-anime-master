@@ -1,11 +1,10 @@
-const cloud = require("wx-server-sdk");
+exports.main = async (_event, context) => {
+  const caller = require('./request-context')(context);
+  const OPENID = caller.WX_OPENID || caller.OPENID;
+  const APPID = caller.WX_APPID || caller.APPID;
+  const UNIONID = caller.WX_UNIONID || caller.UNIONID;
 
-cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
-
-exports.main = async () => {
-  const { OPENID, APPID, UNIONID } = cloud.getWXContext();
-
-  if (!OPENID || !APPID) {
+  if (!OPENID || APPID !== 'wxc94e1c1b38944511') {
     return {
       ok: false,
       error: {
@@ -26,6 +25,7 @@ exports.main = async () => {
     ok: true,
     data: {
       authenticated: true,
+      appId: APPID,
       hasUnionId: Boolean(UNIONID)
     }
   };

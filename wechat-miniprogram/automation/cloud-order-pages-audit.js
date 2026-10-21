@@ -9,7 +9,7 @@ const booking = read("miniprogram/pages/booking/index.js");
 assert.match(booking, /cloudOrders\.createOrder/);
 assert.match(booking, /idempotencyKey: this\.requestIdempotencyKey/);
 assert.match(booking, /cloudCatalog\.uploadImage\([^]*"PROJECT_REFERENCE"\)/);
-assert.match(booking, /options\.audit !== "1"/);
+assert.match(booking, /!localPreview\.isAudit\(options\)/);
 
 const orders = read("miniprogram/pages/orders/index.js");
 assert.match(orders, /cloudOrders\.listOrders/);
@@ -32,13 +32,15 @@ assert.match(provider, /cloudOrders\.uploadDeliveryFiles/);
 
 const orderDetail = read("miniprogram/pages/order-detail/index.js");
 assert.match(orderDetail, /cloudOrders\.getOrder/);
-assert.match(orderDetail, /options\.audit !== "1"/);
+assert.match(orderDetail, /!localPreview\.isAudit\(options\)/);
 
 const fulfillment = read("miniprogram/pages/fulfillment/index.js");
 assert.match(fulfillment, /cloudOrders\.getOrder/);
 assert.match(fulfillment, /BUYER_REQUESTS_REVISION/);
 assert.match(fulfillment, /BUYER_ACCEPTS_DELIVERY/);
-assert.match(fulfillment, /wx\.cloud\.downloadFile/);
+assert.match(fulfillment, /cloudOrders\.getDeliveryDownload/);
+assert.match(fulfillment, /wx\.downloadFile/);
+assert.doesNotMatch(fulfillment, /wx\.cloud\.downloadFile/);
 
 const review = read("miniprogram/pages/review/index.js");
 assert.match(review, /cloudOrders\.getOrder/);

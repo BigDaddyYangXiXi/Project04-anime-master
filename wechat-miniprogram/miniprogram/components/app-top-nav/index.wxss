@@ -1,9 +1,11 @@
+@import "../../styles/design-tokens.wxss";
+@import "../../styles/actions.wxss";
 :host { position: sticky; z-index: 80; top: 0; display: block; }
-.app-top-nav { width: 100%; border-bottom: 1rpx solid #f2e6e1; background: rgba(255,255,255,.98); box-sizing: border-box; }
+.app-top-nav { width: 100%; border-bottom: 1rpx solid var(--am-color-border); background: var(--am-color-surface); box-sizing: border-box; }
 .app-top-nav-row { position: relative; display: flex; width: 100%; align-items: center; box-sizing: border-box; }
-.app-back,.app-back-placeholder { width: 88rpx; min-width: 88rpx; max-width: 88rpx; height: 88rpx; margin: 0; flex: 0 0 88rpx; padding: 0; border: 0; background: transparent; box-sizing: border-box; }
+.app-back,.app-back-placeholder { width: 88rpx; min-width: 88rpx; max-width: 88rpx; height: 88rpx; margin: var(--am-space-none); flex: 0 0 88rpx; padding: var(--am-space-none); border: 0; background: transparent; box-sizing: border-box; }
 .app-back { position: absolute; z-index: 1; top: 50%; left: 8px; display: flex; align-items: center; justify-content: center; transform: translateY(-50%); }
-.back-chevron { width: 22rpx; height: 22rpx; border-bottom: 4rpx solid #2b2523; border-left: 4rpx solid #2b2523; transform: rotate(45deg); }
-.app-nav-title { position: absolute; right: 0; left: 0; overflow: hidden; padding: 0 220rpx; color: #171717; font-size: 30rpx; font-weight: 700; line-height: 44rpx; text-align: center; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
+.back-chevron { width: 22rpx; height: 22rpx; border-bottom: 4rpx solid var(--am-color-text); border-left: 4rpx solid var(--am-color-text); transform: rotate(45deg); }
+.app-nav-title { position: absolute; right: 0; left: 0; overflow: hidden; padding: 0 220rpx; color: var(--am-color-text); font-size: 30rpx; font-weight: var(--am-weight-semibold); line-height: var(--am-line-body); text-align: center; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
 .app-back:active { opacity: .56; }
-.role-switch{position:absolute;z-index:1;top:50%;left:8px;display:flex;width:112rpx;height:56rpx;align-items:center;justify-content:center;gap:6rpx;border:1rpx solid #f0d4cf;border-radius:28rpx;color:#b64f5e;background:#fff7f5;font-size:18rpx;font-weight:700;transform:translateY(-50%)}.switch-glyph{font-size:20rpx;font-weight:800;line-height:1}
+.role-switch{position: absolute;z-index: 1;top: 50%;left: 8px;display: flex;width: 136rpx;min-height: 88rpx;align-items: center;justify-content: center;gap: var(--am-space-1);border-radius: 24rpx; color: var(--am-color-brand); background: transparent;font-size: var(--am-type-caption);font-weight: var(--am-weight-semibold);transform: translateY(-50%)}.switch-glyph{font-size: var(--am-type-caption);font-weight: var(--am-weight-semibold);line-height: 1}.role-switch:active{ background: var(--am-color-selected-surface)}

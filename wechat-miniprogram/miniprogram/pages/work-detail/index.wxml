@@ -1,20 +1,44 @@
 <app-top-nav class="app-navigation" title="作品详情" workspace="{{navWorkspace}}" show-back="{{true}}"/>
-<view wx:if="{{work}}" class="detail-shell">
+<view wx:if="{{work && providerPreview}}" class="storefront-work-preview">
+ <text class="creator-caption">案例预览 · 与当前橱窗版本一致</text><image wx:if="{{gallery[0].src}}" class="storefront-work-hero" src="{{gallery[0].src}}" mode="widthFix" data-index="0" bindtap="previewGallery"/>
+ <text class="storefront-work-title">{{work.title}}</text><text wx:if="{{work.subtitle}}" class="creator-caption">{{work.subtitle}}</text><text class="storefront-work-copy">{{work.description}}</text>
+ <view wx:if="{{relatedService}}" class="storefront-work-section"><text class="storefront-work-heading">对应服务</text><button class="storefront-link" bindtap="openRelatedService"><text>{{relatedService.name}}</text><text class="am-money am-money-list">{{relatedService.priceText}} ›</text></button></view>
+ <text wx:if="{{work.price != null}}" class="creator-caption">这件案例的参考费用：{{work.priceText}}。预约报价以对应服务及双方确认内容为准。</text>
+ <view wx:if="{{work.creditCoser || work.creditPhoto || work.creditMakeup || work.creditRetouch || work.creditMine}}" class="storefront-work-section"><text class="storefront-work-heading">创作署名</text><text wx:if="{{work.creditCoser}}" class="storefront-work-copy">出镜 / {{work.creditCoser}}</text><text wx:if="{{work.creditPhoto}}" class="storefront-work-copy">摄影 / {{work.creditPhoto}}</text><text wx:if="{{work.creditMakeup}}" class="storefront-work-copy">妆造 / {{work.creditMakeup}}</text><text wx:if="{{work.creditRetouch}}" class="storefront-work-copy">后期 / {{work.creditRetouch}}</text><text wx:if="{{work.creditMine}}" class="storefront-work-copy">本人负责 / {{work.creditMine}}</text></view>
+ <button wx:if="{{gallery.length}}" class="am-action am-action-secondary" bindtap="previewGallery">查看图集 · {{gallery.length}} 张</button>
+</view>
+<view wx:elif="{{work}}" class="detail-shell work-detail-shell {{providerPreview ? 'is-provider-preview' : ''}}">
+    <view wx:if="{{socialLoadError}}" class="social-read-error"><text>{{socialLoadError}}</text><button hover-class="none" class="am-action am-action-secondary" aria-disabled="{{socialPending}}" data-am-disabled="{{socialPending}}" bindtap="{{(socialPending) ? '' : 'retrySocial'}}">重新同步状态</button></view>
+  <view wx:if="{{gallery.length}}" class="work-image-stack"><view class="work-figure-card"><image wx:if="{{gallery[0].src}}" class="detail-image" src="{{gallery[0].src}}" mode="widthFix"/><view wx:else class="am-media-unavailable">图片暂不可用</view></view></view>
   <view class="work-detail-head">
-    <view class="provider-head"><button class="provider-link" bindtap="openProvider"><image wx:if="{{work.provider.avatar}}" class="avatar avatar-image" src="{{work.provider.avatar}}" mode="aspectFill"/><view wx:else class="avatar">{{work.provider.initial}}</view><text>{{work.provider.name}}</text></button><view class="head-actions"><button disabled="{{socialPending}}" class="like-button {{liked ? 'active' : ''}}" bindtap="toggleLike">{{liked ? '已喜欢' : '喜欢'}}</button><button disabled="{{socialPending}}" class="follow-button {{followed ? 'active' : ''}}" bindtap="toggleFollow" aria-label="{{followed ? '取消关注' : '关注'}}"><image class="follow-icon" src="{{followed ? '/assets/actions/follow-active.svg' : '/assets/actions/follow.svg'}}" mode="aspectFit"/><text>{{followed ? '已关注' : '关注'}}</text></button></view></view>
+
     <text class="detail-title">{{work.title}}</text>
     <text class="detail-subtitle">{{work.subtitle}}</text>
   </view>
 
-  <view class="work-image-stack"><view wx:for="{{gallery}}" wx:key="index" class="work-figure-card"><image wx:if="{{item.src}}" class="detail-image" src="{{item.src}}" mode="widthFix" lazy-load="{{true}}"/><view wx:else class="detail-visual tone-{{work.tone}}"><view class="detail-figure"></view></view><text class="figure-count">{{item.label}}</text></view></view>
+  <view class="content-card work-detail-info"><text class="detail-description">{{work.description}}</text><text class="work-context-note">参考图用于沟通妆容方向，具体妆面、假发与服务范围以双方确认的方案为准。</text><view class="tag-row"><text wx:for="{{work.tags}}" wx:key="*this">{{item}}</text></view></view>
+    <view class="provider-head">
+      <button hover-class="none" class="provider-link" bindtap="openProvider" aria-label="查看 {{work.provider.name}} 的服务"><image wx:if="{{work.provider.avatar}}" class="avatar avatar-image" src="{{work.provider.avatar}}" mode="aspectFill"/><view wx:else class="avatar">{{work.provider.initial}}</view><view class="author-copy"><text>{{work.provider.name}}</text><text class="author-meta">{{work.provider.career}}{{work.provider.career && work.provider.city ? ' · ' : ''}}{{work.provider.city}}</text></view></button>
+      <button aria-disabled="{{socialPending || socialLoadError}}" hover-class="none" wx:if="{{!providerPreview}}" data-am-disabled="{{socialPending || socialLoadError}}" class="follow-button {{followed ? 'active' : ''}}" bindtap="{{(socialPending || socialLoadError) ? '' : 'toggleFollow'}}" aria-label="{{socialLoadError ? '关注状态待同步' : followed ? '取消关注创作者' : '关注创作者'}}"><text>{{socialLoadError ? '状态待同步' : followed ? '已关注' : '关注'}}</text></button>
+    </view>
 
+  <view wx:if="{{relatedService && !providerPreview}}" class="related-service">
+    <view class="service-section-head"><text class="service-heading">参考这组作品，预约服务</text><text class="reference-count">被参考 {{work.referenceCount}} 次</text></view>
+    <button hover-class="none" class="related-service-link" bindtap="openProvider"><view class="service-copy"><text class="service-name">{{relatedService.name}}</text><text class="service-description">{{relatedService.description}}{{relatedService.unit ? ' · 按' + relatedService.unit + '计价' : ''}}</text></view><view class="service-price"><text class="am-money am-money-list">{{relatedService.priceText}}</text></view><view class="service-chevron" aria-hidden="true"></view></button>
+    <text class="service-note">作品效果供沟通参考，最终范围与价格在预约时确认。</text>
+  </view>
+  <view class="work-image-stack work-image-continuation"><block wx:for="{{gallery}}" wx:key="index"><view wx:if="{{index > 0}}" class="work-figure-card"><image wx:if="{{item.src}}" class="detail-image" src="{{item.src}}" mode="widthFix" lazy-load="{{true}}"/><view wx:else class="am-media-unavailable">图片暂不可用</view></view></block></view>
+  <view wx:if="{{work.creditCoser || work.creditPhoto || work.creditMakeup || work.creditRetouch || work.creditMine}}" class="work-credits"><view wx:if="{{work.creditCoser}}"><text>出镜</text><text>{{work.creditCoser}}</text></view><view wx:if="{{work.creditPhoto}}"><text>摄影</text><text>{{work.creditPhoto}}</text></view><view wx:if="{{work.creditMakeup}}"><text>妆造</text><text>{{work.creditMakeup}}</text></view><view wx:if="{{work.creditRetouch}}"><text>后期</text><text>{{work.creditRetouch}}</text></view><view wx:if="{{work.creditMine}}"><text>本人负责</text><text>{{work.creditMine}}</text></view></view>
+  <text wx:if="{{!relatedService || providerPreview}}" class="reference-count">被参考 {{work.referenceCount}} 次</text>
   <view class="work-code-bar">
-    <view class="work-code-copy"><text>服务器分配作品码</text><text>{{work.code}}</text></view>
-    <button class="code-copy-button {{codeCopied ? 'active' : ''}}" bindtap="copyCode"><view class="copy-glyph" aria-hidden="true"></view><text>{{codeCopied ? '已复制' : '复制'}}</text></button>
+    <view class="work-code-copy"><text>作品编号</text><text>{{work.code}}</text></view>
+    <button hover-class="none" class="code-copy-button {{codeCopied ? 'active' : ''}}" bindtap="copyCode"><view class="copy-glyph" aria-hidden="true"></view><text>{{codeCopied ? '已复制' : '复制'}}</text></button>
   </view>
 
-  <view class="content-card work-detail-info"><view class="section-title"><view><text>作品对应服务展示价</text><text>{{work.priceText}}</text></view><text>被引用 {{work.referenceCount}} 次</text></view><text class="detail-description">{{work.description}}</text><view class="tag-row"><text wx:for="{{work.tags}}" wx:key="*this">{{item}}</text></view></view>
-
-  <view wx:if="{{!providerPreview}}" class="sticky-action"><view><text>{{work.provider.name}} · {{work.provider.career}}</text><text>{{work.priceText}}</text></view><button bindtap="startBooking">引用作品预约</button></view>
+  <view wx:if="{{!providerPreview}}" class="work-action-bar">
+    <button aria-disabled="{{socialPending || socialLoadError}}" hover-class="none" class="like-button {{liked ? 'active' : ''}}" data-am-disabled="{{socialPending || socialLoadError}}" bindtap="{{(socialPending || socialLoadError) ? '' : 'toggleLike'}}" aria-label="{{socialLoadError ? '喜欢状态待同步' : liked ? '取消喜欢这件作品' : '喜欢这件作品'}}"><image class="like-icon" src="{{liked ? '/assets/actions/work-like-active.svg' : '/assets/actions/work-like.svg'}}" aria-hidden="true"/><text>{{socialLoadError ? '状态待同步' : liked ? '已喜欢' : '喜欢'}}</text></button>
+    <view class="action-price"><text>参考价</text><text class="am-money am-money-detail">{{relatedService ? relatedService.priceText : work.priceText}}</text></view>
+    <button hover-class="none" class="booking-button am-action am-action-primary" bindtap="startBooking">参考作品预约</button>
+  </view>
 </view>
-<main-bottom-nav/>
+<view wx:if="{{!work && !loading}}" class="work-state"><text>{{loadError || '没有找到作品'}}</text><button hover-class="none" wx:if="{{!loading && loadError}}" bindtap="retryLoad">重新加载</button></view>

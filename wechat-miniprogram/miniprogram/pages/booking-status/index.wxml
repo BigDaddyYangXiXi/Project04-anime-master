@@ -1,105 +1,35 @@
 <app-top-nav class="app-navigation" title="预约状态" show-back="{{true}}"/>
-<view wx:if="{{loading}}" class="empty-page"><text class="empty-page-title">正在读取预约状态</text><text class="empty-page-copy">请稍候，不会重复提交任何操作。</text></view>
+<block wx:if="{{loading && !order}}"></block>
 <view wx:elif="{{order}}" class="status-shell">
-  <view wx:if="{{order.paymentStatus === 'PAYMENT_REVIEW' && !isStepThree}}" class="waiting-panel"><text>付款待核对</text><text>已收到付款记录，付款信息或订单状态需要核对，请勿重复付款。</text></view>
-  <view class="page-intro">
-    <text class="status-dot {{isStepFour ? 'ready' : ''}}">{{statusTitle}}</text>
-    <text class="intro-title">{{order.service}}</text>
-    <text class="intro-identity">{{providerIdentity.nickname}} · {{providerIdentity.uid}}</text>
-    <view class="intro-where-when"><text>{{order.city}}</text><text wx:if="{{order.deliveryText}}">{{order.deliveryText}}</text><view><text wx:for="{{schedule.lines}}" wx:key="label">{{item.label}} · {{item.text}}</text></view></view>
+  <view class="status-head"><view class="status-label"><image class="status-icon" src="/assets/booking/status-{{statusIcon}}.svg"/><text>{{statusTitle}}</text></view><text class="status-title">{{statusView.title}}</text><text class="status-lead">{{statusView.lead}}</text></view>
+  <view wx:if="{{!isFailed}}" class="status-track"><view wx:for="{{journeySteps}}" wx:key="number" class="track-step {{item.state}}"><view class="track-line"/><text>{{item.title}}</text></view></view>
+  <view class="status-card next-card"><text class="fact-title">{{statusView.focus}}</text><text class="secondary-copy">{{statusView.hint}}</text></view>
+  <order-subscription id="order-subscription" wx:if="{{order.cloudOrder && order.stage !== 'COMPLETED' && order.stage !== 'DECLINED'}}" order-id="{{order.id}}"/>
+  <text class="section-heading">本次预约</text>
+  <view class="status-card">
+    <view class="status-person"><view class="status-avatar"><text>{{providerIdentity.nickname[0]}}</text></view><view class="person-copy"><text class="am-identity-full">{{providerIdentity.nickname}}</text><text class="secondary-copy">{{order.career}} · {{order.city}}</text></view><button hover-class="none" class="status-link" bindtap="viewProvider">查看主页</button></view>
+    <view class="status-service"><view class="service-copy"><text class="fact-title">{{order.service}}</text><text class="secondary-copy" wx:if="{{order.deliveryText}}">{{order.deliveryText}}</text></view><view class="service-price"><text class="am-money am-money-list">￥{{referencePrice}}</text><text class="secondary-copy">参考价</text></view></view>
+    <view class="status-facts"><view class="status-fact"><text>服务地点</text><text>{{order.city}}</text></view><view class="status-fact" wx:for="{{schedule.lines}}" wx:key="label"><text>{{item.label}}</text><text>{{item.text}}</text></view></view>
   </view>
-
-  <view wx:if="{{isSupplement}}" class="content-card form-stack">
-    <text class="field-label">服务方需要补充：{{order.supplementNote}}</text>
-    <textarea class="supplement-input" value="{{supplement}}" placeholder="补充缺失信息" bindinput="updateSupplement"></textarea>
-    <view wx:if="{{!canSubmitSupplement}}" class="required-note"><view class="required-dot"></view><text>请填写服务方要求的补充信息。</text></view>
-    <button class="primary-block {{!canSubmitSupplement ? 'blocked' : ''}}" disabled="{{actionPending}}" aria-disabled="{{!canSubmitSupplement}}" bindtap="submitSupplement">保存补充并重新提交</button>
-  </view>
-
-  <view wx:elif="{{isFailed}}" class="content-card result-card failed-card">
-    <view class="section-title"><text>{{order.declinePhase === 'communication' ? '本次沟通未达成' : '老师未接受本次预约'}}</text><text>{{order.id}}</text></view>
-    <text class="result-copy">{{order.supplementNote || '本次沟通未能确认合作条件。'}}</text>
-    <text class="result-help">原预约的老师、服务、时间、联系方式和需求说明会带回预约页，提交前仍可修改。</text>
-    <button class="primary-block" bindtap="retryBooking">使用相同信息再次发起</button>
-    <button class="text-action" bindtap="goMarket">返回职业市场</button>
-  </view>
-
-  <block wx:elif="{{showJourney}}">
-    <view class="content-card journey-card step-{{currentStep}}">
-      <view class="journey-meta"><text>预约进度 · 第 {{currentStep}} 步</text><text>{{order.id}}</text></view>
-      <text class="journey-title">{{journeyTitle}}</text>
-      <text class="journey-lead">{{journeyLead}}</text>
-      <view class="journey-list">
-        <view wx:for="{{journeySteps}}" wx:key="number" class="journey-node {{item.state}}">
-          <view class="journey-rail"><view class="journey-number"><text wx:if="{{item.state !== 'done'}}">{{item.number}}</text><view wx:else class="mini-check"></view></view><view wx:if="{{index < journeySteps.length - 1}}" class="journey-line"></view></view>
-          <view class="journey-copy"><text>{{item.title}}</text><text wx:if="{{item.state === 'active'}}">当前</text></view>
-        </view>
-      </view>
-
-      <view wx:if="{{isStepOne}}" class="stage-body">
-        <view class="stage-focus">
-          <view class="focus-number">1</view><view><text>预约信息已送达</text><text>服务、时间、需求说明和联系方式已安全保存。</text></view>
-        </view>
-        <view class="stage-focus active-focus">
-          <view class="focus-number">2</view><view><text>{{order.stage === 'CONTACTING' ? '等待老师发起联系' : '等待老师评估预约'}}</text><text>{{order.stage === 'CONTACTING' ? '老师复制你的微信或手机号后，即视为沟通开始。' : '老师会确认沟通、要求补充信息或说明无法承接。'}}</text><text class="response-chip">{{replySampleCount ? '历史平均约 ' + replyMinutes + ' 分钟回复' : '暂无历史回复数据'}}</text></view>
-        </view>
-        <view class="privacy-panel"><view class="privacy-icon"><view class="lock-loop"></view><view class="lock-body"></view></view><view><text>联系方式仍受保护</text><text>只有老师接受预约后才能查看；首次复制任一联系方式会记录为开始沟通。</text></view></view>
-        <view class="next-panel"><text>你需要做</text><text>现在无需重复操作，请耐心等待并留意状态更新。</text></view>
-      </view>
-
-      <view wx:if="{{isStepTwo}}" class="stage-body">
-        <view class="communication-banner"><view class="pulse-dot"></view><view><text>沟通已经开始</text><text>服务方已获取至少一种联系方式，服务方页面仍停留在预约请求并填写沟通结果。</text></view></view>
-        <view class="responsibility-grid">
-          <view><text>你需要做</text><text>留意微信或电话，确认时间、地点、服务范围、保密需求与金额。</text></view>
-          <view><text>对方需要做</text><text>完成沟通后逐项确认合作条件，并提交“合作确立”或“合作不确立”。</text></view>
-        </view>
-        <view class="next-panel"><text>下一步</text><text>服务方提交合作确立后，你将在第 3 步核对完整合作信息并付款。</text></view>
-      </view>
-
-      <view wx:if="{{isStepThree}}" class="stage-body agreement-body">
-        <view class="agreement-group">
-          <view class="group-heading"><view class="group-index">1</view><view><text>双方与预约信息</text><text>核对是谁、何时、在哪里完成什么服务</text></view></view>
-          <view class="fact-stack">
-            <view class="fact-item"><text>需求方</text><text>{{buyerIdentity.nickname}} · {{buyerIdentity.uid}}</text></view>
-            <view class="fact-item"><text>服务方</text><text>{{providerIdentity.nickname}} · {{providerIdentity.uid}} · {{order.career}}</text></view>
-            <view class="fact-item schedule-fact"><text>地点与时间</text><text>{{order.city}} · {{schedule.mode}}</text><view><text wx:for="{{schedule.lines}}" wx:key="label">{{item.label}}　{{item.text}}</text></view></view>
-          </view>
-        </view>
-        <view class="agreement-group">
-          <view class="group-heading"><view class="group-index">2</view><view><text>服务内容与需求</text><text>需求方原始信息和服务方确认结果共同构成本次约定</text></view></view>
-          <view class="service-card" wx:for="{{order.serviceItems}}" wx:key="id"><view><text>{{item.name}}</text><text>服务方已确认可执行</text></view><text>￥{{item.finalPrice}}</text></view>
-          <view class="statement-card"><text>你的需求说明</text><text>{{order.requirement}}</text></view>
-          <view class="reference-card"><view><text>参考资料</text><text>{{order.reference}}</text></view><image wx:if="{{order.referenceImage}}" src="{{order.referenceImage}}" mode="aspectFill"/></view>
-        </view>
-        <view class="agreement-group">
-          <view class="group-heading"><view class="group-index">3</view><view><text>服务方提交的确认</text><text>四项内容均由服务方沟通后明确提交</text></view></view>
-          <view class="confirm-stack">
-            <view class="confirm-item"><view class="confirm-tick"></view><view><text>地点与时间确认</text><text>{{order.city}} · {{schedule.mode}}</text><text wx:for="{{schedule.lines}}" wx:key="label" class="confirm-schedule-line">{{item.label}}　{{item.text}}</text></view></view>
-            <view class="confirm-item"><view class="confirm-tick"></view><view><text>服务内容确认</text><text>{{order.service}}</text></view></view>
-            <view class="confirm-item"><view class="confirm-tick"></view><view><text>保密需求确认</text><text>{{order.ndaRequired ? '需要双方签署 NDA' : '双方确认无需 NDA'}}</text></view></view>
-            <view class="confirm-item"><view class="confirm-tick"></view><view><text>合作金额确认</text><text>合计 ￥{{totalPrice}}{{order.priceEdited ? ' · 服务方已改价一次' : ' · 沿用预约报价'}}</text></view></view>
-          </view>
-        </view>
-
-        <view wx:if="{{agreementIssues.length}}" class="required-summary"><view class="required-heading"><view class="required-dot"></view><text>还不能确认合作</text></view><text wx:for="{{agreementIssues}}" wx:key="*this">{{item}}</text></view>
-        <button wx:if="{{canSignNda}}" class="primary-block" disabled="{{actionPending}}" bindtap="signNda">阅读并签署保密协议</button>
-        <view wx:if="{{waitingProviderNda}}" class="waiting-panel"><text>你已完成签署</text><text>等待服务方签署保密协议，完成后本页会开放合作确认。</text></view>
-        <button wx:if="{{canConfirmAgreement}}" class="primary-block" disabled="{{actionPending}}" bindtap="confirmAgreement">确认以上合作信息</button>
-        <view wx:if="{{agreementConfirmed}}" class="payment-panel">
-          <view><text>合作信息已确认</text><text>{{paymentHint}}</text></view><text>￥{{totalPrice}}</text>
-          <button class="primary-block {{paymentStatus === 'PAID' || paymentStatus === 'VERIFYING' || paymentStatus === 'PAYMENT_REVIEW' || paying || paymentQuerying ? 'blocked' : ''}}" disabled="{{paymentStatus === 'PAID' || paymentStatus === 'VERIFYING' || paymentStatus === 'PAYMENT_REVIEW' || paying || paymentQuerying}}" bindtap="startPayment">{{paying || paymentQuerying ? '正在核对付款…' : paymentStatus === 'PAYMENT_REVIEW' ? '付款待核对' : paymentStatus === 'PAID' ? '付款已确认' : paymentStatus === 'VERIFYING' ? '等待支付结果确认' : '微信支付 ￥' + totalPrice}}</button>
-        </view>
-      </view>
-
-      <view wx:if="{{isStepFour}}" class="stage-body">
-        <view class="production-hero"><view class="production-icon"><view class="production-check"></view></view><view><text>合作已生效，开始制作</text><text>支付结果已核验，服务方可以按确认内容履约。</text></view></view>
-        <view class="production-progress"><view><text>当前执行进度</text><text>{{order.progress || 10}}%</text></view><progress percent="{{order.progress || 10}}" stroke-width="8" activeColor="#f0787e" backgroundColor="#f4e7e3"/></view>
-        <view class="next-panel"><text>后续动作</text><text>服务方更新进度和提交交付后，双方页面会继续同步。你可进入订单详情查看制作状态。</text></view>
-        <button class="primary-block" bindtap="goOrder">查看制作详情</button>
-      </view>
-    </view>
-  </block>
+  <view class="status-disclosure"><button hover-class="none" class="disclosure-toggle" bindtap="toggleDetails"><text>需求与参考资料</text><text>{{detailsOpen ? '−' : '+'}}</text></button><view wx:if="{{detailsOpen}}" class="disclosure-content"><text>{{order.requirement || '未填写需求说明'}}</text><text class="secondary-copy">{{order.reference || '未提供参考资料'}}</text><button hover-class="none" wx:if="{{order.referenceAssetId && !order.privateFieldsHidden}}" class="am-action am-action-secondary am-action-block" bindtap="openReference">查看私人参考图</button><image wx:if="{{order.referenceImage}}" class="reference-image" src="{{order.referenceImage}}" mode="widthFix"/></view></view>
+  <view class="status-code"><view><text class="secondary-copy">预约编号</text><text>{{order.id}}</text></view><button hover-class="none" class="status-link" bindtap="copyCode">复制</button></view>
 </view>
-
-<view wx:else class="empty-page"><text class="empty-page-title">{{loadError ? '预约加载失败' : '没有找到预约'}}</text><text class="empty-page-copy">{{loadError || '请从职业市场重新发起预约。'}}</text><button wx:if="{{loadError}}" class="empty-retry" bindtap="retryLoad">重新加载</button></view>
+<view wx:else class="empty-page"><text class="empty-page-title">{{loadError ? '预约加载失败' : '没有找到预约'}}</text><text class="empty-page-copy">{{loadError || '请从职业市场重新发起预约。'}}</text><button hover-class="none" wx:if="{{loadError}}" class="am-action am-action-secondary" bindtap="retryLoad">重新加载</button></view>
+<view wx:if="{{order}}" class="status-action">
+  <button hover-class="none" wx:if="{{isSupplement}}" class="am-action am-action-primary" data-panel="supplement" bindtap="openPanel">补充预约信息</button>
+  <block wx:elif="{{isFailed}}"><button hover-class="none" class="am-action am-action-secondary" bindtap="goMarket">找其他高手</button><button hover-class="none" class="am-action am-action-primary" bindtap="retryBooking">调整后再次预约</button></block>
+  <button aria-disabled="{{paymentQuerying || loading}}" hover-class="none" wx:elif="{{statusView.kind === 'review'}}" class="am-action am-action-primary" data-am-disabled="{{paymentQuerying || loading}}" bindtap="{{(paymentQuerying || loading) ? '' : 'refreshStatus'}}">{{paymentQuerying ? '正在核对…' : '刷新付款状态'}}</button>
+  <button hover-class="none" wx:elif="{{isStepFour}}" class="am-action am-action-primary" bindtap="goOrder">查看执行详情</button>
+  <button hover-class="none" wx:elif="{{canSignNda}}" class="am-action am-action-primary" data-panel="nda" bindtap="openPanel">查看保密协议</button>
+  <button hover-class="none" wx:elif="{{canConfirmAgreement || (isStepThree && !agreementConfirmed && !waitingProviderNda)}}" class="am-action am-action-primary" data-panel="agreement" bindtap="openPanel">核对合作信息</button>
+  <block wx:elif="{{agreementConfirmed && statusView.kind === 'pay'}}"><view class="action-price"><text class="secondary-copy">本次应付</text><text class="am-money am-money-detail">￥{{totalPrice}}</text></view><button aria-disabled="{{paying || paymentQuerying}}" hover-class="none" class="am-action am-action-primary" data-am-disabled="{{paying || paymentQuerying}}" bindtap="{{(paying || paymentQuerying) ? '' : 'startPayment'}}">{{paying ? '正在处理…' : '微信支付'}}</button></block>
+  <block wx:else><text class="secondary-copy">{{waitingProviderNda ? '等待双方完成签署' : '当前无需付款，等待状态更新'}}</text><button aria-disabled="{{loading}}" hover-class="none" class="status-link" data-am-disabled="{{loading}}" bindtap="{{(loading) ? '' : 'refreshStatus'}}">刷新状态</button></block>
+</view>
 <main-bottom-nav/>
+<view wx:if="{{panel}}" class="status-mask {{sheetKeyboardHeight ? 'am-keyboard-open' : ''}}" style="bottom: {{sheetKeyboardHeight}}px; top: {{sheetKeyboardHeight ? sheetSafeTop : 0}}px" bindtap="closePanel"><view class="status-sheet am-input-sheet" catchtap="stopTap"><view class="sheet-heading" catchtouchmove="preventSheetBackgroundScroll"><text>{{panel === 'supplement' ? '补充预约信息' : panel === 'nda' ? '保密约定' : '核对合作信息'}}</text><button hover-class="none" class="status-link" bindtap="closePanel">关闭</button></view><scroll-view scroll-y class="sheet-content am-sheet-scroll" scroll-into-view="{{sheetScrollTarget}}">
+  <block wx:if="{{panel === 'supplement'}}"><text class="sheet-copy">{{order.supplementNote}}</text><textarea id="supplement-input" class="am-textarea" data-field="supplement-input" adjust-position="{{false}}" bindfocus="sheetInputFocus" bindkeyboardheightchange="sheetKeyboardChange" value="{{supplement}}" bindinput="updateSupplement" placeholder="填写补充信息" maxlength="2000"/><button aria-disabled="{{actionPending}}" hover-class="none" class="am-action am-action-primary" data-am-disabled="{{actionPending}}" bindtap="{{(actionPending) ? '' : 'submitSupplement'}}">保存补充并重新提交</button></block>
+  <block wx:else><view class="status-fact"><text>需求方</text><text class="am-identity-full">{{buyerIdentity.nickname}}</text></view><view class="status-fact"><text>服务方</text><text class="am-identity-full">{{providerIdentity.nickname}}</text></view><view class="status-fact"><text>地点</text><text>{{order.city}}</text></view><view class="status-fact" wx:for="{{schedule.lines}}" wx:key="label"><text>{{item.label}}</text><text>{{item.text}}</text></view><view class="status-fact"><text>服务范围</text><text>{{order.service}}</text></view><view class="status-fact"><text>需求说明</text><text>{{order.requirement}}</text></view><view class="status-fact"><text>保密约定</text><text>{{order.ndaRequired ? '需要双方签署保密协议' : '双方确认无需保密协议'}}</text></view><view class="sheet-total"><text>合作金额</text><text class="am-money am-money-detail">￥{{totalPrice}}</text></view>
+    <block wx:if="{{panel === 'nda'}}"><text class="secondary-copy">当前仅记录保密约定的确认顺序，不提供法律电子签章。</text><button aria-disabled="{{actionPending}}" hover-class="none" class="am-action am-action-primary" data-am-disabled="{{actionPending}}" bindtap="{{(actionPending) ? '' : 'signNda'}}">确认保密约定</button></block>
+    <block wx:else><view wx:if="{{agreementIssues.length}}" class="sheet-issues"><text wx:for="{{agreementIssues}}" wx:key="*this">{{item}}</text></view><checkbox-group bindchange="updateAgreementRead"><label class="agreement-check"><checkbox value="read" checked="{{agreementRead}}" color="#ff946b"/><text>已核对合作信息，与沟通结果一致</text></label></checkbox-group><button aria-disabled="{{actionPending}}" hover-class="none" class="am-action am-action-primary" data-am-disabled="{{actionPending}}" bindtap="{{(actionPending) ? '' : 'confirmReviewed'}}">确认合作信息</button><text class="secondary-copy">确认信息不会直接扣款</text></block>
+  </block>
+</scroll-view></view></view>

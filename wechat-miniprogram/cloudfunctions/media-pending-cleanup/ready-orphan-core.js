@@ -1,4 +1,4 @@
-const { deleteFile } = require("./cleanup-core");
+const { cleanupErrorCode } = require("./cleanup-core");
 
 const READY_ORPHAN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const ORPHAN_QUARANTINE_MS = 24 * 60 * 60 * 1000;
@@ -31,7 +31,9 @@ async function ownerReferenceIds(db, ownerId) {
   const draft = rows(await db.from("provider_catalog_drafts").select("payload").eq("provider_id", ownerId), "read draft references")[0];
   const publication = rows(await db.from("provider_catalog_publications").select("payload").eq("provider_id", ownerId), "read publication references")[0];
   collectPayload(draft, output); collectPayload(publication, output);
+  rows(await db.from("content_intents").select("payload").eq("account_id", ownerId).in("status", ["STAGED", "PENDING"]), "read pending content references").forEach(row => collectPayload(row, output));
   rows(await db.from("project_aggregates").select("payload").eq("buyer_id", ownerId), "read project references").forEach((row) => collectPayload(row, output));
+  rows(await db.from("support_requests").select("payload").eq("account_id", ownerId), "read support references").forEach((row) => collectPayload(row, output));
   rows(await db.from("order_aggregates").select("payload").eq("buyer_id", ownerId), "read buyer order references").forEach((row) => collectPayload(row, output));
   rows(await db.from("order_aggregates").select("payload").eq("provider_id", ownerId), "read provider order references").forEach((row) => collectPayload(row, output));
   const works = rows(await db.from("works").select("id").eq("provider_id", ownerId), "read owned works");
@@ -51,7 +53,7 @@ async function cleanupReadyOrphans(db, storage, context = {}, now = Date.now(), 
     .eq("status", "READY").lt("committed_at", now - READY_ORPHAN_TTL_MS).limit(batchSize), "read ready orphan candidates");
   const quarantined = rows(await db.from("media_assets").select("id,owner_account_id,storage_key,status,committed_at,orphaned_at")
     .eq("status", "ORPHAN_CANDIDATE").lt("orphaned_at", now - ORPHAN_QUARANTINE_MS).limit(batchSize), "read quarantined orphan candidates");
-  const summary = { readyScanned: ready.length, quarantinedScanned: quarantined.length, quarantined: 0, restored: 0, deleted: 0, skipped: 0, failed: 0 };
+  const summary = { readyScanned: ready.length, quarantinedScanned: quarantined.length, quarantined: 0, restored: 0, deleted: 0, skipped: 0, failed: 0, deferred: 0 };
   const referencesByOwner = new Map();
   async function references(asset) {
     if (!referencesByOwner.has(asset.owner_account_id)) referencesByOwner.set(asset.owner_account_id, await ownerReferenceIds(db, asset.owner_account_id));
@@ -64,22 +66,23 @@ async function cleanupReadyOrphans(db, storage, context = {}, now = Date.now(), 
         else summary.skipped += 1;
         continue;
       }
-      await deleteFile(storage, asset.storage_key);
-      if (await updateState(db, asset, "ORPHAN_CANDIDATE", { status: "DELETED", deleted_at: now }, "mark ready orphan deleted")) summary.deleted += 1;
-      else summary.skipped += 1;
+      // Absence in a reference scan is not a deletion lock: writers may still
+      // publish a reference, and database result limits may truncate the scan.
+      // Resume reclamation only with complete reads and atomic reference guards.
+      summary.deferred += 1;
     } catch (error) {
       summary.failed += 1;
-      console.error(JSON.stringify({ scope: "media-ready-orphan-cleanup", code: error && error.code || "UNEXPECTED" }));
+      console.error(JSON.stringify({ scope: "media-ready-orphan-cleanup", code: cleanupErrorCode(error) }));
     }
   }
   for (const asset of ready) {
     try {
       if ((await references(asset)).has(asset.id)) { summary.skipped += 1; continue; }
-      if (await updateState(db, asset, "READY", { status: "ORPHAN_CANDIDATE", orphaned_at: now }, "quarantine ready orphan")) summary.quarantined += 1;
-      else summary.skipped += 1;
+      // Quarantining also invalidates media for writers that require READY.
+      summary.deferred += 1;
     } catch (error) {
       summary.failed += 1;
-      console.error(JSON.stringify({ scope: "media-ready-orphan-cleanup", code: error && error.code || "UNEXPECTED" }));
+      console.error(JSON.stringify({ scope: "media-ready-orphan-cleanup", code: cleanupErrorCode(error) }));
     }
   }
   return summary;

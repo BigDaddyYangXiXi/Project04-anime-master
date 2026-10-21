@@ -1,0 +1,2 @@
+/* 完整身份场景允许换行；作品卡片继续使用自己的单行省略规则。 */
+page text.am-identity-full { min-width: 0; white-space: normal; overflow-wrap: anywhere; overflow: visible; text-overflow: clip; }

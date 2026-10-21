@@ -78,7 +78,7 @@ assert.strictEqual(page.data.workPickerOpen, false);
 assert.strictEqual(page.data.serviceDrafts[0].workIds.includes(pickerTarget.id), !wasPicked);
 const originalWorkDrafts = JSON.parse(JSON.stringify(page.data.workDrafts));
 page.setData({ workDrafts: page.data.workDrafts.slice(0, 2) }, () => page.refreshDerived());
-assert.strictEqual(page.data.canPublish, false, "少于 3 件作品不得发布橱窗");
+assert.strictEqual(page.data.canPublish, true, "作品数量不再限制发布，已有作品仍须完整");
 page.setData({ workDrafts: originalWorkDrafts }, () => page.refreshDerived());
 assert.strictEqual(page.data.canPublish, true);
 page.updateProfile({ currentTarget: { dataset: { key: "nickname" } }, detail: { value: "不可写昵称" } });

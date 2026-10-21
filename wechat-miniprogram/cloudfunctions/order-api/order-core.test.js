@@ -1,8 +1,49 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { decryptContact, encryptContact, handleOrder, requestHash } = require("./order-core");
+const { decryptContact, encryptContact, handleOrder: handleOrderCore, requestHash } = require("./order-core");
+
+// State-machine tests use an in-memory writer; real concurrent locking is tested against MySQL.
+function handleOrder(db, ...args) {
+  while (args.length < 6) args.push(undefined);
+  return handleOrderCore(db, ...args, async (row, next) => {
+    const result = await db.from("order_aggregates").update(next).eq("id", row.id).eq("version", row.version).select("id");
+    if (!result.data.length) { const error = new Error("VERSION_CONFLICT"); error.code = error.message; throw error; }
+  });
+}
 
 const KEY = Buffer.alloc(32, 7).toString("base64");
+test("交付下载仅给订单参与者，签约和文件绑定校验先于签发链接", async () => {
+  const db = mockDb();
+  const order = await handleOrder(db, createEvent(), { WX_OPENID: "openid-buyer" }, KEY, 1000, uuidSequence());
+  const row = db.orders[0];
+  const assetId = `asset_${"a".repeat(32)}`;
+  const fileId = `cloud://quest-band-d1gem4bxt3fa17720.bucket/user-uploads/${PROVIDER}/order_delivery/${row.id}/${assetId}.pdf`;
+  const payload = JSON.parse(row.payload);
+  payload.public.deliveryFiles = [{ assetId, fileId, name: "交付.pdf" }];
+  row.payload = JSON.stringify(payload); row.stage = "DELIVERY_PENDING";
+  let issued = 0;
+  const storage = { async getTempFileURL(input) {
+    issued++;
+    assert.deepEqual(input, { fileList: [{ fileID: fileId, maxAge: 300 }] });
+    return { fileList: [{ fileID: fileId, code: "SUCCESS", tempFileURL: "https://files.example.test/signed" }] };
+  } };
+  const event = { action: "getDeliveryDownload", orderId: order.id, assetId };
+  const request = (openId, change = {}) => handleOrder(db, { ...event, ...change }, { WX_OPENID: openId }, KEY, 2000, uuidSequence(), storage);
+  for (const openId of ["openid-buyer", "openid-provider"]) assert.equal((await request(openId)).mimeType, "application/pdf");
+  assert.equal(issued, 2);
+  await assert.rejects(() => request("openid-outsider"), error => error.code === "ORDER_NOT_FOUND");
+  await assert.rejects(() => request("openid-buyer", { assetId: `asset_${"b".repeat(32)}` }), error => error.code === "DELIVERY_FILE_INVALID");
+  payload.public.ndaRequired = true;
+  row.payload = JSON.stringify(payload);
+  await assert.rejects(() => request("openid-buyer"), error => error.code === "NDA_REQUIRED");
+  payload.public.ndaRequired = false;
+  payload.public.deliveryFiles[0].fileId = fileId.replace("acct_provider", "acct_other");
+  row.payload = JSON.stringify(payload);
+  await assert.rejects(() => request("openid-buyer"), error => error.code === "DELIVERY_FILE_INVALID");
+  row.stage = "IN_PRODUCTION";
+  await assert.rejects(() => request("openid-buyer"), error => error.code === "ILLEGAL_TRANSITION");
+  assert.equal(issued, 2, "所有拒绝都不能生成可访问链接");
+});
 const PROVIDER = "acct_provider";
 const BUYER = "acct_buyer";
 const CONFIRMATIONS = { timePlaceConfirmed: true, serviceScopeConfirmed: true, amountConfirmed: true, ndaRequired: false };
@@ -16,10 +57,25 @@ const publication = {
   })
 };
 
-function mockDb() {
+test("暂停接单在服务端阻止新的预约，保持已发布价格与订单不变", async () => {
+  const previous = publication.payload;
+  const value = JSON.parse(previous);
+  value.profile.accepting = false;
+  publication.payload = JSON.stringify(value);
+  const db = mockDb();
+  try {
+    await assert.rejects(() => handleOrder(db, createEvent(), { WX_OPENID: "openid-buyer" }, KEY, 1000, uuidSequence()), error => error.code === "PROVIDER_NOT_AVAILABLE");
+    assert.equal(db.orders.length, 0);
+  } finally { publication.payload = previous; }
+});
+
+function mockDb(qualification = { status: "APPROVED", career: "摄影", eligibility_verified: 1 }) {
   const orders = [];
+  const referenceAsset = { id: "asset_reference", owner_account_id: BUYER, purpose: "PROJECT_REFERENCE", status: "READY",
+    storage_key: "cloud://test.bucket/user-uploads/acct_buyer/project_reference/asset_reference.jpg", mime_type: "image/jpeg" };
   return {
     orders,
+    referenceAsset,
     from(table) {
       let operation = "select";
       let value = null;
@@ -33,7 +89,7 @@ function mockDb() {
           let data = [];
           if (table === "wechat_identities") {
             const openId = filters.find(([column]) => column === "open_id")[1];
-            data = [{ account_id: openId === "openid-provider" ? PROVIDER : BUYER }];
+            data = [{ account_id: openId === "openid-provider" ? PROVIDER : openId === "openid-outsider" ? "acct_outsider" : BUYER }];
           } else if (table === "account_roles") {
             const id = filters.find(([column]) => column === "account_id")[1];
             data = [{ role: id === PROVIDER ? "PROVIDER" : "BUYER" }];
@@ -41,13 +97,15 @@ function mockDb() {
             const id = filters.find(([column]) => column === "id")[1];
             data = [{ id, uid: id === PROVIDER ? "AM-PROVIDER" : "AM-BUYER", nickname: id === PROVIDER ? "迟霜" : "阿遥", status: "ACTIVE" }]
               .filter((row) => filters.every(([column, expected]) => row[column] === expected));
+          } else if (table === "provider_qualifications") {
+            data = qualification ? [qualification] : [];
           } else if (table === "provider_catalog_publications") {
             data = filters.every(([column, expected]) => publication[column] === expected) ? [publication] : [];
           } else if (table === "media_assets") {
             const requestedId = filters.find(([column]) => column === "id")[1];
             const deliveryOrder = orders[0] && orders[0].id;
             const asset = requestedId === "asset_reference"
-              ? { id: "asset_reference", owner_account_id: BUYER, purpose: "PROJECT_REFERENCE", status: "READY" }
+              ? referenceAsset
               : {
                 id: requestedId, owner_account_id: PROVIDER, purpose: "ORDER_DELIVERY", scope_id: deliveryOrder,
                 storage_key: `cloud://quest-band-d1gem4bxt3fa17720.bucket/user-uploads/${PROVIDER}/order_delivery/${deliveryOrder}/${requestedId}.pdf`,
@@ -78,6 +136,7 @@ function createEvent(overrides = {}) {
     timeSegments: [{ startsAt: 2000, endsAt: 3000 }],
     contact: { name: "阿遥", wechat: "coser_ayao", phone: "" },
     idempotencyKey: "request-key-000001",
+    ndaRequired: false,
     ...overrides
   };
 }
@@ -87,15 +146,135 @@ function uuidSequence() {
   return () => `${String(++value).padStart(8, "0")}-0000-0000-0000-000000000000`;
 }
 
+test("required NDA protects private order fields in detail and list until both participants sign", async () => {
+  const db = mockDb();
+  const created = await handleOrder(db, createEvent({ referenceAssetId: "asset_reference" }), { WX_OPENID: "openid-buyer" }, KEY, 1000, uuidSequence());
+  const row = db.orders[0];
+  const payload = JSON.parse(row.payload);
+  Object.assign(payload.public, { ndaRequired: true, supplementNote: "private supplement" });
+  payload.events.push({ event: "BUYER_SUPPLEMENTS", detail: "private history", createdAt: 1500 });
+  for (const [buyerSigned, providerSigned] of [[false, false], [true, false], [false, true], [true, true]]) {
+    Object.assign(payload.public, { buyerNdaSigned: buyerSigned, providerNdaSigned: providerSigned });
+    row.payload = JSON.stringify(payload);
+    row.stage = "NDA_PROVIDER_PENDING";
+    const stored = row.payload;
+    const detail = await handleOrder(db, { action: "getOrder", orderId: created.id }, { WX_OPENID: "openid-provider" }, KEY);
+    const list = await handleOrder(db, { action: "listOrders" }, { WX_OPENID: "openid-provider" }, KEY);
+    for (const view of [detail, list.orders[0]]) {
+      const locked = !(buyerSigned && providerSigned);
+      assert.equal(view.requirement, locked ? "" : payload.public.requirement);
+      assert.equal(view.location, locked ? "" : payload.public.location);
+      assert.equal(view.referenceAssetId, locked ? null : "asset_reference");
+      assert.equal(view.supplementNote, locked ? "" : "private supplement");
+      assert.equal(view.events[1].detail, locked ? "" : "private history");
+      assert.equal(view.amountFen, created.amountFen);
+      assert.deepEqual(view.timeSegments, created.timeSegments);
+      assert.equal(view.cityCode, created.cityCode);
+      const client = require("../../miniprogram/services/cloud-orders").toClientOrder(view);
+      assert.equal(client.bookingDraft.note, view.requirement);
+      assert.equal(client.bookingDraft.referenceFile && client.bookingDraft.referenceFile.assetId, view.referenceAssetId);
+    }
+    const owner = await handleOrder(db, { action: "getOrder", orderId: created.id }, { WX_OPENID: "openid-buyer" }, KEY);
+    assert.equal(owner.requirement, payload.public.requirement);
+    assert.equal(owner.events[1].detail, "private history");
+    assert.equal(row.payload, stored, "redaction must not erase stored private data");
+  }
+});
+
+test("an unrelated account cannot read, list, or sign another order NDA", async () => {
+  const db = mockDb();
+  const created = await handleOrder(db, createEvent(), { WX_OPENID: "openid-buyer" }, KEY, 1000, uuidSequence());
+  const row = db.orders[0];
+  const payload = JSON.parse(row.payload);
+  payload.public.ndaRequired = true;
+  row.payload = JSON.stringify(payload);
+  row.stage = "NDA_BUYER_PENDING";
+  const stored = JSON.stringify(row);
+  for (const event of [
+    { action: "getOrder", orderId: created.id },
+    { action: "transitionOrder", orderId: created.id, expectedVersion: 1, event: "BUYER_SIGNS_NDA" }
+  ]) {
+    await assert.rejects(handleOrder(db, event, { WX_OPENID: "openid-outsider" }, KEY), error => error.code === "ORDER_NOT_FOUND");
+  }
+  const list = await handleOrder(db, { action: "listOrders" }, { WX_OPENID: "openid-outsider" }, KEY);
+  assert.deepEqual(list.orders, []);
+  assert.equal(JSON.stringify(row), stored);
+});
+
+test("NDA transition responses hide private fields then reveal them after the final signature", async () => {
+  const db = mockDb();
+  const created = await handleOrder(db, createEvent(), { WX_OPENID: "openid-buyer" }, KEY, 1000, uuidSequence());
+  const transition = (event, openid, expectedVersion, extra = {}) => handleOrder(db,
+    { action: "transitionOrder", orderId: created.id, event, expectedVersion, ...extra },
+    { WX_OPENID: openid }, KEY, 1500, uuidSequence());
+  await transition("PROVIDER_INTERESTED", "openid-provider", 1);
+  await transition("PROVIDER_RECORDS_CONTACT", "openid-provider", 2);
+  const beforeConfirmation = JSON.stringify(db.orders[0]);
+  await assert.rejects(handleOrderCore(db, { action: "transitionOrder", orderId: created.id,
+    event: "PROVIDER_ENDS_COMMUNICATION", expectedVersion: 3, ...CONFIRMATIONS },
+  { WX_OPENID: "openid-provider" }, KEY, 1500), error => error.code === "SLOT_STORE_NOT_CONFIGURED");
+  assert.equal(JSON.stringify(db.orders[0]), beforeConfirmation);
+  const pending = await transition("PROVIDER_ENDS_COMMUNICATION", "openid-provider", 3, { ...CONFIRMATIONS, ndaRequired: true });
+  assert.equal(pending.requirement, "");
+  await transition("BUYER_SIGNS_NDA", "openid-buyer", 4);
+  const signed = await transition("PROVIDER_SIGNS_NDA", "openid-provider", 5);
+  assert.equal(signed.requirement, created.requirement);
+  assert.equal(signed.location, created.location);
+});
+
 function forceProduction(db, orderId) {
   const row = db.orders.find((item) => item.id === orderId);
   const payload = JSON.parse(row.payload);
   payload.public.paymentStatus = "PAID";
+  payload.public.paymentId = "11111111111111111111111111111111";
+  payload.public.paymentTransactionId = "wx_transaction_fixture";
   payload.public.buyerAgreementConfirmedAt = 3500;
   row.payload = JSON.stringify(payload);
   row.stage = "IN_PRODUCTION";
   return row;
 }
+
+test("buyer-declared NDA hides initial details, signs before communication and cannot be waived", async () => {
+  const db = mockDb();
+  const created = await handleOrder(db, createEvent({ ndaRequired: true, referenceAssetId: "asset_reference" }), { WX_OPENID: "openid-buyer" }, KEY, 1000, uuidSequence());
+  const readProvider = () => handleOrder(db, { action: "getOrder", orderId: created.id }, { WX_OPENID: "openid-provider" }, KEY);
+  assert.equal((await readProvider()).requirement, "");
+  assert.equal((await readProvider()).referenceAssetId, null);
+  const act = (event, version, actor = "provider", fields = {}) => handleOrder(db,
+    { action: "transitionOrder", orderId: created.id, expectedVersion: version, event, ...fields },
+    { WX_OPENID: `openid-${actor}` }, KEY, 1500, uuidSequence());
+  assert.equal((await act("PROVIDER_INTERESTED", 1)).stage, "NDA_BUYER_PENDING");
+  await act("BUYER_SIGNS_NDA", 2, "buyer");
+  assert.equal((await readProvider()).privateFieldsHidden, true);
+  const signed = await act("PROVIDER_SIGNS_NDA", 3);
+  assert.equal(signed.stage, "CONTACTING");
+  assert.equal(signed.requirement, created.requirement);
+  assert.equal(signed.communicationDone, false);
+  await act("PROVIDER_RECORDS_CONTACT", 4);
+  await assert.rejects(act("PROVIDER_ENDS_COMMUNICATION", 5, "provider", CONFIRMATIONS), error => error.code === "NDA_REQUIRED");
+  const confirmed = await act("PROVIDER_ENDS_COMMUNICATION", 5, "provider", { ...CONFIRMATIONS, ndaRequired: true });
+  assert.equal(confirmed.stage, "BUYER_FINAL_CONFIRM");
+  assert.equal(confirmed.communicationDone, true);
+});
+
+test("new booking must explicitly declare NDA and declaration is part of idempotency", async () => {
+  const db = mockDb();
+  await assert.rejects(handleOrder(db, createEvent({ ndaRequired: undefined }), { WX_OPENID: "openid-buyer" }, KEY, 1000), error => error.code === "VALIDATION_ERROR");
+  await handleOrder(db, createEvent({ ndaRequired: true }), { WX_OPENID: "openid-buyer" }, KEY, 1000, uuidSequence());
+  await assert.rejects(handleOrder(db, createEvent({ ndaRequired: false }), { WX_OPENID: "openid-buyer" }, KEY, 1000), error => error.code === "IDEMPOTENCY_CONFLICT");
+});
+
+test("booking no longer requires onboarding approval but cannot override explicit suspension", async () => {
+  for (const qualification of [null, { status: "PENDING", career: "摄影", eligibility_verified: 0 },
+    { status: "REJECTED", career: "摄影", eligibility_verified: 0 }, { status: "APPROVED", career: "妆娘", eligibility_verified: 1 }]) {
+    const db = mockDb(qualification);
+    await handleOrder(db, createEvent(), { WX_OPENID: "openid-buyer" }, KEY, 1000, uuidSequence());
+    assert.equal(db.orders.length, 1);
+  }
+  const db = mockDb({ status: "SUSPENDED" });
+  await assert.rejects(handleOrder(db, createEvent({ qualification: { status: "APPROVED" } }), { WX_OPENID: "openid-buyer" }, KEY, 1000), { code: "PROVIDER_NOT_AVAILABLE" });
+  assert.equal(db.orders.length, 0);
+});
 
 function deliveryStorage(fileIds) {
   return {
@@ -143,6 +322,29 @@ test("rejects a city outside the published service coverage", async () => {
   );
 });
 
+for (const outcome of ['lost-response', 'sdk-error-result', 'concurrent-conflict', 'not-written']) {
+  test(`order creation recovers only a matching persisted request after ${outcome}`, async () => {
+    const db = mockDb(), originalFrom = db.from.bind(db);
+    let writes = 0;
+    db.from = table => {
+      const builder = originalFrom(table);
+      if (table === 'order_aggregates') builder.insert = async row => {
+        writes++;
+        if (outcome !== 'not-written') db.orders.push({ ...row,
+          request_hash: outcome === 'concurrent-conflict' ? '0'.repeat(64) : row.request_hash });
+        if (outcome === 'sdk-error-result') return { error: { message: 'synthetic duplicate' } };
+        throw Object.assign(new Error('synthetic insertion failure'), { code: 'SYNTHETIC_WRITE_FAILURE' });
+      };
+      return builder;
+    };
+    const operation = handleOrder(db, createEvent(), { WX_OPENID: 'openid-buyer' }, KEY, 1000, uuidSequence());
+    if (['lost-response', 'sdk-error-result'].includes(outcome)) assert.equal((await operation).id, db.orders[0].id);
+    else await assert.rejects(operation, error => error.code === (outcome === 'concurrent-conflict' ? 'IDEMPOTENCY_CONFLICT' : 'SYNTHETIC_WRITE_FAILURE'));
+    assert.equal(writes, 1);
+    assert.equal(db.orders.length, outcome === 'not-written' ? 0 : 1);
+  });
+}
+
 test("rejects a district code where the order contract requires a city code", async () => {
   await assert.rejects(
     () => handleOrder(mockDb(), createEvent({ city: "徐汇区", cityCode: "310104" }), { WX_OPENID: "openid-buyer" }, KEY, 1000, uuidSequence()),
@@ -157,6 +359,19 @@ test("same idempotency key with different payload conflicts", async () => {
     () => handleOrder(db, createEvent({ requirement: "另一份完全不同的订单需求说明" }), { WX_OPENID: "openid-buyer" }, KEY, 1001, uuidSequence()),
     (error) => error.code === "IDEMPOTENCY_CONFLICT"
   );
+});
+
+test('原预约重试跨过开始时间仍返回原订单，新请求不能预约过去时间', async () => {
+  const db = mockDb(), event = createEvent();
+  const original = await handleOrder(db, event, { WX_OPENID: 'openid-buyer' }, KEY, 1000, uuidSequence());
+  const recovered = await handleOrder(db, event, { WX_OPENID: 'openid-buyer' }, KEY, 4000, uuidSequence());
+  assert.equal(recovered.id, original.id);
+  assert.equal(db.orders.length, 1);
+  await assert.rejects(handleOrder(db, { ...event, requirement: '同一编号但修改后的不同预约需求' },
+    { WX_OPENID: 'openid-buyer' }, KEY, 4000, uuidSequence()), error => error.code === 'IDEMPOTENCY_CONFLICT');
+  await assert.rejects(handleOrder(db, { ...event, idempotencyKey: 'new-expired-request-0001' },
+    { WX_OPENID: 'openid-buyer' }, KEY, 4000, uuidSequence()), error => error.code === 'INVALID_TIME_SEGMENTS');
+  assert.equal(db.orders.length, 1);
 });
 
 test("buyer reference image must be owned and READY", async () => {
@@ -444,6 +659,102 @@ test("onsite delivery requires a completion note but no uploaded file", async ()
   assert.deepEqual(delivered.deliveryFiles, []);
 });
 
+test("退款或争议冻结阻止两种验收入口，不写完成或结算意向", async () => {
+  for (const reason of ['REFUND_REQUEST', 'DISPUTE']) {
+    for (const event of ['BUYER_ACCEPTS_DELIVERY', 'BUYER_ACCEPTS_AND_SETTLES']) {
+      const db = mockDb();
+      const created = await handleOrder(db, createEvent(), { WX_OPENID: 'openid-buyer' }, KEY, 1000, uuidSequence());
+      const row = forceProduction(db, created.id), payload = JSON.parse(row.payload);
+      Object.assign(payload.public, { deliveryNote:'现场服务已经完成', provider:{career:'妆娘'} });
+      row.payload=JSON.stringify(payload); row.stage='DELIVERY_PENDING';
+      const from=db.from.bind(db);
+      db.from=table => table === 'order_funds_interlocks'
+        ? { select:()=>({eq:async()=>({data:[{hold_reason:reason}]})}) } : from(table);
+      await assert.rejects(handleOrder(db, {action:'transitionOrder',orderId:row.id,expectedVersion:1,event},
+        {WX_OPENID:'openid-buyer'},KEY,2000,uuidSequence()), {code:'ORDER_FUNDS_HELD'});
+      assert.equal(row.stage,'DELIVERY_PENDING');
+      assert.equal(JSON.parse(row.payload).settlementIntent,undefined);
+    }
+  }
+});
+test("两种验收入口原子保存待结算记录，客户端不能伪造到账或费用", async () => {
+  for (const event of ["BUYER_ACCEPTS_DELIVERY", "BUYER_ACCEPTS_AND_SETTLES"]) {
+    const db = mockDb();
+    const created = await handleOrder(db, createEvent(), { WX_OPENID: "openid-buyer" }, KEY, 1000, uuidSequence());
+    const row = forceProduction(db, created.id);
+    const payload = JSON.parse(row.payload);
+    Object.assign(payload.public, { deliveryNote: "现场服务已经完成", provider: { career: "妆娘" } });
+    row.payload = JSON.stringify(payload);
+    row.stage = "DELIVERY_PENDING";
+    const request = { action: "transitionOrder", orderId: row.id, expectedVersion: 1, event,
+      settlement: { status: "SUCCEEDED" }, platformFeeFen: 1, paymentId: "forged" };
+    const results = await Promise.allSettled([2000, 2001].map(now =>
+      handleOrder(db, request, { WX_OPENID: "openid-buyer" }, KEY, now, uuidSequence())));
+    assert.equal(results.filter(result => result.status === "fulfilled").length, 1);
+    assert.equal(results.find(result => result.status === "rejected").reason.code, "VERSION_CONFLICT");
+    const stored = JSON.parse(row.payload);
+    assert.equal(row.stage, "COMPLETED");
+    assert.deepEqual(stored.settlementIntent, { status: "PENDING", paymentId: payload.public.paymentId,
+      acceptedOrderVersion: 2, createdAt: stored.public.completedAt });
+    assert.equal(results.find(result => result.status === "fulfilled").value.settlementIntent, undefined);
+    const before = row.payload;
+    await assert.rejects(() => handleOrder(db, { ...request, expectedVersion: 2 },
+      { WX_OPENID: "openid-buyer" }, KEY, 3000, uuidSequence()), { code: "ILLEGAL_TRANSITION" });
+    assert.equal(row.payload, before);
+    await handleOrder(db, { action: "transitionOrder", orderId: row.id, expectedVersion: 2,
+      event: "BUYER_SUBMITS_REVIEW", rating: 5 }, { WX_OPENID: "openid-buyer" }, KEY, 4000, uuidSequence());
+    assert.deepEqual(JSON.parse(row.payload).settlementIntent, stored.settlementIntent);
+  }
+});
+
+test("验收写入失败不会留下已完成状态或孤立结算记录，重试可恢复", async () => {
+  const db = mockDb();
+  const created = await handleOrder(db, createEvent(), { WX_OPENID: "openid-buyer" }, KEY, 1000, uuidSequence());
+  const row = forceProduction(db, created.id);
+  const payload = JSON.parse(row.payload);
+  Object.assign(payload.public, { deliveryNote: "现场服务已经完成", provider: { career: "妆娘" } });
+  row.payload = JSON.stringify(payload);
+  row.stage = "DELIVERY_PENDING";
+  const before = JSON.stringify(row);
+  const from = db.from;
+  db.from = table => {
+    const query = from(table);
+    if (table === "order_aggregates") query.update = () => {
+      query.then = resolve => Promise.resolve({ data: null, error: { message: "write failed" } }).then(resolve);
+      return query;
+    };
+    return query;
+  };
+  const request = { action: "transitionOrder", orderId: row.id, expectedVersion: 1, event: "BUYER_ACCEPTS_DELIVERY" };
+  await assert.rejects(() => handleOrder(db, request, { WX_OPENID: "openid-buyer" }, KEY, 2000, uuidSequence()),
+    { code: "DATABASE_OPERATION_FAILED" });
+  assert.equal(JSON.stringify(row), before);
+  db.from = from;
+  await handleOrder(db, request, { WX_OPENID: "openid-buyer" }, KEY, 3000, uuidSequence());
+  assert.equal(row.stage, "COMPLETED");
+  assert.equal(JSON.parse(row.payload).settlementIntent.createdAt, 3000);
+});
+
+test("验收拒绝缺失付款证据及服务方代验收，不产生完成或结算记录", async () => {
+  for (const changes of [{ paymentStatus: "UNPAID" }, { paymentStatus: "PAYMENT_REVIEW" },
+    { paymentId: null }, { paymentTransactionId: null }, {}]) {
+    const db = mockDb();
+    const created = await handleOrder(db, createEvent(), { WX_OPENID: "openid-buyer" }, KEY, 1000, uuidSequence());
+    const row = forceProduction(db, created.id);
+    const payload = JSON.parse(row.payload);
+    Object.assign(payload.public, { deliveryNote: "现场服务已经完成", provider: { career: "妆娘" } }, changes);
+    row.payload = JSON.stringify(payload);
+    row.stage = "DELIVERY_PENDING";
+    const before = JSON.stringify(row);
+    const provider = Object.keys(changes).length === 0;
+    await assert.rejects(() => handleOrder(db, { action: "transitionOrder", orderId: row.id,
+      expectedVersion: 1, event: "BUYER_ACCEPTS_DELIVERY", paymentStatus: "PAID" },
+    { WX_OPENID: provider ? "openid-provider" : "openid-buyer" }, KEY, 2000, uuidSequence()),
+    { code: provider ? "ORDER_ROLE_FORBIDDEN" : "PAYMENT_NOT_VERIFIED" });
+    assert.equal(JSON.stringify(row), before);
+  }
+});
+
 test("completed order accepts one buyer review and one provider reply", async () => {
   const db = mockDb();
   const created = await handleOrder(db, createEvent(), { WX_OPENID: "openid-buyer" }, KEY, 1000, uuidSequence());
@@ -474,4 +785,26 @@ test("completed order accepts one buyer review and one provider reply", async ()
     () => handleOrder(db, { action: "transitionOrder", orderId: created.id, expectedVersion: 3, event: "PROVIDER_REPLIES_REVIEW", reviewReply: "再次回复" }, { WX_OPENID: "openid-provider" }, KEY, 6500, uuidSequence()),
     (error) => error.code === "REVIEW_REPLY_ALREADY_SUBMITTED"
   );
+});
+
+test("私人参考图签前仅需求方可取，签后双方可取，错归属或不可用资产不签发", async () => {
+  const db = mockDb();
+  const order = await handleOrder(db, { ...createEvent(), referenceAssetId: "asset_reference", ndaRequired: true }, { WX_OPENID: "openid-buyer" }, KEY, 1000, uuidSequence());
+  let issued = 0;
+  const storage = { async getTempFileURL({ fileList }) { issued++; return { fileList: [{ fileID: fileList[0].fileID, code: "SUCCESS", tempFileURL: "https://files.example.test/reference" }] }; } };
+  const request = openId => handleOrder(db, { action: "getReferenceDownload", orderId: order.id, assetId: "attacker-controlled-ignored" }, { WX_OPENID: openId }, KEY, 2000, uuidSequence(), storage);
+  assert.equal((await request("openid-buyer")).url, "https://files.example.test/reference");
+  await assert.rejects(() => request("openid-provider"), error => error.code === "NDA_REQUIRED");
+  await assert.rejects(() => request("openid-outsider"), error => error.code === "ORDER_NOT_FOUND");
+  assert.equal(issued, 1);
+  const payload = JSON.parse(db.orders[0].payload);
+  payload.public.buyerNdaSigned = true; payload.public.providerNdaSigned = true;
+  db.orders[0].payload = JSON.stringify(payload);
+  await request("openid-provider"); assert.equal(issued, 2);
+  for (const [key, value] of [["status", "REJECTED"], ["owner_account_id", PROVIDER], ["purpose", "PROJECT_TARGET"], ["mime_type", "application/pdf"], ["storage_key", "https://evil.example/image"]]) {
+    const before = db.referenceAsset[key]; db.referenceAsset[key] = value;
+    await assert.rejects(() => request("openid-provider"), error => error.code === "REFERENCE_MEDIA_NOT_READY");
+    db.referenceAsset[key] = before;
+  }
+  assert.equal(issued, 2);
 });

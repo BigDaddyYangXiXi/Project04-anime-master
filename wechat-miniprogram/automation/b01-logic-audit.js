@@ -39,40 +39,31 @@ assert.ok(page.data.visibleWorks.length > 0 && page.data.visibleWorks.every((wor
 page.openSearch();
 assert.strictEqual(page.data.searchOpen, true, "整条搜索栏点击后必须打开搜索浮层");
 
-assert.ok(/class="career-search"\s+bindtap="openSearch"/.test(discoverWxml), "整条搜索栏必须保留唯一点击入口");
+assert.ok(/class="career-search browse-control"\s+bindtap="openSearch"/.test(discoverWxml), "整条搜索栏必须保留唯一点击入口");
 assert.ok(!discoverWxml.includes("search-action"), "搜索栏最右侧不得保留独立搜索按钮");
-assert.ok(/class="career-search"\s+bindtap="openSearch"/.test(searchResultsWxml) && !searchResultsWxml.includes("search-action"), "搜索结果页也必须使用整栏唯一点击入口");
-for (const [name, source] of [["B01", discoverWxss], ["B01S", searchResultsWxss]]) {
-  assert.ok(/\.search-icon\s*\{[^}]*width:\s*40rpx[^}]*min-width:\s*40rpx[^}]*max-width:\s*40rpx[^}]*height:\s*36rpx[^}]*flex:\s*0 0 40rpx/s.test(source), `${name} 搜索图标必须使用不可压缩的固定占位盒`);
-  assert.ok(/\.search-icon::before\s*\{[^}]*width:\s*30rpx[^}]*height:\s*30rpx[^}]*border:\s*4rpx solid #ff6f71[^}]*border-radius:\s*50%/s.test(source), `${name} 放大镜圆环必须保持 30×30rpx 正圆`);
-  assert.ok(/\.career-search > text:nth-child\(2\)\s*\{[^}]*min-width:\s*0[^}]*flex:\s*1/s.test(source), `${name} 搜索文字必须收缩而不能挤压图标`);
-  assert.ok(/\.modal-search\s*\{[^}]*height:\s*72rpx[^}]*padding:\s*4rpx 18rpx[^}]*border:\s*1rpx solid #f2cfd3[^}]*border-radius:\s*24rpx/s.test(source), `${name} 搜索浮层必须复用首页搜索框的高度、内边距、边框和圆角`);
-  assert.ok(/\.modal-search input\s*\{[^}]*font-size:\s*24rpx[^}]*line-height:\s*36rpx[^}]*font-weight:\s*400/s.test(source), `${name} 搜索浮层输入文字必须复用首页 12/18 Regular`);
-  assert.ok(/\.recent-item::before\s*\{[^}]*top:\s*16rpx[^}]*bottom:\s*16rpx[^}]*border-radius:\s*28rpx/s.test(source), `${name} 最近搜索可见框体必须缩至 28px 并保留 44px 热区`);
-  assert.ok(/\.recent-item\s*\{[^}]*width:\s*auto[^}]*flex:\s*0 0 auto/s.test(source), `${name} 最近搜索必须按内容宽度排列，不能扩展为半屏列表行`);
-  assert.ok(/\.recent-item button\s*\{[^}]*display:\s*flex[^}]*height:\s*88rpx[^}]*align-items:\s*center[^}]*justify-content:\s*center[^}]*font-size:\s*22rpx[^}]*font-weight:\s*400/s.test(source), `${name} 最近搜索文字必须双轴居中并保留 44px 热区`);
-  assert.ok(/\.modal-actions \.primary-button\s*\{[^}]*flex:\s*1\.5[^}]*linear-gradient\(135deg,#f0787e,#ee8f88 52%,#e77c90\)/s.test(source), `${name} 查看结果必须复用产品主操作渐变`);
-}
-assert.ok(/\.discovery-toolbar button\s*\{[^}]*display:\s*flex[^}]*height:\s*72rpx[^}]*align-items:\s*center[^}]*justify-content:\s*center[^}]*padding:\s*0 10rpx/s.test(discoverWxss), "三个检索分段的文字必须在 36px 按钮内双轴居中");
-assert.ok(/class="secondary-button"\s+bindtap="closeSearch"[^>]*>取消<\/button><button class="primary-button"/s.test(discoverWxml), "B01 搜索浮层必须使用产品主副按钮组件");
-assert.ok(/class="secondary-button"\s+bindtap="closeSearch"[^>]*>取消<\/button><button class="primary-button"/s.test(searchResultsWxml), "B01S 搜索浮层必须使用产品主副按钮组件");
-assert.ok(discoverWxml.includes("career-letter"), "四职业名称必须恢复逐字设计结构");
-assert.ok(discoverWxss.includes(".career-label::before") && discoverWxss.includes(".career-label::after"), "职业标签必须恢复两侧装饰点");
-assert.ok(workCardWxml.includes("class=\"work-tags\""), "作品标签必须使用独立容器");
-assert.ok(workCardWxml.includes("class=\"work-price\""), "价格必须是独立节点");
-assert.ok(!workCardWxml.includes("topTagsText}} ·"), "标签与价格不得拼接为同一文本");
-assert.ok(workCardWxml.indexOf("work-author") < workCardWxml.indexOf("work-title"), "作品卡信息层级必须先作者、后标题");
-assert.ok(!workCardWxml.includes("work-subtitle"), "作品卡不得重复显示已经由标签表达的副标题");
-assert.ok(/\.work-tag\s*\{[^}]*background:/s.test(workCardWxss), "每个作品标签必须有独立底色");
-assert.ok(/\.work-price\s*\{[^}]*font-size:\s*28rpx/s.test(workCardWxss), "价格必须使用独立 14px 字级");
-assert.ok(/\.provider-price\s*\{[^}]*color:\s*#c6536b/s.test(discoverWxss), "服务者卡价格必须复用统一莓果珊瑚强调色");
-assert.ok(workCardWxml.startsWith("<navigator"), "作品卡必须使用原生单击导航，不经过二次自定义事件链");
-assert.ok(workCardWxml.includes("open-type=\"navigate\"") && workCardWxml.includes("source={{source}}"), "作品卡必须单击进入带来源的作品详情");
-assert.ok(discoverWxml.includes('source="B01"') && !discoverWxml.includes('bind:open="openWork"'), "首页作品卡必须直接单击进入详情");
-assert.strictEqual(discoverJson.navigationBarTitleText, "动漫高手", "首页顶部必须显示产品名而不是业务入口名");
-assert.ok(/\.hero-panel\s*\{[^}]*padding:\s*32rpx/s.test(discoverWxss), "首页主视觉必须使用 16px 恒定内边距并压缩高度");
-assert.ok(/\.where-when-row\s*\{[^}]*gap:\s*16rpx[^}]*margin-top:\s*24rpx/s.test(discoverWxss) && /\.where-when-field > view\s*\{[^}]*min-height:\s*96rpx[^}]*padding:\s*8rpx 16rpx/s.test(discoverWxss), "地点日期区域必须使用 8/12px 节奏和 48px 紧凑控件");
-assert.ok(/\.career-section\s*\{[^}]*padding:\s*24rpx 0 16rpx/s.test(discoverWxss), "职业区必须为外扩选中轮廓预留 12px 顶部和 8px 底部间距");
-assert.ok(/\.career-row\s*\{[^}]*overflow:\s*visible/s.test(discoverWxss) && /\.career-chip\s*\{[^}]*overflow:\s*visible/s.test(discoverWxss) && !/\.career-chip\.active \.career-icon-shell\s*\{[^}]*translateY\(-/s.test(discoverWxss), "职业选中轮廓不得由父级裁切或向上偏移");
+assert.ok(/class="career-search browse-control"\s+bindtap="openSearch"/.test(searchResultsWxml) && !searchResultsWxml.includes("search-action"), "搜索结果页也必须使用整栏唯一点击入口");
 
-process.stdout.write("B01 UI contract audit: 48 assertions passed\n");
+// The 2026-09-10 discovery contract replaces the old coral, decorated-label layout.
+const controlStyles = read('miniprogram/styles/discovery-controls.wxss');
+for (const source of [discoverWxss, searchResultsWxss]) {
+  assert.ok(source.includes('../../styles/discovery-controls.wxss'), '搜索与筛选必须导入共享排版');
+}
+assert.ok(controlStyles.includes('var(--am-weight-regular)'), '选项必须使用常规字重');
+const sequence = ['class="location-priority"', 'class="career-section"', 'class="career-search browse-control"', 'class="discovery-toolbar"', 'class="where-when-row"'];
+for(let i=1;i<sequence.length;i++) assert.ok(discoverWxml.indexOf(sequence[i-1]) < discoverWxml.indexOf(sequence[i]), '城市日期、职业、搜索、浏览类型、筛选的优先级必须保持');
+assert.ok(discoverWxml.includes('mode="region"') && discoverWxml.includes('mode="date"'), '城市日期保留原生选择器');
+assert.ok(discoverWxml.includes('data-kind="style"') && discoverWxml.includes('data-kind="price"'), '风格和价格必须独立打开');
+assert.ok(discoverWxml.includes('bindtouchend="onCareerTouchEnd"') && discoverWxml.includes('career-scroll-spacer'), '职业停靠保留拖动结束入口和末尾对齐空间');
+for(const career of page.data.careerTabs) assert.ok(career.asset.endsWith('-cutout.svg'), '沿用原角色透明轮廓');
+page.data.selectedFilters=['电影光','￥1000以下'];
+page.openFilters({currentTarget:{dataset:{kind:'style'}}});
+page.resetFilters(); assert.deepStrictEqual(page.data.filterDraft,['￥1000以下'], '风格重置不影响价格');
+page.closeFilters(); assert.deepStrictEqual(page.data.selectedFilters,['电影光','￥1000以下'], '取消不提交草稿');
+page.openFilters({currentTarget:{dataset:{kind:'price'}}});
+assert.ok(page.data.availableFilterGroups.every(g=>g.group==='价格区间'), '价格弹窗不得混入风格');
+assert.ok(workCardWxml.includes('class="work-price am-money am-money-list"'), '价格必须是独立节点');
+assert.ok(workCardWxml.indexOf('work-author') < workCardWxml.indexOf('work-title'), '先作者后标题');
+assert.ok(workCardWxml.startsWith('<navigator') && workCardWxml.includes('source={{source}}'), '保留作品原生导航与来源');
+assert.ok(discoverWxml.includes('source="B01"') && !discoverWxml.includes('bind:open="openWork"'), '首页作品单击进入详情');
+assert.strictEqual(discoverJson.navigationBarTitleText,'动漫高手');
+process.stdout.write('B01 当前检索布局与行为契约通过\n');

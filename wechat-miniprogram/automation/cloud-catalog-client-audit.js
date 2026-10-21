@@ -1,7 +1,15 @@
 const assert = require("node:assert/strict");
 
 global.wx = {};
-const client = require("../miniprogram/services/cloud-catalog");
+// Exercise cloud mappings with a local transport fixture, independently of the
+// source project's intentionally disabled cloud switch. Never edit that switch.
+const clientFile = require.resolve("../miniprogram/services/cloud-catalog");
+const clientRequire = require("node:module").createRequire(clientFile);
+const clientModule = { exports: {} };
+new Function("require", "module", "wx", require("node:fs").readFileSync(clientFile, "utf8"))(
+  name => name === "../config/cloudbase" ? { enabled: true, env: "local-fixture" } : clientRequire(name), clientModule, global.wx
+);
+const client = clientModule.exports;
 
 const server = client.toServerDraft({
   career: "摄影",

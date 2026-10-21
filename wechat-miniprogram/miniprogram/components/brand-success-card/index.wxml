@@ -5,6 +5,6 @@
     <text wx:if="{{scoreText}}" class="success-score">{{scoreText}}</text>
     <text wx:if="{{detailText}}" class="success-detail">{{detailText}}</text>
     <view wx:if="{{replyText}}" class="success-reply"><text>服务方回复</text><text>{{replyText}}</text></view>
-    <button wx:if="{{actionText}}" class="success-action" bindtap="act">{{actionText}}</button>
+    <button hover-class="none" wx:if="{{actionText}}" class="success-action am-action am-action-primary" bindtap="act">{{actionText}}</button>
   </view>
 </view>

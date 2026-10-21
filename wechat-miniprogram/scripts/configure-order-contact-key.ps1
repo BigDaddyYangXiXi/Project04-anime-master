@@ -1,6 +1,11 @@
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
+$targetEnv = "quest-band-d1gem4bxt3fa17720"
+$projectEnv = (Get-Content -Raw -LiteralPath (Join-Path $projectRoot "cloudbaserc.json") | ConvertFrom-Json).envId
+if ($projectEnv -ne $targetEnv) {
+  throw "旧环境密钥脚本已阻止运行：项目环境与旧环境不一致。请使用公司环境的独立配置，不能复用或覆盖旧号密钥。"
+}
 $credentialDir = Join-Path $projectRoot ".cloudbase-cli-config"
 $encryptedKeyPath = Join-Path $credentialDir "order-contact-key.dpapi"
 New-Item -ItemType Directory -Force -Path $credentialDir | Out-Null
@@ -23,7 +28,7 @@ New-Item -ItemType Directory -Path $tempDir | Out-Null
 try {
   $config = @{
     '$schema' = "https://static.cloudbase.net/cli/cloudbaserc.schema.json"
-    envId = "quest-band-d1gem4bxt3fa17720"
+    envId = $targetEnv
     functionRoot = (Join-Path $projectRoot "cloudfunctions")
     functions = @(@{
       name = "order-api"

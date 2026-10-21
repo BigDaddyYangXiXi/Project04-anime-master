@@ -3,11 +3,12 @@
   "version": "0.7.0",
   "private": true,
   "scripts": {
-    "test": "node --test payment-store.test.js wechat-verification.test.js wechat-query.test.js payment-http.test.js payment-refresh.test.js index.test.js"
+    "test": "node --test *.test.js"
   },
   "dependencies": {
     "mysql2": "3.24.3",
     "@cloudbase/node-sdk": "3.18.3"
   },
-  "main": "index.js"
+  "main": "index.js",
+  "overrides": { "@cloudbase/node-sdk": { "axios": "0.33.0" } }
 }

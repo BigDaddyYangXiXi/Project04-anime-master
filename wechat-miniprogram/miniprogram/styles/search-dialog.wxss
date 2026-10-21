@@ -1,0 +1,10 @@
+/* Shared search/filter disclosure; preserves its anchored top position. */
+.modal-layer .scrim { background: var(--am-booking-scrim); }
+.modal-layer .modal-panel { max-height: var(--am-status-sheet-max); gap: var(--am-space-4); padding: var(--am-space-4); border-radius: var(--am-space-none) var(--am-space-none) var(--am-booking-sheet-radius) var(--am-booking-sheet-radius); background: var(--am-color-canvas); box-shadow: var(--am-shadow-none); }
+.modal-panel .modal-title { color: var(--am-color-text); font-size: var(--am-type-section-title); font-weight: var(--am-weight-semibold); line-height: var(--am-line-section-title); }
+.modal-panel .modal-search { min-height: var(--am-touch-min); height: var(--am-touch-min); max-height: none; gap: var(--am-space-2); padding: var(--am-space-none) var(--am-space-3); border: var(--am-work-rule); border-radius: var(--am-radius-control); background: var(--am-color-control-surface); }
+.modal-search input { color: var(--am-color-text); font-size: var(--am-type-label); font-weight: var(--am-weight-regular); line-height: var(--am-booking-line-primary); }
+.modal-panel .filter-group > text { color: var(--am-color-text-secondary); font-size: var(--am-booking-type-secondary); font-weight: var(--am-weight-regular); line-height: var(--am-line-caption); }
+.modal-panel .filter-options button { color: var(--am-color-text); font-size: var(--am-type-label); font-weight: var(--am-weight-regular); }
+.modal-panel .filter-options button.active { color: var(--am-color-brand); background: var(--am-color-selected-surface); }
+.modal-panel .modal-actions { gap: var(--am-space-3); padding-top: var(--am-space-4); border-top: var(--am-work-rule); }

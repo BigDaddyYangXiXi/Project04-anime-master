@@ -25,7 +25,7 @@ assert.ok(!/roleSlots|role-slots|filledRoleCount|\/4|摄影.*妆娘.*毛娘.*后
 assert.ok(/role-list/.test(detailWxml + detailWxss) && /add-order-inline/.test(detailWxml) && /＋ 添加/.test(detailWxml), "B08 必须使用订单连续列表和单一添加入口");
 assert.ok(!/project-cover/.test(projectsWxml + projectsWxss) && /project-list/.test(projectsWxml + projectsWxss), "B07 不得使用无功能日期封面块");
 assert.ok(/\.role-row[^}]*display:\s*flex/.test(detailWxss) && /\.role-main[^}]*flex:\s*1 1 auto/.test(detailWxss), "B08 订单必须压缩为两行三列紧凑结构");
-assert.ok(/catchtap="unlinkOrder"/.test(detailWxml) && /function unlinkOrder/.test(modelJs), "每个关联订单必须提供不冒泡的移出项目操作");
+assert.ok(/catchtap="\{\{\(actionPending\) \? '' : 'unlinkOrder'\}\}"/.test(detailWxml) && /function unlinkOrder/.test(modelJs), "每个关联订单必须提供不冒泡的移出项目操作");
 assert.ok(/不会取消订单或改变订单执行状态/.test(detailJs), "移出确认必须说明不影响订单本身");
 assert.ok(/EXECUTION_STAGES/.test(modelJs) && /IN_PRODUCTION/.test(modelJs) && /REVISION_REQUESTED/.test(modelJs) && /DELIVERY_PENDING/.test(modelJs), "只有执行、修改和待验收订单可首次加入项目");
 assert.ok(/availableOrders/.test(detailJs) && /选择执行中的订单/.test(detailWxml), "添加入口必须在项目内选择已有执行订单");
@@ -34,13 +34,14 @@ assert.ok(!/#6b3f45|#bc6484|#8f3f4f|#c66c92|#baadb9/.test(projectsWxss + detailW
 assert.ok((projectsWxss.match(/box-shadow:\s*[^;]+/g) || []).every((value) => value.endsWith("none")), "项目列表重要按钮不得保留阴影");
 assert.ok(/项目描述/.test(detailWxml + briefWxml) && /项目信息/.test(detailWxml + briefWxml + projectsWxml), "B08/B09 必须统一为项目信息和项目描述");
 assert.ok(/targetImages/.test(modelJs) && /slice\(0, 6\)/.test(modelJs), "项目模型必须保存最多 6 张有序目标效果图");
-assert.ok(/chooseMedia/.test(briefJs) && /saveFile/.test(briefJs) && /removeTargetImage/.test(briefJs + briefWxml), "B09 必须提供目标效果图上传和逐图删除");
-assert.ok(/previewTargetImage/.test(briefJs + detailJs + briefWxml + detailWxml) && /previewImage/.test(briefJs + detailJs), "B08/B09 必须支持查看目标效果原图");
+assert.ok(/chooseImageMedia/.test(briefJs) && /saveFile/.test(briefJs) && /removeTargetImage/.test(briefJs + briefWxml), "B09 必须提供目标效果图上传和逐图删除");
+assert.ok(/previewTargetImage/.test(briefJs + detailJs + briefWxml + detailWxml) && /previewImage/.test(read("utils/project-image-preview.js")), "B08/B09 必须支持查看目标效果原图");
 assert.ok(/target-images-grid/.test(detailWxml + detailWxss) && !/targetImages/.test(projectsWxml), "目标效果只在项目详情受控展示，不得撑高 B07 连续列表");
 assert.ok(/<view class="add-order-inline" role="button"/.test(detailWxml) && /\.order-section-title\s*\{[^}]*position:\s*relative;[^}]*padding-right:/s.test(detailWxss) && /\.add-order-inline\s*\{[^}]*position:\s*absolute;[^}]*right:\s*0;[^}]*width:\s*112rpx;[^}]*height:\s*64rpx;/s.test(detailWxss), "添加入口必须使用固定尺寸热区并贴齐角色标题行最右侧");
 assert.ok(/formatProjectDescription/.test(detailJs) && /descriptionRows/.test(detailJs + detailWxml), "项目描述必须转换为可读信息行");
-assert.ok(/font-size:\s*26rpx;\s*line-height:\s*42rpx/.test(detailWxss), "项目描述正文必须使用 26rpx/42rpx 默认排版");
-assert.ok(/\.description-section textarea\s*\{[^}]*font-size:\s*26rpx;[^}]*line-height:\s*42rpx/s.test(read("pages/brief/index.wxss")), "项目描述编辑区必须复用默认排版");
+assert.ok(/\.description-value\s*\{[^}]*font-size:\s*var\(--am-type-label\);[^}]*line-height:\s*42rpx/s.test(detailWxss), "项目描述正文必须引用现行文字token并保持行距");
+assert.ok(/class="am-textarea"/.test(briefWxml) && /editor-form\.wxss/.test(read("pages/brief/index.wxss"))
+  && /\.am-editor-form textarea\.am-textarea[^}]*font-size:\s*var\(--am-type-label\);[^}]*line-height:\s*var\(--am-booking-line-primary\)/s.test(read("styles/editor-form.wxss")), "项目描述编辑区必须复用现行共用表单排版");
 assert.ok(/cloudProjects\.listProjects/.test(projectsJs) && /cloudProjects\.createProject/.test(projectsJs), "B07 生产路径必须从云端读取和创建项目");
 assert.ok(/cloudProjects\.getProject/.test(detailJs) && /cloudProjects\.linkOrder/.test(detailJs) && /cloudProjects\.unlinkOrder/.test(detailJs), "B08 生产路径必须从云端读取并维护项目订单关联");
 assert.ok(/cloudProjects\.getProject/.test(briefJs) && /cloudProjects\.saveProject/.test(briefJs) && /PROJECT_TARGET/.test(briefJs), "B09 生产路径必须云端保存项目并使用目标图专用媒体用途");

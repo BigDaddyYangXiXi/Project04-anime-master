@@ -1,0 +1,6 @@
+/* Approved booking form hierarchy, opt-in for deeper editing pages. */
+.am-editor-form .form-stack { gap: var(--am-space-4); }
+.am-editor-form .form-stack label,.am-editor-form .service-editor-body label,.am-editor-form .reason-field { gap: var(--am-space-2); color: var(--am-color-text-secondary); font-size: var(--am-booking-type-secondary); font-weight: var(--am-weight-regular); line-height: var(--am-line-caption); }
+.am-editor-form input.am-input,.am-editor-form textarea.am-textarea,.am-editor-form .am-picker { color: var(--am-color-text); background: var(--am-color-control-surface); border: var(--am-work-rule); border-radius: var(--am-radius-control); font-size: var(--am-type-label); font-weight: var(--am-weight-regular); line-height: var(--am-booking-line-primary); }
+.am-editor-form .field-help { display: block; margin-top: var(--am-space-2); color: var(--am-color-text-secondary); font-size: var(--am-booking-type-secondary); font-weight: var(--am-weight-regular); line-height: var(--am-line-caption); }
+.am-editor-form .field-error { color: var(--am-color-danger); font-size: var(--am-booking-type-secondary); font-weight: var(--am-weight-regular); line-height: var(--am-line-caption); }

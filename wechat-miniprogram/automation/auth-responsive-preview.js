@@ -6,7 +6,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
 const root = path.resolve(__dirname, "../miniprogram");
 const output = path.resolve(__dirname, "../.artifacts/auth-responsive-preview");
 const template = fs.readFileSync(path.join(root, "pages/auth/index.wxml"), "utf8");
-const styles = ["app.wxss", "pages/auth/index.wxss"].map(file => fs.readFileSync(path.join(root, file), "utf8")).join("\n");
+const styles = ["styles/design-tokens.wxss", "styles/actions.wxss", "styles/fields.wxss", "app.wxss", "pages/auth/index.wxss"].map(file => fs.readFileSync(path.join(root, file), "utf8")).join("\n").replace(/@import[^;]+;/g, '');
 let definition;
 global.wx = {};
 global.Page = value => { definition = value; };
@@ -23,8 +23,10 @@ async function main() {
         for (const fontScale of [1, 1.2]) {
           const auth = { ...definition, data: JSON.parse(JSON.stringify(definition.data)) };
           auth.setData = patch => Object.assign(auth.data, patch);
-          auth.onLoad({ audit: "1", state });
+          // Isolated web projection: do not invoke the live session entry point.
+          auth.loadAuditState(state);
           const css = styles.replace(/(-?[\d.]+)rpx/g, (_, value) => `${Number(value) * width / 750}px`)
+            .replace(/(--am-(?:type-[\w-]+|work-type-[\w-]+):\s*)([\d.]+)px/g, (_, prefix, value) => `${prefix}${Number(value) * fontScale}px`)
             .replace(/font-size:\s*([\d.]+)px/g, (_, value) => `font-size: ${Number(value) * fontScale}px`)
             .replace(/\bpage\b/g, "body").replace(/\bview\b/g, "div");
           await page.setContent(`<style>body{margin:0}button,input{font-family:inherit;border:0}button{cursor:pointer}button[disabled]{opacity:.5}input{box-sizing:border-box}</style><style>${css}</style><main></main>`);
@@ -42,7 +44,7 @@ async function main() {
                 else if (otherwise !== null) { if (matched) continue; matched = evaluate(otherwise.slice(2, -2)); if (!matched) continue; }
                 else if (node.hasAttribute("wx:else")) { if (matched) continue; matched = true; }
                 else matched = false;
-                if (node.tagName === "APP-TOP-NAV") { const nav = document.createElement("div"); nav.style.height = "88px"; nav.style.background = "white"; target.append(nav); continue; }
+                if (node.tagName === "APP-TOP-NAV") { const nav = document.createElement("div"); nav.style.height = "88px"; nav.style.background = "var(--am-color-canvas)"; target.append(nav); continue; }
                 const tag = { VIEW: "div", TEXT: "span", IMAGE: "img" }[node.tagName] || node.tagName.toLowerCase();
                 const element = document.createElement(tag);
                 for (const attribute of node.attributes) {
@@ -57,11 +59,18 @@ async function main() {
             }
             render(doc.body, document.querySelector("main"));
           }, { template: template.replace(/<(app-top-nav|image|input)\b([^>]*?)\/>/g, "<$1$2></$1>"), data: auth.data });
-          const brand = fs.readFileSync(path.join(root, "assets/brand/peach-slime-main-768.jpg")).toString("base64");
-          await page.locator("img").evaluate((img, brand) => { img.src = `data:image/jpeg;base64,${brand}`; }, brand);
+          const brand = fs.readFileSync(path.join(root, "assets/brand/arsviora-compact-v04.png")).toString("base64");
+          await page.locator("img").evaluate((img, brand) => { img.src = `data:image/png;base64,${brand}`; img.style.objectFit = 'contain'; }, brand);
           await page.locator("img").evaluate(img => img.decode());
           const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
           assert.equal(overflow, false, `${state} ${width}px ${fontScale}x horizontal overflow`);
+          if (state !== "login") {
+            const notice = page.locator(".notice-links");
+            assert.equal(await notice.textContent(), "我已阅读并同意《用户服务协议与账号规范》和《隐私保护指引》。");
+            assert.equal(await notice.locator(".notice-link").count(), 2);
+            const layout = await notice.evaluate(element => ({ height: element.getBoundingClientRect().height, line: parseFloat(getComputedStyle(element).lineHeight), padding: parseFloat(getComputedStyle(element).paddingTop) }));
+            assert.ok(layout.height - layout.padding <= layout.line * 3 + 1, "consent wraps within three normal text lines");
+          }
           const button = await page.locator(".primary-button").boundingBox();
           const content = await page.locator(".auth-form").boundingBox();
           assert.ok(Math.abs(button.width - content.width) < 1, "primary action spans form");

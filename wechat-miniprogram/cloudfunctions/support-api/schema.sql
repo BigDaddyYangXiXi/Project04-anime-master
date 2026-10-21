@@ -1,0 +1,2 @@
+-- Canonical migration: ../../database/mysql/0055_support_requests.sql
+-- Not executed in this development round. Do not maintain a second schema here.

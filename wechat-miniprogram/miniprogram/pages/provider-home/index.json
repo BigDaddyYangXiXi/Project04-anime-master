@@ -1,1 +1,4 @@
-{ "navigationBarTitleText": "服务方工作台" }
+{
+  "navigationBarTitleText": "服务方工作台",
+  "backgroundColorContent": "#171514"
+}

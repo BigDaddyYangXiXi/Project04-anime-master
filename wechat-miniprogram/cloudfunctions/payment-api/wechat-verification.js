@@ -47,11 +47,18 @@ function verifyMessage(rawBody, headers, config, now = Date.now()) {
 }
 
 function decryptNotification(rawBody, headers, config, now = Date.now()) {
+  const message = decryptResource(rawBody, headers, config, now, 'transaction', ['TRANSACTION.SUCCESS']);
+  return { notificationId: message.notificationId, transaction: message.data };
+}
+function decryptRefundNotification(rawBody, headers, config, now = Date.now()) {
+  return decryptResource(rawBody, headers, config, now, 'refund', ['REFUND.SUCCESS', 'REFUND.CLOSED', 'REFUND.ABNORMAL']);
+}
+function decryptResource(rawBody, headers, config, now, originalType, events) {
   const envelope = parse(verifyMessage(rawBody, headers, config, now));
-  if (envelope.event_type !== "TRANSACTION.SUCCESS" || envelope.resource_type !== "encrypt-resource") fail("PAYMENT_EVENT_UNSUPPORTED");
+  if (!events.includes(envelope.event_type) || envelope.resource_type !== "encrypt-resource") fail("PAYMENT_EVENT_UNSUPPORTED");
   token(envelope.id, 128);
   const resource = object(envelope.resource);
-  if (resource.algorithm !== "AEAD_AES_256_GCM" || resource.original_type !== "transaction") fail("PAYMENT_MESSAGE_INVALID");
+  if (resource.algorithm !== "AEAD_AES_256_GCM" || resource.original_type !== originalType) fail("PAYMENT_MESSAGE_INVALID");
   const key = config.apiV3Key;
   if (!Buffer.isBuffer(key) || key.length !== 32) fail("PAYMENT_VERIFIER_NOT_CONFIGURED");
   if (typeof resource.nonce !== "string" || Buffer.byteLength(resource.nonce, "utf8") !== 12
@@ -65,7 +72,7 @@ function decryptNotification(rawBody, headers, config, now = Date.now()) {
     decipher.setAuthTag(ciphertext.subarray(-16));
     plaintext = Buffer.concat([decipher.update(ciphertext.subarray(0, -16)), decipher.final()]);
   } catch { fail("PAYMENT_DECRYPTION_FAILED"); }
-  return { notificationId: envelope.id, transaction: parse(plaintext) };
+  return { notificationId: envelope.id, eventType: envelope.event_type, data: parse(plaintext) };
 }
 
 function normalizeCombineSuccess(transaction, allowMissingPayer = false) {
@@ -106,4 +113,4 @@ function normalizeCombineQuery(transaction) {
     ...(payer === undefined ? {} : { payerOpenid: token(payer) }) };
 }
 
-module.exports = { verifyMessage, decryptNotification, normalizeCombineSuccess, normalizeCombineQuery };
+module.exports = { verifyMessage, decryptNotification, decryptRefundNotification, normalizeCombineSuccess, normalizeCombineQuery };

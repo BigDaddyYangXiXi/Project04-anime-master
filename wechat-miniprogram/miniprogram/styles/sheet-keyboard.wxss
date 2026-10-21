@@ -1,0 +1,5 @@
+/* Shared only by fixed sheets containing native text inputs. */
+.am-keyboard-open { padding-top: var(--am-space-2); }
+.am-keyboard-open .am-input-sheet { height: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding-bottom: var(--am-space-3); }
+.am-keyboard-open .sheet-heading,.am-keyboard-open .sheet-handle { flex-shrink: 0; }
+.am-keyboard-open .am-sheet-scroll { flex: 1; height: 0; min-height: var(--am-space-none); max-height: none; }

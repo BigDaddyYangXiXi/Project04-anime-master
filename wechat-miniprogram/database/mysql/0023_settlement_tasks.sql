@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS `order_settlement_tasks` (
+  `id` CHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `order_id` VARCHAR(64) NOT NULL,
+  `payment_id` CHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `request_snapshot` JSON NOT NULL,
+  `status` VARCHAR(16) NOT NULL DEFAULT 'PREPARED',
+  `attempts` INT UNSIGNED NOT NULL DEFAULT 0,
+  `lease_token` CHAR(32) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  `lease_until` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  `created_at` BIGINT UNSIGNED NOT NULL,
+  `updated_at` BIGINT UNSIGNED NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `settlement_order_unique` (`order_id`),
+  UNIQUE KEY `settlement_payment_unique` (`payment_id`),
+  KEY `settlement_pending_idx` (`status`, `lease_until`, `id`),
+  CONSTRAINT `settlement_order_fk` FOREIGN KEY (`order_id`) REFERENCES `order_aggregates` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `settlement_payment_fk` FOREIGN KEY (`payment_id`) REFERENCES `order_payments` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `settlement_task_state_check` CHECK (`status` IN ('PREPARED','PROCESSING')),
+  CONSTRAINT `settlement_task_time_check` CHECK (`updated_at` >= `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

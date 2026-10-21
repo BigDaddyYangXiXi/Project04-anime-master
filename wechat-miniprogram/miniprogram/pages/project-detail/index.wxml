@@ -1,5 +1,5 @@
 <app-top-nav class="app-navigation" title="项目详情" show-back="{{true}}"/>
-<view wx:if="{{loading}}" class="empty-state"><text>正在读取项目</text></view>
+<block wx:if="{{loading}}"></block>
 <view wx:elif="{{project}}" class="project-shell">
   <view class="project-header">
     <text class="project-title">{{project.shortTitle || project.title}}</text>
@@ -7,7 +7,7 @@
     <view class="project-stats">
       <view><text>{{orderCount}}</text><text>角色与订单</text></view>
       <view><text>{{ndaPending}}</text><text>NDA 待签</text></view>
-      <view><text>￥{{total}}</text><text>合作金额</text></view>
+      <view><text class="am-money am-money-inline">￥{{total}}</text><text>合作金额</text></view>
     </view>
   </view>
 
@@ -15,9 +15,9 @@
     <view class="section-title order-section-title"><view class="role-heading"><text>角色与订单</text><text class="role-count">{{orderCount}} 项</text><view class="add-order-inline" role="button" bindtap="addOrder">＋ 添加</view></view></view>
     <view wx:if="{{linkedOrders.length}}" class="role-list">
       <view wx:for="{{linkedOrders}}" wx:key="orderId" class="role-row" data-index="{{index}}" bindtap="openOrder">
-        <view class="role-main"><text class="role-title">{{item.career}} · {{item.service}}</text><text class="role-sub">{{item.provider}}{{item.providerUid ? ' · UID ' + item.providerUid : ''}} · {{item.orderId}}</text></view>
-        <view class="role-trailing"><text class="role-state">{{item.state}}</text><text class="role-amount">￥{{item.amount}}</text></view>
-        <button class="unlink-order" disabled="{{actionPending}}" data-index="{{index}}" catchtap="unlinkOrder">移出</button>
+        <view class="role-main"><text class="role-title">{{item.career}} · {{item.service}}</text><text class="role-sub">{{item.provider}} · {{item.orderId}}</text></view>
+        <view class="role-trailing"><text class="role-state">{{item.state}}</text><text class="am-money am-money-inline role-amount">￥{{item.amount}}</text></view>
+        <button aria-disabled="{{actionPending}}" hover-class="none" class="unlink-order" data-am-disabled="{{actionPending}}" data-index="{{index}}" catchtap="{{(actionPending) ? '' : 'unlinkOrder'}}">移出</button>
       </view>
     </view>
     <view wx:else class="empty-state">
@@ -27,7 +27,7 @@
     <view wx:if="{{selectingOrder}}" class="available-panel">
       <view class="available-heading"><text>选择执行中的订单</text><text>加入后代表服务者已进组</text></view>
       <view class="available-list">
-        <button wx:for="{{availableOrders}}" wx:key="orderId" class="available-row" disabled="{{actionPending}}" data-index="{{index}}" bindtap="linkOrder">
+        <button aria-disabled="{{actionPending}}" hover-class="none" wx:for="{{availableOrders}}" wx:key="orderId" class="available-row" data-am-disabled="{{actionPending}}" data-index="{{index}}" bindtap="{{(actionPending) ? '' : 'linkOrder'}}">
           <view><text>{{item.career}} · {{item.service}}</text><text>{{item.provider}} · {{item.orderId}}</text></view>
           <view><text>{{item.state}}</text><text>加入</text></view>
         </button>
@@ -51,12 +51,15 @@
     <view class="target-images-block">
       <view class="target-images-heading"><text>目标效果</text><text>{{project.targetImages.length ? project.targetImages.length + ' 张' : '待补充'}}</text></view>
       <view wx:if="{{project.targetImages.length}}" class="target-images-grid {{project.targetImages.length === 1 ? 'single' : ''}}">
-        <image wx:for="{{project.targetImages}}" wx:key="*this" src="{{item}}" mode="aspectFill" data-index="{{index}}" bindtap="previewTargetImage"/>
+        <block wx:for="{{targetImageRows}}" wx:key="key">
+          <image wx:if="{{item.url}}" src="{{item.url}}" mode="aspectFill" data-index="{{index}}" bindtap="previewTargetImage"/>
+          <text wx:else class="target-images-empty">图片暂不可用，请在编辑页重新添加。</text>
+        </block>
       </view>
       <text wx:else class="target-images-empty">尚未添加参考图，可在编辑页补充目标效果。</text>
     </view>
-    <button class="secondary-block" bindtap="openBrief">编辑项目信息、描述和参考图</button>
+    <button hover-class="none" class="secondary-block am-action am-action-secondary" bindtap="openBrief">编辑项目信息、描述和参考图</button>
   </view>
 </view>
-<view wx:else class="empty-state"><text>{{loadError || '没有找到项目'}}</text><button wx:if="{{loadError}}" bindtap="retryLoad">重新加载</button></view>
+<view wx:else class="empty-state"><text>{{loadError || '没有找到项目'}}</text><button hover-class="none" wx:if="{{loadError}}" bindtap="retryLoad">重新加载</button></view>
 <main-bottom-nav/>

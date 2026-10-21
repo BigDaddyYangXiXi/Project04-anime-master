@@ -1,0 +1,27 @@
+/* Explicit opt-in actions; page rules only own placement and width. */
+.am-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--am-touch-min);
+  padding: var(--am-space-2) var(--am-space-3); border: var(--am-border-none);
+  border-radius: var(--am-radius-control);
+  box-shadow: var(--am-shadow-none);
+  font-size: var(--am-type-label);
+  font-weight: var(--am-weight-semibold);
+  line-height: var(--am-line-label);
+  text-align: center;
+  box-sizing: border-box;
+}
+.am-action.am-action-primary { border-radius: var(--am-radius-pill); color: var(--am-color-on-brand); background: var(--am-color-brand); }
+.am-action-secondary { color: var(--am-color-text); background: var(--am-color-control-surface); }
+.am-action-danger { color: var(--am-color-danger); background: var(--am-color-control-surface); }
+.am-action-primary:active { background: var(--am-color-brand-pressed); }
+.am-action-secondary:active, .am-action-danger:active { background: var(--am-color-selected-surface); }
+.am-action[data-am-disabled="true"] { opacity: .5; }
+button.am-action.am-action-primary[data-am-disabled="true"] { color: var(--am-color-on-brand); background: var(--am-color-brand); }
+button.am-action.am-action-secondary[data-am-disabled="true"], button.am-action.am-action-danger[data-am-disabled="true"] { color: var(--am-color-text-secondary); background: var(--am-color-control-surface); }
+.am-action.blocked:not([data-am-disabled="true"]) { opacity: .8; }
+
+/* Full-width form actions opt in; toolbars keep their own column widths. */
+button.am-action.am-action-block { display: flex; width: 100%; min-width: 100%; max-width: 100%; border: var(--am-border-none); border-radius: var(--am-radius-pill); font-size: var(--am-type-label); line-height: var(--am-booking-line-primary); }

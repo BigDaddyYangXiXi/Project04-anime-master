@@ -13,7 +13,7 @@ assert.strictEqual(app.tabBar.list.length, 4, "供需首页合并后必须只保
 assert.strictEqual(app.usingComponents["main-bottom-nav"], "/components/main-bottom-nav/index");
 assert.ok(pageNames.length > 0, "navigation audit requires registered pages");
 
-const focusedPages = new Set(["booking", "account-profile", "me-assets", "funds"]);
+const focusedPages = new Set(["booking", "account-profile", "me-assets", "funds", "work-detail", "provider-profile", "auth", "account-notice", "home-preferences", "me-activity", "help", "settings", "support", "me-social"]);
 const legacyRootPages = new Set(["provider-home"]);
 const tabPages = new Set(app.tabBar.list.map((item) => item.pagePath.split("/")[1]));
 const sharedNavPages = pageNames.filter((name) => !focusedPages.has(name) && !legacyRootPages.has(name) && !tabPages.has(name));
@@ -44,8 +44,8 @@ assert.ok(navJs.includes("buyerRouteSet.has(route)") && navJs.includes("provider
   assert(svg.includes("<svg"), `${name}.svg must remain a vector asset`);
 });
 
-assert(read("pages", "work-detail", "index.wxss").includes("bottom: calc(176rpx + env(safe-area-inset-bottom))"));
-assert(read("pages", "provider-detail", "index.wxss").includes("bottom: calc(176rpx + env(safe-area-inset-bottom))"));
+assert(read("pages", "work-detail", "index.wxss").includes("bottom: 0"), "作品详情业务栏贴设备底部");
+assert(read("pages", "provider-detail", "index.wxss").includes("bottom: calc(var(--am-nav-bottom-content) + env(safe-area-inset-bottom))"));
 const navWxss = read("components", "main-bottom-nav", "index.wxss");
 assert(navWxss.includes("display: flex"));
 assert(navWxss.includes("width: 25%"));

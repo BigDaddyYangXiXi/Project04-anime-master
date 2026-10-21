@@ -1,18 +1,13 @@
+const localPreview = require("../../utils/local-preview");
 const store = require("../../data/v063-store");
 const { stageLabels } = require("../../data/v063");
 const { transitionOrder } = require("../../data/order-machine");
 const presentation = require("../../data/order-presentation");
 const cloudOrders = require("../../services/cloud-orders");
+const previewSlots = require("../../data/preview-order-slots");
 const { sanitizeYuanInput } = require("../../utils/input-normalization");
 
-function confirmAction(title, content, onConfirm) {
-  wx.showModal({
-    title,
-    content,
-    confirmColor: "#ff6f71",
-    success: ({ confirm }) => { if (confirm) onConfirm(); }
-  });
-}
+const confirmAction = require("../../utils/order-confirmation");
 
 function normalizeQuoteItems(order) {
   const items = Array.isArray(order.serviceItems) && order.serviceItems.length
@@ -30,7 +25,13 @@ function normalizeQuoteItems(order) {
 }
 
 Page({
+  goRefund() {
+    const order = this.data.order;
+    if (order?.cloudOrder && order.viewerRole === 'PROVIDER' && order.paymentStatus === 'PAID') wx.navigateTo({url:`/pages/order-refund/index?id=${encodeURIComponent(this.orderId)}`});
+  },
+  openReference: require("../../utils/order-reference-preview"),
   data: {
+    theme: require("../../data/design-theme"),
     order: null, statusLabel: "", ratingStars: "", note: "", price: 0, quoteItems: [], priceError: "",
     timePlaceConfirmed: false, serviceScopeConfirmed: false, ndaChoice: "", amountConfirmed: false,
     readyConfirm: false, confirmedCount: 0, amountHint: "", quoteChanged: false, priceCanSave: false, communicationIssues: [],
@@ -43,15 +44,15 @@ Page({
 
   onLoad(options) {
     this.orderId = options.id;
-    this.auditReady = options.audit === "1" && options.ready === "1";
-    this.auditStage = options.audit === "1" ? options.stage : "";
-    this.auditDelivery = options.audit === "1" && options.delivery === "1";
-    this.auditQuote = options.audit === "1" ? options.quote : "";
-    this.auditSegments = options.audit === "1" && options.segments === "1";
-    this.cloudMode = options.audit !== "1";
+    this.auditReady = localPreview.isAudit(options) && options.ready === "1";
+    this.auditStage = localPreview.isAudit(options) ? options.stage : "";
+    this.auditDelivery = localPreview.isAudit(options) && options.delivery === "1";
+    this.auditQuote = localPreview.isAudit(options) ? options.quote : "";
+    this.auditSegments = localPreview.isAudit(options) && options.segments === "1";
+    this.cloudMode = !localPreview.isAudit(options);
   },
   onShow() { this.load(); },
-  onUnload() { this.loadRequest = (this.loadRequest || 0) + 1; },
+  onUnload() { this.unloaded = true; this.loadRequest = (this.loadRequest || 0) + 1; },
 
   async load() {
     if (this.cloudMode) {
@@ -61,7 +62,7 @@ Page({
       try {
         const order = await cloudOrders.getOrder(this.orderId);
         if (request !== this.loadRequest) return;
-        this.renderOrder(order);
+        this.renderOrder(order, { preserveDeliveryDraft: true });
       } catch (error) {
         if (request === this.loadRequest && this.data.order === visibleOrder) {
           this.setData({ order: null, loadError: this.cloudErrorMessage(error) });
@@ -73,13 +74,13 @@ Page({
     }
     let order = store.findOrder(this.orderId);
     if (!order) return this.setData({ order: null });
-    this.renderOrder(order);
+    this.renderOrder(order, { preserveDeliveryDraft: true });
   },
 
-  renderOrder(sourceOrder) {
+  renderOrder(sourceOrder, { preserveDeliveryDraft = false } = {}) {
     if (sourceOrder.cloudOrder && this.data.order && this.data.order.id === sourceOrder.id
       && Number(this.data.order.version) > Number(sourceOrder.version)) return false;
-    let order = sourceOrder;
+    let order = presentation.providerOrderView(sourceOrder);
     if (this.auditStage) order = Object.assign({}, order, { stage: this.auditStage });
     if (this.auditSegments) order = Object.assign({}, order, { bookingDraft: Object.assign({}, order.bookingDraft, { timeMode: "segments", segments: [
       { id: 1, startDate: "2026-08-25", startTime: "06:30", endDate: "2026-08-25", endTime: "09:00" },
@@ -90,17 +91,26 @@ Page({
     const serviceScopeConfirmed = this.auditReady ? true : Boolean(order.serviceScopeConfirmed);
     const ndaChoice = this.auditReady ? "no" : order.ndaRequired === null ? "" : order.ndaRequired ? "yes" : "no";
     const amountConfirmed = this.auditReady ? true : Boolean(order.amountConfirmed);
-    const delivery = this.auditDelivery ? "已按需求方反馈完成本轮调整，请核对交付内容。" : order.deliveryNote || "";
-    const deliveryFiles = this.auditDelivery && !onsite ? [{ name: "修订交付预览.jpg", type: "image/jpeg", path: "" }] : order.deliveryFiles || [];
-    const quoteItems = normalizeQuoteItems(order);
+    const previous = this.data.order;
+    const sameDraft = preserveDeliveryDraft && previous && previous.id === order.id
+      && previous.version === order.version && previous.stage === order.stage;
+    const keepContact = sameDraft && order.stage === "CONTACTING";
+    const keepDelivery = sameDraft && ["IN_PRODUCTION", "REVISION_REQUESTED"].includes(order.stage);
+    const delivery = keepDelivery ? this.data.delivery : this.auditDelivery ? "已按需求方反馈完成本轮调整，请核对交付内容。" : order.deliveryNote || "";
+    const deliveryFiles = keepDelivery ? this.data.deliveryFiles : this.auditDelivery && !onsite ? [{ name: "修订交付预览.jpg", type: "image/jpeg", path: "" }] : order.deliveryFiles || [];
+    const quoteItems = keepContact ? this.data.quoteItems : normalizeQuoteItems(order);
     if (quoteItems[0] && this.auditQuote === "invalid") quoteItems[0].finalPrice = quoteItems[0].maxPrice + 1;
     if (quoteItems[0] && this.auditQuote === "valid") quoteItems[0].finalPrice = Math.min(quoteItems[0].maxPrice, quoteItems[0].originalFinalPrice + 20);
     this.setData({
       order, statusLabel: stageLabels[order.stage], ratingStars: "★".repeat(order.rating || 0), onsite,
+      note: sameDraft && ["REQUESTED", "SUPPLEMENTED"].includes(order.stage) ? this.data.note : "",
       buyerIdentity: presentation.buyerIdentity(order), providerIdentity: presentation.providerIdentity(order), schedule: presentation.scheduleFor(order),
       price: quoteItems.reduce((sum, item) => sum + item.finalPrice, 0), quoteItems, priceError: "",
-      timePlaceConfirmed, serviceScopeConfirmed, ndaChoice, amountConfirmed,
-      delivery, deliveryFiles, progress: order.progress || 0,
+      timePlaceConfirmed: keepContact ? this.data.timePlaceConfirmed : timePlaceConfirmed,
+      serviceScopeConfirmed: keepContact ? this.data.serviceScopeConfirmed : serviceScopeConfirmed,
+      ndaChoice: keepContact ? this.data.ndaChoice : ndaChoice,
+      amountConfirmed: keepContact ? this.data.amountConfirmed : amountConfirmed,
+      delivery, deliveryFiles, progress: keepDelivery ? this.data.progress : order.progress || 0,
       isRequest: ["REQUESTED", "SUPPLEMENTED"].includes(order.stage),
       isContacting: order.stage === "CONTACTING",
       isNda: ["NDA_BUYER_PENDING", "NDA_PROVIDER_PENDING"].includes(order.stage),
@@ -153,7 +163,7 @@ Page({
     const quoteItems = this.data.quoteItems.map((item, itemIndex) => itemIndex === index ? Object.assign({}, item, { finalPrice }) : item);
     this.setData({ quoteItems, price: quoteItems.reduce((sum, item) => sum + item.finalPrice, 0), amountConfirmed: false }, () => this.refreshDerived());
   },
-  updateDelivery(event) { this.setData({ delivery: event.detail.value }, () => this.refreshDerived()); },
+  updateDelivery(event) { if (this.data.actionPending) return; this.setData({ delivery: event.detail.value }, () => this.refreshDerived()); },
   commitProgress(event) { this.setData({ progress: Number(event.detail.value) }, () => this.refreshDerived()); },
   toggleConfirm(event) {
     const key = event.currentTarget.dataset.key;
@@ -161,7 +171,10 @@ Page({
     if (key === "amountConfirmed" && quoteChanged) return wx.showToast({ title: "请先确认逐项报价", icon: "none" });
     this.setData({ [key]: !this.data[key] }, () => this.refreshDerived());
   },
-  chooseNda(event) { this.setData({ ndaChoice: event.currentTarget.dataset.value }, () => this.refreshDerived()); },
+  chooseNda(event) {
+    if (this.data.order.ndaFlowVersion === 2) return;
+    this.setData({ ndaChoice: event.currentTarget.dataset.value }, () => this.refreshDerived());
+  },
 
   interested() {
     if (this.cloudMode) return this.runTransition("PROVIDER_INTERESTED");
@@ -174,7 +187,7 @@ Page({
   },
   decline() {
     const reason = this.data.note.trim() || "当前档期无法承接";
-    confirmAction("确认拒绝本次预约", `拒绝后订单将结束，需求方会看到原因：“${reason}”。`, () => {
+    confirmAction(this, "确认拒绝本次预约", `拒绝后订单将结束，需求方会看到原因：“${reason}”。`, () => {
       if (this.cloudMode) return this.runTransition("PROVIDER_DECLINES", { detail: reason });
       const order = store.findOrder(this.orderId);
       if (!order || !["REQUESTED", "SUPPLEMENTED"].includes(order.stage)) return this.load();
@@ -197,7 +210,7 @@ Page({
   savePrice() {
     if (!this.data.priceCanSave) return;
     const serviceItems = this.data.quoteItems.map(({ id, name, displayPrice, finalPrice }) => ({ id, name, displayPrice, finalPrice }));
-    confirmAction("确认锁定本次报价", `合计 ￥${this.data.price}。确认后本次报价不能再次修改。`, () => {
+    confirmAction(this, "确认锁定本次报价", `合计 ￥${this.data.price}。确认后本次报价不能再次修改。`, () => {
       if (this.cloudMode) {
         const confirmations = {
           timePlaceConfirmed: this.data.timePlaceConfirmed,
@@ -225,7 +238,7 @@ Page({
   finishCommunication() {
     if (!this.data.readyConfirm) return wx.showToast({ title: "请完成四项合作确认", icon: "none" });
     const ndaRequired = this.data.ndaChoice === "yes";
-    confirmAction("确认结束沟通", `${ndaRequired ? "需要先完成 NDA 签署" : "无需 NDA"}；合作金额 ￥${this.data.price}。提交后进入需求方确认。`, () => {
+    confirmAction(this, "确认结束沟通", `${ndaRequired ? "需要先完成 NDA 签署" : "无需 NDA"}；合作金额 ￥${this.data.price}。确认成功后占用本次合作时段，并进入需求方确认。`, () => {
       if (this.cloudMode) return this.runTransition("PROVIDER_ENDS_COMMUNICATION", {
         ndaRequired,
         timePlaceConfirmed: this.data.timePlaceConfirmed,
@@ -234,17 +247,18 @@ Page({
       });
       const order = store.findOrder(this.orderId);
       if (!order || order.stage !== "CONTACTING") return this.load();
+      if (previewSlots.hasConflict(order, store.getOrders())) return wx.showToast({ title: this.cloudErrorMessage({ code: "SCHEDULE_CONFLICT" }), icon: "none" });
       store.updateOrder(this.orderId, {
         communicationDone: true, timePlaceConfirmed: true, serviceScopeConfirmed: true,
         ndaRequired, amountConfirmed: true, executable: true,
-        stage: transitionOrder(order.stage, "PROVIDER_ENDS_COMMUNICATION", ndaRequired)
+        stage: transitionOrder(order.stage, "PROVIDER_ENDS_COMMUNICATION", ndaRequired, order)
       });
       this.load();
     });
   },
   failCommunication() {
     const reason = this.data.note.trim() || "本次沟通未能确认合作条件";
-    confirmAction("确认合作不确立", `提交后本次预约将结束，需求方可使用原信息再次发起。对方会看到原因：“${reason}”。`, () => {
+    confirmAction(this, "确认合作不确立", `提交后本次预约将结束，需求方可使用原信息再次发起。对方会看到原因：“${reason}”。`, () => {
       if (this.cloudMode) return this.runTransition("PROVIDER_ENDS_COMMUNICATION_FAILED", { detail: reason });
       const order = store.findOrder(this.orderId);
       if (!order || order.stage !== "CONTACTING") return this.load();
@@ -256,14 +270,16 @@ Page({
 
   retryLoad() { this.load(); },
   async runTransition(event, fields = {}, after) {
-    if (this.data.actionPending || !this.data.order) return;
+    if (this.unloaded || this.data.actionPending || !this.data.order) return;
     this.setData({ actionPending: true });
     try {
       const order = await cloudOrders.transitionOrder(this.orderId, this.data.order.version, event, fields);
+      if (this.unloaded) return;
       this.renderOrder(order);
       if (after) after(order);
       this.setData({ actionPending: false, loadError: "" });
     } catch (error) {
+      if (this.unloaded) return;
       this.setData({ actionPending: false, loadError: this.cloudErrorMessage(error) });
       if (error && error.code === "VERSION_CONFLICT") this.load();
       else wx.showToast({ title: this.cloudErrorMessage(error), icon: "none" });
@@ -273,6 +289,10 @@ Page({
     const messages = {
       ORDER_NOT_FOUND: "没有找到这笔订单。",
       VERSION_CONFLICT: "订单状态已变化，正在刷新。",
+      SCHEDULE_CONFLICT: "该时段已有已确认的合作，请与需求方调整时间后重新预约。",
+      SLOT_STORE_NOT_CONFIGURED: "档期确认服务暂不可用，请稍后重试。",
+      NDA_REQUIRED: "请先完成双方保密协议签署，不能取消需求方的保密要求。",
+      PROVIDER_NOT_QUALIFIED: "接单规则尚未同步，请稍后重试；无需申请入驻审核。",
       ILLEGAL_TRANSITION: "当前状态不能执行该操作，请刷新后重试。",
       ORDER_ROLE_FORBIDDEN: "当前身份不能执行该操作。",
       QUOTE_OUT_OF_RANGE: "报价超出允许范围，请修正后重试。",
@@ -299,14 +319,21 @@ Page({
     wx.showToast({ title: "执行进度已同步" });
   },
   chooseDeliveryFiles() {
+    if (this.unloaded || this.data.actionPending) return;
     wx.chooseMessageFile({ count: 5, type: "all", success: ({ tempFiles }) => {
+      if (this.unloaded || this.data.actionPending || !tempFiles || !tempFiles.length) return;
       this.setData({ deliveryFiles: tempFiles.map((file) => ({ name: file.name, type: file.type || "file", path: file.path, size: file.size })) }, () => this.refreshDerived());
+    }, fail: (error) => {
+      if (this.unloaded) return;
+      if (!/cancel/i.test(String(error && error.errMsg || ""))) wx.showToast({ title: "无法选择交付文件，请重试", icon: "none" });
     } });
   },
   submitDelivery() {
+    if (this.unloaded || this.data.actionPending) return;
     if (!this.data.deliveryReady) return wx.showToast({ title: this.data.deliveryIssues[0] || "请完成交付信息", icon: "none" });
     const action = this.data.order.stage === "REVISION_REQUESTED" ? "重新提交后" : "提交后";
-    confirmAction("确认提交本次交付", `${action}将等待需求方验收；交付说明和文件会同步给需求方。`, () => {
+    confirmAction(this, "确认提交本次交付", `${action}将等待需求方验收；交付说明和文件会同步给需求方。`, () => {
+      if (this.unloaded) return;
       if (this.cloudMode) return this.submitCloudDelivery();
       const order = store.findOrder(this.orderId);
       if (!order || !["IN_PRODUCTION", "REVISION_REQUESTED"].includes(order.stage)) return this.load();
@@ -319,19 +346,30 @@ Page({
   },
 
   async submitCloudDelivery() {
-    if (this.data.actionPending || !this.data.order) return;
+    if (this.unloaded || this.data.actionPending || !this.data.order) return;
+    const orderId = this.orderId;
+    const expectedVersion = this.data.order.version;
+    const deliveryNote = this.data.delivery.trim();
+    const selectedFiles = this.data.deliveryFiles;
+    const onsite = this.data.onsite;
     this.setData({ actionPending: true, loadError: "" });
     let uploaded = [];
     try {
-      if (!this.data.onsite) uploaded = await cloudOrders.uploadDeliveryFiles(this.orderId, this.data.deliveryFiles);
-      const order = await cloudOrders.transitionOrder(this.orderId, this.data.order.version, "PROVIDER_SUBMITS_DELIVERY", {
-        deliveryNote: this.data.delivery.trim(),
+      if (!onsite) {
+        uploaded = await cloudOrders.uploadDeliveryFiles(orderId, selectedFiles);
+        if (this.unloaded) return;
+        if (this.orderId === orderId && this.data.deliveryFiles === selectedFiles) this.setData({ deliveryFiles: uploaded });
+      }
+      const order = await cloudOrders.transitionOrder(orderId, expectedVersion, "PROVIDER_SUBMITS_DELIVERY", {
+        deliveryNote,
         deliveryFiles: uploaded
       });
+      if (this.unloaded) return;
       this.renderOrder(order);
       this.setData({ actionPending: false });
       wx.showToast({ title: "交付已提交" });
     } catch (error) {
+      if (this.unloaded) return;
       this.setData({ actionPending: false, loadError: this.cloudErrorMessage(error) });
       if (error && error.code === "VERSION_CONFLICT") this.load();
       else wx.showToast({ title: this.cloudErrorMessage(error), icon: "none" });

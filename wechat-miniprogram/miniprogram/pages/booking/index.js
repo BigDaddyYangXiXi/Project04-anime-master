@@ -1,3 +1,7 @@
+const sheetKeyboard = require("../../utils/sheet-keyboard");
+const { chooseImageMedia } = require("../../utils/work-media-picker");
+const { brandColor } = require("../../data/design-theme");
+const localPreview = require("../../utils/local-preview");
 const { findProvider, findWork } = require("../../data/catalog");
 const { availability } = require("../../data/v063");
 const store = require("../../data/v063-store");
@@ -56,7 +60,11 @@ function serviceLocation(service, provider, cityCode) {
 }
 
 Page({
+  ...sheetKeyboard,
   data: {
+    ndaSwitchColor: brandColor,
+    sheetKeyboardHeight: 0, sheetScrollTarget: "",
+    editorSection: "", editorTitle: "", editorError: "", timeDisplay: "",
     provider: null,
     work: null,
     selectedServices: [],
@@ -75,6 +83,7 @@ Page({
     segments: [],
     contact: { name: "", wechat: "", phone: "" },
     note: "",
+    ndaRequired: false,
     referenceMode: "none",
     referenceFile: null,
     message: "",
@@ -94,8 +103,8 @@ Page({
 
   onLoad(options) {
     this.bookingOptions = options;
-    this.cloudMode = options.audit !== "1";
-    this.auditConflict = options.audit === "1" && options.conflict === "1";
+    this.cloudMode = !localPreview.isAudit(options);
+    this.auditConflict = localPreview.isAudit(options) && options.conflict === "1";
     this.requestIdempotencyKey = cloudOrders.idempotencyKey();
     if (this.cloudMode) {
       this.loadCloudBooking(options);
@@ -107,20 +116,24 @@ Page({
   },
 
   async loadCloudBooking(options) {
+    const requestId = this.bookingLoadId = (this.bookingLoadId || 0) + 1;
     this.setData({ loadingProvider: true, message: "" });
     try {
       const [repeatOrder, preferenceResult] = await Promise.all([
         options.repeatOrderId ? cloudOrders.getOrder(options.repeatOrderId) : Promise.resolve(null),
         cloudAccount.getDiscoveryPreference()
       ]);
+      if (requestId !== this.bookingLoadId) return;
       const providerId = repeatOrder && repeatOrder.stage === "DECLINED" && repeatOrder.viewerRole === "BUYER"
         ? repeatOrder.providerId : options.providerId;
       const result = await cloudCatalog.getProvider(providerId);
+      if (requestId !== this.bookingLoadId) return;
       const provider = result.provider && mapCloudCatalog([result.provider]).providers[0];
       this.initializeBooking(options, repeatOrder, provider, preferenceResult && preferenceResult.preference);
       this.setData({ loadingProvider: false });
     } catch (error) {
-      this.setData({ loadingProvider: false, provider: null, message: this.orderErrorMessage(error) });
+      if (requestId !== this.bookingLoadId) return;
+      this.setData({ loadingProvider: false, provider: null, message: this.orderErrorMessage(error, "预约资料读取失败，请重试。") });
     }
   },
 
@@ -151,7 +164,8 @@ Page({
       : discoveryContext && discoveryContext.cityCode ? { cityName: discoveryContext.city, cityCode: discoveryContext.cityCode }
       : discoveryPreference && discoveryPreference.cityCode ? { cityName: discoveryPreference.cityName, cityCode: discoveryPreference.cityCode }
       : { cityName: provider.city, cityCode: provider.cityCode || "" };
-    const ids = repeatDraft ? repeatDraft.serviceIds : options.services ? decodeURIComponent(options.services).split(",").filter(Boolean) : [provider.services[0].id];
+    const linkedService = work && provider.services.find(service => service.id === work.serviceId || (service.workIds || []).includes(work.id));
+    const ids = repeatDraft ? repeatDraft.serviceIds : options.services ? decodeURIComponent(options.services).split(",").filter(Boolean) : [linkedService ? linkedService.id : provider.services[0].id];
     const services = provider.services.map((service) => {
       const location = this.cloudMode ? serviceLocation(service, provider, region.cityCode) : { available: true, text: "审计夹具服务" };
       return Object.assign({}, service, { availableInCity: location.available, serviceLocationText: location.text, selected: location.available && ids.includes(service.id), priceText: `￥${service.price}` });
@@ -188,6 +202,7 @@ Page({
       segments: repeatDraft ? repeatSegments : [{ id: 1, startDate: date, startTime: "06:30", endDate: date, endTime: "09:00" }],
       contact: repeatDraft ? repeatDraft.contact : validFixture ? { name: "阿遥", wechat: "ayao_cos", phone: "" } : this.data.contact,
       note: repeatDraft ? repeatDraft.note : validFixture ? "希望完成夜航者男性角色妆造，保留近景皮肤质感。" : "",
+      ndaRequired: Boolean(repeatDraft && repeatDraft.ndaRequired),
       referenceMode,
       referenceFile: repeatDraft && repeatDraft.referenceFile ? repeatDraft.referenceFile : referenceMode === "file" ? { name: "角色设定参考.png", path: "" } : null
     }, () => this.validate());
@@ -195,6 +210,42 @@ Page({
 
   onShow() {
     if (this.submittedOrderId && this.data.submitting) this.setData({ submitting: false });
+  },
+
+  changeNda(event) { if (!this.data.submitting) this.setData({ ndaRequired: event.detail.value }); },
+
+  openEditor(event) {
+    const section = event.currentTarget.dataset.section;
+    const titles = { services: "选择预约服务", place: "服务城市", time: "合作时间", note: "个性化需求", contact: "联系信息", reference: "参考资料" };
+    if (!titles[section] || this.data.submitting) return;
+    const keys = ["provider", "selectedServices", "selectedServiceText", "displayedTotal", "city", "cityCode", "timeMode", "date", "startDate", "startTime", "endDate", "endTime", "segments", "contact", "note", "referenceMode", "referenceFile"];
+    this.editorSnapshot = JSON.parse(JSON.stringify(Object.fromEntries(keys.map(key => [key, this.data[key]]))));
+    this.resetSheetKeyboard();
+    this.setData({ editorSection: section, editorTitle: titles[section], editorError: "", showValidationErrors: false });
+  },
+
+  cancelEditor() {
+    this.resetSheetKeyboard();
+    const snapshot = this.editorSnapshot;
+    this.editorSnapshot = null;
+    this.setData({ ...(snapshot || {}), editorSection: "", editorError: "", showValidationErrors: false }, () => this.validate());
+  },
+
+  saveEditor() {
+    this.validate();
+    const section = this.data.editorSection;
+    const errors = {
+      services: !this.data.serviceValid && "请选择至少一项可用服务。",
+      place: !this.data.city && "请选择服务城市。",
+      time: !this.data.timeValid && (this.data.timeError || "请选择有效的合作时间。"),
+      contact: !this.data.contactValid && "请填写姓名，并提供微信号或有效手机号。",
+      note: !this.data.noteValid && "个性化需求至少填写10个字。",
+      reference: this.data.referenceMode === "file" && !this.data.referenceFile && "请选择一张参考图片。"
+    };
+    if (errors[section]) return this.setData({ editorError: errors[section], showValidationErrors: true });
+    this.editorSnapshot = null;
+    this.resetSheetKeyboard();
+    this.setData({ editorSection: "", editorError: "", showValidationErrors: false });
   },
 
   updateCity(event) {
@@ -248,7 +299,9 @@ Page({
     this.setData({ referenceMode, referenceFile: referenceMode === "work" ? null : this.data.referenceFile });
   },
   chooseReferenceFile() {
-    wx.chooseMedia({ count: 1, mediaType: ["image"], success: (result) => {
+    const snapshot = this.editorSnapshot;
+    chooseImageMedia({ count: 1, success: (result) => {
+      if (snapshot !== this.editorSnapshot) return;
       const file = result.tempFiles[0];
       const name = file.tempFilePath.split(/[\\/]/).pop() || "参考图片";
       this.setData({ referenceMode: "file", referenceFile: { name, path: file.tempFilePath } });
@@ -298,6 +351,7 @@ Page({
     if (!noteValid) validationIssues.push("个性化需求至少填写 10 个字");
     this.setData({
       canSubmit: validationIssues.length === 0,
+      timeDisplay: timeMode === "continuous" && startDate === endDate ? `${startDate} · ${startTime}–${endTime}` : this.timeSummary(),
       timeError,
       timeValid: finalTimeValid,
       serviceValid,
@@ -309,21 +363,33 @@ Page({
     });
   },
 
+  onUnload() {
+    this.bookingRequestId = (this.bookingRequestId || 0) + 1;
+    this.bookingLoadId = (this.bookingLoadId || 0) + 1;
+  },
+
   async submitBooking() {
     if (this.data.submitting) return;
     if (this.submittedOrderId) {
+      const requestId = this.bookingRequestId;
       this.setData({ submitting: true });
-      wx.navigateTo({ url: `/pages/booking-status/index?id=${this.submittedOrderId}`, fail: () => this.setData({ submitting: false, message: "页面跳转失败，请重试；预约不会重复创建。" }) });
+      wx.navigateTo({ url: `/pages/booking-status/index?id=${this.submittedOrderId}`, fail: () => {
+        if (requestId === this.bookingRequestId) this.setData({ submitting: false, message: "页面跳转失败，请重试；预约不会重复创建。" });
+      } });
       return;
     }
     if (!this.data.canSubmit) {
+      const section = !this.data.serviceValid ? "services" : !this.data.timeValid ? "time" : !this.data.contactValid ? "contact" : "note";
+      this.openEditor({ currentTarget: { dataset: { section } } });
       this.setData({ showValidationErrors: true, message: "" });
       return;
     }
     this.setData({ submitting: true });
     if (this.cloudMode) {
+      const requestId = this.bookingRequestId = (this.bookingRequestId || 0) + 1;
       try {
-        const referenceAssetId = await this.ensureReferenceAsset();
+        const referenceAssetId = await this.ensureReferenceAsset(requestId);
+        if (requestId !== this.bookingRequestId) return;
         const order = await cloudOrders.createOrder({
           providerId: this.data.provider.id,
           serviceIds: this.data.selectedServices.map((service) => service.id),
@@ -333,16 +399,21 @@ Page({
           cityCode: this.data.cityCode,
           location: this.data.city,
           requirement: this.data.note.trim(),
+          ndaRequired: this.data.ndaRequired,
           timeSegments: this.cloudTimeSegments(),
           contact: this.data.contact,
           idempotencyKey: this.requestIdempotencyKey
         });
+        if (requestId !== this.bookingRequestId) return;
         this.submittedOrderId = order.id;
         wx.navigateTo({
           url: `/pages/booking-status/index?id=${order.id}`,
-          fail: () => this.setData({ submitting: false, message: "页面跳转失败，请重试；预约不会重复创建。" })
+          fail: () => {
+            if (requestId === this.bookingRequestId) this.setData({ submitting: false, message: "页面跳转失败，请重试；预约不会重复创建。" });
+          }
         });
       } catch (error) {
+        if (requestId !== this.bookingRequestId) return;
         this.setData({ submitting: false, message: this.orderErrorMessage(error) });
       }
       return;
@@ -360,6 +431,7 @@ Page({
       cityCode: this.data.cityCode,
       time: this.timeSummary(),
       requirement: this.data.note.trim(),
+      ndaRequired: this.data.ndaRequired, ndaFlowVersion: 2,
       reference: this.referenceSummary(),
       referenceImage: this.data.referenceMode === "file" && this.data.referenceFile ? this.data.referenceFile.path : "",
       contact: this.data.contact,
@@ -377,7 +449,8 @@ Page({
         serviceIds: this.data.selectedServices.map((service) => service.id), city: this.data.city, cityCode: this.data.cityCode,
         timeMode: this.data.timeMode, date: this.data.date, startDate: this.data.startDate, startTime: this.data.startTime,
         endDate: this.data.endDate, endTime: this.data.endTime, segments: this.data.segments,
-        contact: this.data.contact, note: this.data.note.trim(), referenceMode: this.data.referenceMode, referenceFile: this.data.referenceFile
+        contact: this.data.contact, note: this.data.note.trim(), referenceMode: this.data.referenceMode, referenceFile: this.data.referenceFile,
+        ndaRequired: this.data.ndaRequired
       }
     });
     this.submittedOrderId = order.id;
@@ -400,16 +473,19 @@ Page({
     }];
   },
 
-  async ensureReferenceAsset() {
+  async ensureReferenceAsset(requestId) {
     if (this.data.referenceMode !== "file" || !this.data.referenceFile) return "";
     let file = this.data.referenceFile;
     if (!file.assetId) {
       const uploaded = await cloudCatalog.uploadImage({ tempFilePath: file.path }, "PROJECT_REFERENCE");
+      if (requestId !== this.bookingRequestId) return "";
       file = { ...file, assetId: uploaded.assetId, fileId: uploaded.fileId, status: uploaded.status };
       this.setData({ referenceFile: file, message: "参考图片正在完成安全审核…" });
     }
     for (let attempt = 0; attempt < 15; attempt += 1) {
+      if (requestId !== this.bookingRequestId) return "";
       const result = await cloudCatalog.getImageStatus(file.assetId);
+      if (requestId !== this.bookingRequestId) return "";
       if (result.status === "READY") {
         this.setData({ referenceFile: { ...file, status: "READY" }, message: "" });
         return file.assetId;
@@ -426,13 +502,14 @@ Page({
     throw error;
   },
 
-  orderErrorMessage(error) {
+  orderErrorMessage(error, fallback = "预约发送失败，请稍后重试。") {
     const messages = {
       PROVIDER_NOT_PUBLISHED: "该服务方的公开橱窗已下线，请返回重新选择。",
       PROVIDER_NOT_AVAILABLE: "该服务方当前不可预约。",
+      PROVIDER_NOT_QUALIFIED: "预约规则尚未同步，请稍后重试；无需服务方申请入驻审核。",
       SERVICE_NOT_PUBLISHED: "所选服务已更新，请刷新后重新选择。",
       SERVICE_CITY_UNAVAILABLE: "所选服务不覆盖当前城市，请更换城市或服务项目。",
-      WORK_NOT_PUBLISHED: "引用作品已下线，请清除后重试。",
+      WORK_NOT_PUBLISHED: "参考作品已下线，请清除后重试。",
       REFERENCE_MEDIA_NOT_READY: "参考图片尚未通过安全审核，请稍后重试。",
       REFERENCE_MEDIA_REJECTED: "参考图片未通过安全审核，请更换图片。",
       REFERENCE_MEDIA_PENDING: "参考图片仍在审核，请稍后再次发送预约。",
@@ -440,7 +517,7 @@ Page({
       IDEMPOTENCY_CONFLICT: "预约内容已变化，请返回后重新发起。",
       ACCOUNT_NOT_FOUND: "账号尚未初始化，请返回首页重试。"
     };
-    return messages[error && error.code] || "预约发送失败，请稍后重试。";
+    return messages[error && error.code] || fallback;
   },
 
   timeSummary() {

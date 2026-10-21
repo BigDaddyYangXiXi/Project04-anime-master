@@ -3,6 +3,7 @@
 
 # 依赖、构建、自动化输出和本机状态。
 node_modules/
+.npm-cache/
 .artifacts/
 .tmp-ui-audit/
 audit-output/

@@ -1,0 +1,5 @@
+@import "../../styles/design-tokens.wxss";
+@import "../../styles/actions.wxss";
+.subscription-row { display: flex; flex-direction: column; gap: var(--am-space-2); margin-bottom: var(--am-space-4); }
+.subscription-row button { width: 100%; }
+.subscription-copy { color: var(--am-color-text-secondary); font-size: var(--am-type-caption); line-height: var(--am-line-body); }

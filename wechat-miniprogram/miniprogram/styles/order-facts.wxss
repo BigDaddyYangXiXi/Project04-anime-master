@@ -1,8 +1,9 @@
-.order-fact-stack { margin-top: 20rpx; border: 1rpx solid #eee3df; border-radius: 24rpx; background: #fff; overflow: hidden; }
-.order-fact-item { display: grid; grid-template-columns: 40rpx minmax(0,1fr); gap: 16rpx; padding: 20rpx 22rpx; }
-.order-fact-item + .order-fact-item { border-top: 1rpx solid #f0e6e2; }
-.order-fact-number { display: flex; width: 36rpx; height: 36rpx; align-items: center; justify-content: center; border-radius: 50%; color: #fff; background: #ef7b84; font-size: 20rpx; font-weight: 800; line-height: 36rpx; }
+.section-title.order-fact-heading, .summary-meta.order-fact-heading { flex-direction: column; align-items: stretch; gap: var(--am-space-1); }
+.order-fact-heading > text { min-width: 0; overflow-wrap: anywhere; word-break: break-all; }
+.order-fact-stack { margin-top: var(--am-space-4); border-top: var(--am-work-rule); }
+.order-fact-item { display: flex; padding: var(--am-space-3) var(--am-space-none); }
+.order-fact-item+.order-fact-item { border-top: var(--am-work-rule); }
+.order-fact-copy { width: 100%; min-width: 0; }
 .order-fact-copy text { display: block; }
-.order-fact-copy > text:first-child { color: #2b2523; font-size: 23rpx; font-weight: 800; line-height: 34rpx; }
-.order-fact-copy > text:not(:first-child), .order-fact-schedule text { margin-top: 4rpx; color: #6f625d; font-size: 21rpx; font-weight: 400; line-height: 34rpx; }
-.order-fact-schedule text { display: block; }
+.order-fact-copy>text:first-child { font-size: var(--am-booking-type-secondary); line-height: var(--am-line-caption); color: var(--am-color-text-secondary); font-weight: var(--am-weight-regular); }
+.order-fact-copy>text:not(:first-child), .order-fact-schedule text { margin-top: var(--am-space-1); color: var(--am-color-text); font-size: var(--am-type-label); line-height: var(--am-booking-line-primary); font-weight: var(--am-weight-regular); }

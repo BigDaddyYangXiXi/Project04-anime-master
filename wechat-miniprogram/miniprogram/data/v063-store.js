@@ -104,7 +104,7 @@ function updateOrder(id, patch) {
 function applyEvent(id, event, patch) {
   const order = findOrder(id);
   if (!order) throw new Error(`Order not found: ${id}`);
-  return updateOrder(id, Object.assign({}, patch || {}, { stage: transitionOrder(order.stage, event, order.ndaRequired === true) }));
+  return updateOrder(id, Object.assign({}, patch || {}, { stage: transitionOrder(order.stage, event, order.ndaRequired === true, order) }));
 }
 function calculateProviderReplyMetric(providerId, orders, updatedAt = Date.now()) {
   const samples = orders.filter((order) => order.providerId === providerId
@@ -168,7 +168,7 @@ function getMeDashboard(role) {
   const assets = [
     { key: "followed", label: "我的关注", value: metricValue(contentAssets, "followed") },
     { key: "liked", label: "我的喜欢", value: metricValue(contentAssets, "liked") },
-    { key: "referenced", label: "引用作品", value: metricValue(contentAssets, "referenced") }
+    { key: "referenced", label: "参考作品", value: metricValue(contentAssets, "referenced") }
   ];
   if (key === "provider") return {
     account,
@@ -176,7 +176,7 @@ function getMeDashboard(role) {
     stats: [
       { label: "历史合作", value: metricValue(metrics, "completedOrders") },
       { label: "作品创作", value: metricValue(metrics, "createdWorks") },
-      { label: "作品被引用", value: metricValue(metrics, "workReferences") },
+      { label: "作品被参考", value: metricValue(metrics, "workReferences") },
       { label: "作品被收藏", value: metricValue(metrics, "workFavorites") },
       { label: "账号获关注", value: metricValue(metrics, "accountFollowers") }
     ],
@@ -189,7 +189,7 @@ function getMeDashboard(role) {
     stats: [
       { label: "历史合作", value: metricValue(metrics, "completedOrders") },
       { label: "进行中订单", value: metricValue(metrics, "activeOrders") },
-      { label: "引用作品", value: metricValue(metrics, "referencedWorks") }
+      { label: "参考作品", value: metricValue(metrics, "referencedWorks") }
     ]
   };
 }

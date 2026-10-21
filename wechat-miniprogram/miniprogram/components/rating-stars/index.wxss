@@ -1,4 +1,6 @@
+@import "../../styles/design-tokens.wxss";
+@import "../../styles/actions.wxss";
 :host { display: block; }
-.rating-stars { display: flex; align-items: center; gap: 16rpx; }
-.stars { color: #c6536b; font-size: 28rpx; letter-spacing: 4rpx; }
-.rating-stars text:last-child { font-size: 22rpx; line-height: 32rpx; font-weight: 500; }
+.rating-stars { display: flex; align-items: center; gap: var(--am-space-2); }
+.stars { color: var(--am-color-price); font-size: var(--am-type-body); letter-spacing: 4rpx; }
+.rating-stars text:last-child { font-size: var(--am-type-micro); line-height: 32rpx; font-weight: var(--am-weight-medium); }

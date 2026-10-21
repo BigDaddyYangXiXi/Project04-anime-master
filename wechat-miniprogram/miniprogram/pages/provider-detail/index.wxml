@@ -1,41 +1,52 @@
-<app-top-nav class="app-navigation" title="服务者详情" workspace="{{navWorkspace}}" show-back="{{true}}"/>
-<view wx:if="{{provider}}" class="profile-shell">
-  <view class="profile-hero">
-    <view class="identity-row">
-      <image wx:if="{{provider.avatar}}" class="avatar-large avatar-image" src="{{provider.avatar}}" mode="aspectFill"/><view wx:else class="avatar-large">{{provider.initial}}</view>
-      <view class="identity-copy"><view class="identity-heading"><text>{{provider.name}}</text><text>平台实名</text></view><text>{{provider.handle}}</text><text>{{provider.career}} · 常驻地 {{provider.city}}</text></view>
-    </view>
-    <text class="history-label">个人历史数据</text>
-    <view class="trust-row"><view><text>{{provider.orders}}</text><text>次合作完成</text></view><view><text>{{provider.ratingText}}</text><text>综合评分</text></view><view><text>{{provider.replyText}}</text><text>平均回复</text></view></view>
-    <text class="profile-bio">{{provider.bio}}</text>
-    <view class="tag-row"><text wx:for="{{provider.tags}}" wx:key="*this">{{item}}</text></view>
-  </view>
-
-  <view class="section-card information-card"><view class="section-title compact-title"><view><text>预约前须知</text><text>预约前请确认服务边界</text></view></view><text class="body-copy">{{provider.notice}}</text><image wx:if="{{noticeImage}}" class="notice-image" src="{{noticeImage}}" mode="aspectFill"/></view>
-
-  <view class="section-card service-section">
-    <view class="section-title"><view><text>可预约服务</text><text>资料与价格由服务方橱窗发布</text></view><text>{{provider.services.length}} 项</text></view>
-    <view class="service-list">
-      <view wx:for="{{provider.services}}" wx:key="id" class="service-row {{item.selected ? 'selected' : ''}} {{item.availableInCity === false ? 'unavailable' : ''}}">
-        <view class="service-main"><text>{{item.name}}</text><text>{{item.description}}</text><view class="service-meta"><text>{{item.priceText}}</text><text>{{item.locationText}}</text></view></view>
-        <view class="service-actions">
-          <view class="service-select" role="checkbox" aria-checked="{{item.selected}}" data-id="{{item.id}}" bindtap="toggleService"><view class="service-check-mark {{item.selected ? 'checked' : ''}}" aria-hidden="true"></view><text>{{item.availableInCity === false ? '不可约' : item.selected ? '已选择' : '选择'}}</text></view>
-          <view class="service-expand" role="button" aria-expanded="{{item.expanded}}" data-id="{{item.id}}" bindtap="toggleExpand"><text>{{item.expanded ? '收起' : '查看详情'}}</text><view class="service-chevron {{item.expanded ? 'expanded' : ''}}" aria-hidden="true"></view></view>
-        </view>
-        <image wx:if="{{item.coverWork && item.coverWork.coverImage}}" class="service-cover" src="{{item.coverWork.coverImage}}" mode="aspectFill" lazy-load="{{true}}"/>
-        <view wx:if="{{item.expanded}}" class="service-detail"><text>{{item.description}} 具体范围、时长与现场边界将在预约沟通中确认。</text><text wx:if="{{item.galleryWorks.length}}" class="gallery-label">关联作品证据</text><view wx:if="{{item.galleryWorks.length}}" class="service-gallery"><button wx:for="{{item.galleryWorks}}" wx:for-item="work" wx:key="id" data-id="{{work.id}}" bindtap="openWork"><image wx:if="{{work.coverImage}}" src="{{work.coverImage}}" mode="aspectFill" lazy-load="{{true}}"/><text>{{work.title}}</text></button></view><text wx:else class="service-empty">服务方尚未关联公开作品。</text></view>
-      </view>
-    </view>
-  </view>
-
-  <view class="section-card rating-card"><view class="section-title"><view><text>服务评价</text><text>{{reviewCount}} 条完成订单评价</text></view><text class="rating-score">{{provider.ratingText}}</text></view><text class="rating-stars">★★★★★</text></view>
-
-  <view class="section-card schedule-card"><view class="section-title"><view><text>公开档期</text><text>与服务方日历同步</text></view><button class="schedule-link" bindtap="openSchedule">查看完整月历</button></view><availability-strip days="{{availabilityDays}}"/></view>
-
-  <view class="section-card"><view class="section-title"><view><text>公开作品</text><text>点击作品查看完整图集</text></view><text>{{provider.works.length}} 件</text></view><view class="work-grid"><work-card wx:for="{{provider.works}}" wx:key="id" work="{{item}}" source="B02" workspace="{{navWorkspace}}" preview="{{storefrontDraftPreview ? 'storefront' : ''}}"/></view></view>
-
-  <view wx:if="{{storefrontDraftPreview}}" class="preview-publish-action"><button class="primary-button" disabled="{{publishing || previewPublished}}" bindtap="confirmPublish">{{previewPublished ? '已发布' : publishing ? '正在发布' : '确认并发布'}}</button></view>
-  <view wx:elif="{{!providerPreview}}" class="sticky-action"><view><text>已选 {{selectedServiceIds.length}} 项</text><text>￥{{selectedTotal}}</text></view><button disabled="{{!selectedServiceIds.length}}" bindtap="startBooking">发起预约</button></view>
+<import src="../../templates/creator-content.wxml"/>
+<import src="../../templates/creator-profile.wxml"/>
+<app-top-nav class="app-navigation" title="{{readingPage === 'preferences' ? '合作偏好' : readingPage === 'reviews' ? '合作评价' : publicationFlow ? '发布进度' : serviceDetail ? '服务详情' : '创作者主页'}}" workspace="{{navWorkspace}}" show-back="{{true}}" custom-back="{{!!serviceDetail || !!readingPage}}" bindback="backStorefrontPage"/>
+<view wx:if="{{readingPage && provider}}" class="profile-shell storefront-reading-page">
+ <text class="storefront-state-band">{{storefrontDraftPreview ? '草稿预览 · 仅自己可见' : '已公开版本'}}</text>
+ <block wx:if="{{readingPage === 'preferences'}}"><view wx:if="{{creator.specialties}}" class="storefront-reading-group"><text class="creator-section-heading">擅长类型</text><text class="storefront-reading">{{creator.specialties}}</text></view><view wx:if="{{creator.declines}}" class="storefront-reading-group"><text class="creator-section-heading">不承接类型</text><text class="storefront-reading">{{creator.declines}}</text></view><view wx:if="{{creator.contactHours}}" class="storefront-reading-group"><text class="creator-section-heading">通常沟通时间</text><text class="storefront-reading">{{creator.contactHours}}</text></view><view wx:if="{{!creator.specialties && !creator.declines && !creator.contactHours}}" class="storefront-reading-empty">暂未填写合作偏好</view></block>
+ <block wx:else><view wx:if="{{!reviews.length}}" class="storefront-reading-empty"><text class="storefront-section-heading">暂无合作评价</text><text class="storefront-reading">完成真实合作后，评价将在这里展示。</text></view><view wx:for="{{reviews}}" wx:key="index" class="storefront-reading-group"><text>合作用户 · {{item.rating}} 分</text><text class="storefront-reading">{{item.text || '未填写评价内容'}}</text><text wx:if="{{item.reply}}" class="storefront-reading">创作者回复：{{item.reply}}</text></view></block>
 </view>
-<view wx:else class="empty-page"><text class="empty-page-title">没有找到服务者</text></view>
-<main-bottom-nav/>
+<view wx:elif="{{publicationFlow && provider}}" class="profile-shell storefront-result">
+ <view class="storefront-result-heading">
+  <image wx:if="{{previewPublished || publishQueued || publishing}}" class="storefront-result-expression" src="/assets/brand/expression-{{previewPublished ? 'happy' : 'focus'}}.png"/>
+  <text class="storefront-result-title">{{previewPublished ? '本次内容已公开' : publicationUnknown ? '发布结果待确认' : publishing ? '正在提交' : publishQueued ? '已提交，尚未公开' : publishError ? '本次更新尚未公开' : intentChecked ? '目前没有进行中的发布' : '正在读取发布状态'}}</text>
+  <text class="creator-caption">{{previewPublished ? '需求方现在可以查看发布的内容。' : publicationUnknown ? '网络中断，请先查询原任务，不要重新提交。' : publishing ? '正在确认接收，请勿重复提交。' : publishQueued ? '正在进行内容安全检测。你可以离开，在管理橱窗查看结果。' : publishError ? '草稿已保留，原公开内容不受影响。' : '保存草稿后，在发布确认页提交。'}}</text>
+ </view>
+ <view wx:if="{{publishing || publishQueued}}" class="storefront-timeline"><view class="{{publishQueued ? 'done' : 'current'}}"><text>{{publishQueued ? '✓ 已接收本次内容' : '正在接收本次内容'}}</text></view><view class="{{publishQueued ? 'current' : ''}}"><text>{{publishQueued ? '内容检测中' : '等待内容检测'}}</text><text>通过后才能公开</text></view><view><text>待公开</text><text>现在还没有完成这一步</text></view></view>
+ <view wx:if="{{publicationUnknown}}" class="storefront-progress"><text>原发布请求已保留</text><text class="storefront-reading">恢复连接后查询同一次请求，避免重复发布。</text></view><text wx:if="{{publishError}}" class="field-error">{{publishError}}</text>
+ <button wx:if="{{publicationUnknown}}" class="am-action am-action-primary am-action-block" bindtap="queryOriginalPublication">查询原任务</button>
+ <button wx:if="{{publishQueued}}" class="storefront-link" disabled="{{publishing}}" bindtap="cancelPublication"><text>需要继续修改？</text><text>先撤回本次提交 ›</text></button>
+ <button wx:if="{{previewPublished}}" class="storefront-link" bindtap="showPublishedStorefront"><text>查看公开主页</text><text>已发布版本 ›</text></button>
+ <view wx:if="{{previewPublished}}" class="storefront-progress"><text>{{provider.accepting === false ? '目前暂停接单' : '目前开放接单'}}</text><text class="storefront-reading">档期未公开的日期，仍需由你确认预约。</text></view><button wx:if="{{previewPublished}}" class="storefront-link" bindtap="openOwnerCalendar"><text>检查接单状态与档期</text><text>›</text></button><button wx:if="{{publishError && !publicationUnknown && !publishQueued && !publishing}}" class="storefront-link" bindtap="editStorefront"><text>修改本次内容</text><text>›</text></button><view wx:if="{{publishQueued}}" class="storefront-progress"><text>通过检测后才会公开；已有公开版本继续展示。</text></view><view class="two-actions"><button class="am-action am-action-primary" disabled="{{publishing}}" bindtap="returnToStorefrontManager">返回管理橱窗</button></view>
+</view>
+<view wx:elif="{{provider}}" class="profile-shell storefront-preview">
+ <text wx:if="{{storefrontDraftPreview}}" class="storefront-preview-note">草稿预览 · 尚未发布</text>
+ <block wx:if="{{serviceDetail}}">
+  <text class="storefront-result-title">{{serviceDetail.name}}</text><text class="am-money am-money-detail">￥{{serviceDetail.price}} / {{serviceDetail.unit}}</text><text class="creator-caption">服务报价 · {{serviceDetail.serviceModeLabel}}{{serviceDetail.serviceCitiesText ? ' · ' + serviceDetail.serviceCitiesText : ''}}</text>
+  <text class="storefront-reading">{{serviceDetail.description}}</text>
+  <view wx:if="{{serviceDetail.includes}}" class="storefront-reading-group"><text class="creator-section-heading">包含 / 不包含</text><text class="storefront-reading">{{serviceDetail.includes}}</text></view>
+  <view wx:if="{{serviceDetail.extras}}" class="storefront-reading-group"><text class="creator-section-heading">额外费用</text><text class="storefront-reading">{{serviceDetail.extras}}</text></view>
+  <view wx:if="{{serviceDetail.preparation}}" class="storefront-reading-group"><text class="creator-section-heading">预约前准备</text><text class="storefront-reading">{{serviceDetail.preparation}}</text></view>
+  <view wx:if="{{serviceDetail.galleryWorks.length}}" class="storefront-reading-group"><text class="creator-section-heading">展示案例</text><view wx:for="{{serviceDetail.galleryWorks}}" wx:key="id" data-id="{{item.id}}" bindtap="openWork"><template is="creator-work" data="{{work:item}}"/></view></view>
+ </block>
+ <block wx:else>
+  <image wx:if="{{provider.bannerImage}}" class="storefront-cover" src="{{provider.bannerImage}}" mode="widthFix"/>
+  <template is="creator-profile" data="{{creator,showFollow:!providerPreview,followed,socialPending,socialLoadError}}"/>
+  <view wx:if="{{socialLoadError && !providerPreview}}"><text class="creator-caption">{{socialLoadError}}</text><button class="am-action am-action-secondary" bindtap="retrySocial">重新同步</button></view>
+  <view class="creator-tabs"><button class="{{profileTab === 'works' ? 'active' : ''}}" data-tab="works" bindtap="chooseProfileTab">案例</button><button class="{{profileTab === 'services' ? 'active' : ''}}" data-tab="services" bindtap="chooseProfileTab">服务</button><button class="{{profileTab === 'notice' ? 'active' : ''}}" data-tab="notice" bindtap="chooseProfileTab">须知</button><button class="{{profileTab === 'schedule' ? 'active' : ''}}" data-tab="schedule" bindtap="chooseProfileTab">档期</button></view>
+  <view wx:if="{{profileTab === 'works'}}" class="creator-work-grid"><view wx:for="{{provider.works}}" wx:key="id" class="creator-work-card" data-id="{{item.id}}" bindtap="openWork"><template is="creator-work" data="{{work:item}}"/></view><text wx:if="{{!provider.works.length}}" class="creator-caption">暂未添加展示案例</text></view>
+  <view wx:if="{{profileTab === 'services'}}" class="storefront-services"><view wx:for="{{provider.services}}" wx:key="id"><button class="storefront-link" data-id="{{item.id}}" bindtap="openServiceDetail"><text>{{item.name}}</text><text class="am-money am-money-list">￥{{item.price}} / {{item.unit}} ›</text></button><button wx:if="{{!providerPreview}}" class="am-action am-action-secondary" data-id="{{item.id}}" bindtap="toggleService">{{item.availableInCity === false ? '当前不可预约' : item.selected ? '✓ 已选择' : '选择此服务'}}</button></view><text wx:if="{{!provider.services.length}}" class="creator-caption">暂未添加服务</text></view>
+  <view wx:if="{{profileTab === 'notice'}}"><text class="storefront-reading">{{provider.notice || '暂未填写合作须知'}}</text><image wx:if="{{noticeImage}}" class="storefront-notice-image" src="{{noticeImage}}" mode="widthFix"/></view>
+  <view wx:if="{{profileTab === 'schedule'}}" class="storefront-calendar">
+   <text wx:if="{{calendarLoading}}" class="creator-caption">正在读取真实档期…</text><view wx:elif="{{calendarError}}"><text>{{calendarError}}</text><button class="storefront-file-tool" bindtap="loadStorefrontCalendar">重新读取</button></view>
+   <block wx:elif="{{calendarKnown}}"><view class="storefront-month-heading"><button class="storefront-file-tool" data-step="-1" disabled="{{!calendarOffset}}" bindtap="changeStorefrontMonth">‹</button><text>{{calendarTitle}}</text><button class="storefront-file-tool" data-step="1" disabled="{{calendarOffset === 11}}" bindtap="changeStorefrontMonth">›</button></view><view class="storefront-month-grid"><text wx:for="{{calendarWeekdays}}" wx:key="*this">{{item}}</text><view wx:for="{{calendarDays}}" wx:key="key" class="{{item.past ? 'past' : item.state}}"><text>{{item.value}}</text><text wx:if="{{item.valid && !item.past}}">{{item.locked ? '已锁' : item.open ? '可约' : '未公开'}}</text></view></view><text class="creator-caption">可约：明确开放　未公开：需确认　已锁：订单占用</text></block>
+   <text class="creator-caption">未公开日期需与服务方确认，不等于不可预约。</text>
+  </view>
+  <button class="storefront-link" bindtap="togglePreferences"><text>合作偏好</text><text>›</text></button><button class="storefront-link" bindtap="openReviews"><text>合作评价</text><text>{{reviewCount}} 条评价 ›</text></button>
+ </block>
+ <view wx:if="{{storefrontDraftPreview}}" class="two-actions"><button class="am-action am-action-primary" bindtap="continueEditing">{{serviceDetail ? '返回主页预览' : '返回发布确认'}}</button></view>
+ <view wx:elif="{{providerPreview}}" class="two-actions"><button class="am-action am-action-primary" bindtap="{{serviceDetail ? 'closeServiceDetail' : 'returnToStorefrontManager'}}">{{serviceDetail ? '返回主页预览' : '返回管理橱窗'}}</button></view>
+ <view wx:else class="sticky-action"><view><text>已选 {{selectedServiceIds.length}} 项 · 参考合计</text><text class="am-money am-money-list">￥{{selectedTotal}}</text></view><button class="am-action am-action-primary" bindtap="startBooking">{{provider.accepting === false ? '暂停接单' : selectedServiceIds.length ? '预约所选服务' : '选择服务'}}</button></view>
+</view>
+<view wx:elif="{{!loading}}" class="empty-page"><text class="empty-page-title">{{loadError || '没有找到已公开的橱窗'}}</text><button wx:if="{{loadError}}" class="am-action am-action-secondary" bindtap="retryLoad">重新读取</button></view>
+<main-bottom-nav wx:if="{{!storefrontDraftPreview && !providerPreview}}" workspace="{{navWorkspace}}"/>

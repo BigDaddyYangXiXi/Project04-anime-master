@@ -1,5 +1,5 @@
 {
-  "appid": "wx57412ad07a806b70",
+  "appid": "wxc94e1c1b38944511",
   "compileType": "miniprogram",
   "projectname": "anime-master-v0.7.0-native.16",
   "description": "动漫高手 0.7 微信小程序工程",
@@ -9,8 +9,8 @@
     "es6": true,
     "enhance": true,
     "postcss": true,
-    "minified": false,
-    "urlCheck": false,
+    "minified": true,
+    "urlCheck": true,
     "compileWorklet": false,
     "uglifyFileName": false,
     "uploadWithSourceMap": true,
@@ -32,8 +32,98 @@
   },
   "simulatorPluginLibVersion": {},
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      {
+        "type": "folder",
+        "value": "components/rating-stars"
+      },
+      {
+        "type": "file",
+        "value": "utils/input-normalization.test.js"
+      },
+      {
+        "type": "file",
+        "value": "utils/discovery-region.test.js"
+      },
+      {
+        "type": "file",
+        "value": "utils/discovery-query.test.js"
+      },
+      {
+        "type": "file",
+        "value": "data/calendar-model.test.js"
+      },
+      {
+        "type": "file",
+        "value": "assets/careers/houqi.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/careers/maoniang.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/careers/sheying.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/careers/zhuangniang.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/nav/calendar-tab.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/nav/market-tab.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/nav/market-selected.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/nav/order-tab.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/nav/profile-tab.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/nav/project-tab.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/nav/workbench-tab.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/nav/calendar.svg"
+      },
+      {
+        "type": "file",
+        "value": "assets/nav/market.svg"
+      },
+      {
+        "type": "file",
+        "value": "assets/nav/order.svg"
+      },
+      {
+        "type": "file",
+        "value": "assets/nav/profile.svg"
+      },
+      {
+        "type": "file",
+        "value": "assets/nav/project.svg"
+      },
+      {
+        "type": "file",
+        "value": "assets/nav/workbench.svg"
+      }
+    ],
     "include": []
   },
-  "editorSetting": {}
+  "editorSetting": {},
+  "isGameTourist": false
 }

@@ -1,0 +1,32 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const orders = require("../miniprogram/services/cloud-orders");
+const openReference = require("../miniprogram/utils/order-reference-preview");
+global.wx = { previewImage() {}, showToast() {} };
+test("签前隐藏态不请求，连续点击只发一次，结束后重新鉴权", async t => {
+  const page = { data: { order: { id: "a", referenceAssetId: "ref", privateFieldsHidden: true } }, openReference };
+  global.getCurrentPages = () => [page];
+  let calls = 0; let finish; let shown = 0;
+  t.mock.method(orders, "getReferenceDownload", () => { calls++; return new Promise(resolve => { finish = resolve; }); });
+  t.mock.method(wx, "previewImage", ({ urls, success }) => { assert.deepEqual(urls, ["https://files.example.test/reference"]); shown++; success(); });
+  await page.openReference(); assert.equal(calls, 0);
+  page.data.order.privateFieldsHidden = false;
+  const pending = page.openReference(); await page.openReference(); assert.equal(calls, 1);
+  finish({ url: "https://files.example.test/reference" }); await pending;
+  assert.equal(shown, 1); assert.equal(page.referencePending, false);
+  const next = page.openReference(); finish({ url: "https://files.example.test/reference" }); await next;
+  assert.equal(calls, 2);
+});
+test("离开页面或保密状态改变后不打开迟到图片，权限失败可重试", async t => {
+  const page = { data: { order: { id: "a", referenceAssetId: "ref" } }, openReference };
+  let current = page; global.getCurrentPages = () => [current];
+  let finish; const access = t.mock.method(orders, "getReferenceDownload", () => new Promise(resolve => { finish = resolve; }));
+  t.mock.method(wx, "previewImage", () => assert.fail("迟到结果不能预览"));
+  const one = page.openReference(); current = {}; finish({ url: "https://files.example.test/reference" }); await one;
+  current = page;
+  const two = page.openReference(); page.data.order.privateFieldsHidden = true; finish({ url: "https://files.example.test/reference" }); await two;
+  page.data.order.privateFieldsHidden = false;
+  access.mock.mockImplementation(async () => { const error = new Error(); error.code = "NDA_REQUIRED"; throw error; });
+  let message; t.mock.method(wx, "showToast", ({ title }) => { message = title; });
+  await page.openReference(); assert.equal(message, "请先完成双方保密签署"); assert.equal(page.referencePending, false);
+});

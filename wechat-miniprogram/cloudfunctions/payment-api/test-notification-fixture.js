@@ -11,13 +11,13 @@ function createNotificationFixture() {
       "Wechatpay-Signature": crypto.sign("RSA-SHA256", Buffer.concat([Buffer.from(`${timestamp}\n${nonce}\n`), Buffer.from(body), Buffer.from("\n")]), pair.privateKey).toString("base64") };
     return { method: "POST", statusCode: 200, body: Buffer.from(body), headers };
   }
-  function notify(transaction, now, patch = {}) {
+  function notify(transaction, now, patch = {}, originalType = 'transaction') {
     const nonce = crypto.randomBytes(6).toString("hex"), associated_data = "transaction";
     const cipher = crypto.createCipheriv("aes-256-gcm", config.apiV3Key, Buffer.from(nonce));
     cipher.setAAD(Buffer.from(associated_data));
     const ciphertext = Buffer.concat([cipher.update(JSON.stringify(transaction)), cipher.final(), cipher.getAuthTag()]).toString("base64");
     const envelope = { id: `EV-${crypto.randomUUID()}`, create_time: new Date(now).toISOString(), event_type: "TRANSACTION.SUCCESS", resource_type: "encrypt-resource",
-      resource: { original_type: "transaction", algorithm: "AEAD_AES_256_GCM", nonce, associated_data, ciphertext }, ...patch };
+      resource: { original_type: originalType, algorithm: "AEAD_AES_256_GCM", nonce, associated_data, ciphertext }, ...patch };
     return sign(JSON.stringify(envelope), now);
   }
   function transaction(payment) {

@@ -18,4 +18,12 @@ function resolvedRegion(value) {
   };
 }
 
-module.exports = { canonicalCityCode, resolvedRegion };
+function geocoderUrl(latitude, longitude, key, secret) {
+  const path = '/ws/geocoder/v1/';
+  const location = `${latitude},${longitude}`;
+  const query = `get_poi=0&key=${key}&location=${location}`;
+  const sig = require('node:crypto').createHash('md5').update(path + '?' + query + secret).digest('hex');
+  return `https://apis.map.qq.com${path}?get_poi=0&key=${encodeURIComponent(key)}&location=${encodeURIComponent(location)}&sig=${sig}`;
+}
+
+module.exports = { canonicalCityCode, resolvedRegion, geocoderUrl };

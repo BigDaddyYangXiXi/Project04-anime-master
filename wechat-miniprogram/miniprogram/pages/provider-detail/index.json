@@ -3,5 +3,6 @@
   "usingComponents": {
     "work-card": "../../components/work-card/index",
     "availability-strip": "../../components/availability-strip/index"
-  }
+  },
+  "backgroundColorContent": "#171514"
 }

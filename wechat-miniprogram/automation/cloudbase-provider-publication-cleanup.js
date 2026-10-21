@@ -4,6 +4,7 @@ const path = require("node:path");
 const automator = require("miniprogram-automator");
 
 const envId = "quest-band-d1gem4bxt3fa17720";
+require("./assert-audit-environment")("wx57412ad07a806b70", envId);
 const artifactPath = path.resolve(__dirname, "..", ".artifacts", "cloudbase-provider-publication-positive-runtime.json");
 
 async function run() {

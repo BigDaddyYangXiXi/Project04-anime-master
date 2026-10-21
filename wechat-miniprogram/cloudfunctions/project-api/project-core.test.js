@@ -13,7 +13,7 @@ function mockDb() {
   ];
   const assets = [{ id: "asset_target", owner_account_id: BUYER, purpose: "PROJECT_TARGET", status: "READY", storage_key: "cloud://target.jpg", mime_type: "image/jpeg", size_bytes: 1000 }];
   return {
-    projects, orders,
+    projects, orders, assets,
     from(table) {
       let operation = "select"; let value; const filters = []; let inFilter = null;
       const builder = {
@@ -25,6 +25,7 @@ function mockDb() {
         then(resolve) {
           let source = [];
           if (table === "wechat_identities") source = [{ open_id: "openid-buyer", account_id: BUYER }];
+          if (table === "accounts") source = [{ id: BUYER, status: "ACTIVE" }];
           if (table === "account_roles") source = [{ account_id: BUYER, role: "BUYER" }];
           if (table === "order_aggregates") source = orders;
           if (table === "project_aggregates") source = projects;
@@ -55,6 +56,43 @@ test("creates one idempotent buyer project with server-derived source fields", a
   assert.match(first.description, /角色摄影/);
   assert.deepEqual(first.bookingIds, []);
   assert.equal(db.projects.length, 1);
+});
+
+test("target image links require the owned project and currently owned ready image assets", async () => {
+  const db = mockDb();
+  const project = await handleProject(db, { action: "createProject", idempotencyKey: "project-request-0001" }, { WX_OPENID: "openid-buyer" }, 4000, uuid);
+  const event = { action: "getTargetImages", projectId: project.id, assetIds: ["asset_target"] };
+  let calls = 0;
+  const storage = { async getTempFileURL(input) {
+    calls++;
+    assert.deepEqual(input.fileList, [{ fileID: "cloud://target.jpg", maxAge: 300 }]);
+    return { fileList: [{ fileID: "cloud://target.jpg", code: "SUCCESS", tempFileURL: "https://example.test/target.jpg" }] };
+  } };
+  const read = () => handleProject(db, event, { WX_OPENID: "openid-buyer" }, 5000, uuid, storage);
+  assert.equal((await read()).images[0].url, "https://example.test/target.jpg");
+  const original = { ...db.assets[0] };
+  for (const change of [{ status: "REJECTED" }, { owner_account_id: "other" }, { purpose: "PROJECT_REFERENCE" }, { mime_type: "application/pdf" }, { storage_key: "https://public.test/a" }]) {
+    Object.assign(db.assets[0], original, change);
+    assert.equal((await read()).images[0].url, null);
+  }
+  assert.equal(calls, 1);
+  Object.assign(db.assets[0], original);
+  db.projects[0].buyer_id = "other";
+  await assert.rejects(read, error => error.code === "PROJECT_NOT_FOUND");
+  assert.equal(calls, 1);
+});
+
+test("target signing ignores missing, mismatched, credentialed and failed URLs", async () => {
+  const db = mockDb();
+  const project = await handleProject(db, { action: "createProject", idempotencyKey: "project-request-0001" }, { WX_OPENID: "openid-buyer" }, 4000, uuid);
+  for (const file of [{ fileID: "other", tempFileURL: "https://example.test/a" },
+    { fileID: "cloud://target.jpg", tempFileURL: "https://user:secret@example.test/a" },
+    { fileID: "cloud://target.jpg", tempFileURL: "https://" },
+    { fileID: "cloud://target.jpg", code: "FAILED", tempFileURL: "https://example.test/a" }]) {
+    const result = await handleProject(db, { action: "getTargetImages", projectId: project.id, assetIds: ["asset_target"] },
+      { WX_OPENID: "openid-buyer" }, 5000, uuid, { getTempFileURL: async () => ({ fileList: [file] }) });
+    assert.equal(result.images[0].url, null);
+  }
 });
 
 test("saves validated project fields and owned ready target media with version lock", async () => {

@@ -39,3 +39,21 @@ assert.strictEqual(navigatedBack, 0, "服务方预览不得接受需求方详情
 assert.strictEqual(switchedTo, "/pages/discover/index");
 
 process.stdout.write("Top navigation shared-role audit passed\n");
+
+goBack('provider',{route:'pages/order-refund/index',data:{navWorkspace:'provider'}});
+assert.strictEqual(navigatedBack,1,'服务方可返回自己的退款记录');
+goBack('provider',{route:'pages/order-refund/index',data:{navWorkspace:'buyer'}});
+assert.strictEqual(navigatedBack,0,'不得返回其他身份的退款记录');
+goBack('buyer',{route:'pages/order-refund/index',data:{navWorkspace:'buyer'}});
+assert.strictEqual(navigatedBack,1,'需求方可返回自己的退款记录');
+goBack('buyer',{route:'pages/order-refund/index',data:{navWorkspace:'provider'}});
+assert.strictEqual(navigatedBack,0,'需求方不得返回服务方退款记录');
+
+for (const workspace of ['buyer','provider']) {
+  for (const name of ['help','settings','support','me-social','me-activity']) {
+    goBack(workspace,{route:'pages/'+name+'/index',data:{navWorkspace:workspace}});
+    assert.strictEqual(navigatedBack,1,name+' must return within the same workspace');
+    goBack(workspace,{route:'pages/'+name+'/index',data:{navWorkspace:workspace==='buyer'?'provider':'buyer'}});
+    assert.strictEqual(navigatedBack,0,name+' must not cross workspace');
+  }
+}

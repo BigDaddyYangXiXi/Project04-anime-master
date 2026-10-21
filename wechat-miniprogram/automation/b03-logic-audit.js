@@ -64,7 +64,7 @@ assert.ok(bookingWxml.includes('class="segmented-control time-mode-control"'), "
 assert.ok(!bookingWxml.includes("连续多日"), "连续多日不得继续作为重复的独立模式展示");
 assert.ok(!bookingJs.includes('{ id: "multi-day"'), "连续多日不得继续进入可选模式数据");
 assert.ok(/\.time-mode-control\s*\{[^}]*repeat\(3,/s.test(bookingWxss), "时间选择器必须使用三等分布局");
-assert.ok(bookingWxml.includes('class="segmented-control reference-mode-control"'), "引用作品与上传图片必须复用同一分段选择器语言");
+assert.ok(bookingWxml.includes('class="segmented-control reference-mode-control"'), "参考作品与上传图片必须复用同一分段选择器语言");
 assert.ok(/\.segmented-control\s*\{[^}]*gap:\s*0/s.test(bookingWxss), "分段选择器必须连续且没有分段间距");
 assert.ok(/\.segmented-control button\s*\{[^}]*display:\s*flex[^}]*min-height:\s*88rpx[^}]*align-items:\s*center[^}]*justify-content:\s*center/s.test(bookingWxss), "分段选项必须保留 44px 热区并双轴居中文字");
 assert.ok(/\.segment-surface\s*\{[^}]*height:\s*72rpx[^}]*#e7deda[^}]*font-size:\s*24rpx/s.test(bookingWxss), "44px 热区内必须使用 36px 暖灰边视觉表面和 12px 文字");
@@ -76,13 +76,13 @@ assert.ok(!/\.mode-row|\.reference-tabs/.test(bookingWxss), "旧的大块按钮�
 assert.ok(bookingWxml.includes('disabled="{{submitting}}" aria-disabled="{{!canSubmit}}"'), "业务缺项时主按钮仍须可点击并解释原因，仅提交中原生禁用");
 assert.ok(bookingWxml.includes('class="required-dot"'), "未完成必填分组必须显示红点");
 assert.ok(bookingJs.includes("provider.works.find((item) => item.id === requestedWorkId)"), "B03 必须优先解析服务者自己的已发布作品");
-assert.ok(bookingJs.includes("catalogWork.provider.id === provider.id"), "B03 必须拒绝跨服务者作品引用");
-assert.ok(bookingJs.includes("作品与服务者不匹配"), "跨服务者作品引用必须给出明确反馈");
+assert.ok(bookingJs.includes("catalogWork.provider.id === provider.id"), "B03 必须拒绝跨服务者作品参考");
+assert.ok(bookingJs.includes("作品与服务者不匹配"), "跨服务者作品参考必须给出明确反馈");
 assert.ok(bookingJs.includes("wx.navigateTo({ url: `/pages/booking-status/index?id=${order.id}`"), "进入 B04 时必须保留 B03 页面栈");
 assert.ok(!bookingJs.includes("wx.redirectTo({ url: `/pages/booking-status/index"), "进入 B04 不得替换 B03");
 assert.ok(bookingJs.includes("if (this.submittedOrderId && this.data.submitting)"), "从 B04 返回时必须恢复 B03 提交控件");
 assert.strictEqual(defaultPage.data.canSubmit, false, "空联系方式与空需求必须禁用提交");
-assert.strictEqual(defaultPage.data.referenceMode, "work", "从作品进入应默认引用作品");
+assert.strictEqual(defaultPage.data.referenceMode, "work", "从作品进入应默认参考作品");
 assert.strictEqual(defaultPage.data.displayedTotal, 520, "默认服务合计应为 520");
 assert.ok(defaultPage.data.date >= new Date().toISOString().slice(0, 10), "默认日期不得早于今天");
 

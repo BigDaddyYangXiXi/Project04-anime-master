@@ -1,0 +1,11 @@
+<template name="creator-service">
+  <view class="creator-service-heading"><view><text class="creator-service-title">{{service.name || '未命名服务'}}</text><text class="creator-caption">{{service.serviceModeLabel || service.locationText}}</text></view><view><text class="am-money am-money-list">￥{{service.price}}</text><text class="creator-caption">/ {{service.unit}}</text></view></view>
+  <text class="creator-service-copy">{{service.description}}</text>
+  <view role="button" class="creator-link" data-id="{{service.id}}" bindtap="toggleServiceInfo"><text>包含内容与预约须知</text><text>{{service.infoOpen || service.expanded ? '收起' : '展开'}}</text></view>
+  <view wx:if="{{service.infoOpen || service.expanded}}" class="creator-preferences"><text>包含／不包含：{{service.includes || '待沟通'}}</text><text>额外费用：{{service.extras || '待沟通'}}</text><text>提前准备：{{service.preparation || '待沟通'}}</text></view>
+  <text class="creator-caption">关联作品 · {{service.linkedTitles || '暂无'}}</text>
+</template>
+<template name="creator-work">
+  <view class="creator-work-cover"><image wx:if="{{work.coverImage}}" src="{{work.coverImage}}" mode="widthFix" lazy-load="{{true}}"/><text wx:else>暂无作品图片</text></view>
+  <view class="creator-work-copy"><text class="creator-work-title">{{work.title || '未命名作品'}}</text><view class="creator-work-tags"><text wx:for="{{work.tags}}" wx:key="*this">{{item}}</text></view><view class="creator-work-meta"><text wx:if="{{work.price != null}}" class="am-money am-money-list">￥{{work.price}}</text><text class="creator-caption">被参考 {{work.referenceCount || 0}} 次</text></view></view>
+</template>

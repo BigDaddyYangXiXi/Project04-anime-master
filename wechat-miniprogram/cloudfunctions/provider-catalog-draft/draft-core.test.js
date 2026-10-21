@@ -1,8 +1,9 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { handleProviderDraft, normalizeDraft } = require("./draft-core");
+const { handleProviderDraft: realhandleProviderDraft, normalizeDraft } = require("./draft-core");
+const handleProviderDraft = (db,event,context,now,dependencies={ reviewServiceNames: async()=>{} }) => realhandleProviderDraft(db,event,context,now,dependencies);
 
-function mockDb({ draft = null, providerRole = true } = {}) {
+function mockDb({ draft = null, publication = null, providerRole = true } = {}) {
   const writes = [];
   return {
     writes,
@@ -21,8 +22,10 @@ function mockDb({ draft = null, providerRole = true } = {}) {
           if (operation === "insert") data = [value];
           else if (operation === "update") data = filters.some(([key, expected]) => key === "version" && draft && Number(expected) !== Number(draft.version)) ? [] : [{ version: value.version }];
           else if (table === "wechat_identities") data = [{ account_id: "provider_me" }];
+          else if (table === "accounts") data = [{ id: "provider_me", status: "ACTIVE" }].filter(row => filters.every(([key, expected]) => row[key] === expected));
           else if (table === "account_roles") data = providerRole ? [{ role: "PROVIDER" }] : [];
           else if (table === "provider_catalog_drafts") data = draft ? [draft] : [];
+          else if (table === "provider_catalog_publications") data = publication && filters.some(([key, expected]) => key === 'provider_id' && expected === 'provider_me') ? [publication] : [];
           return Promise.resolve({ data, error: null }).then(resolve);
         }
       };
@@ -50,6 +53,17 @@ test("读取不存在的草稿返回版本零和空结构", async () => {
   const result = await handleProviderDraft(mockDb(), { action: "getDraft" }, { WX_OPENID: "openid-me" });
   assert.equal(result.version, 0);
   assert.deepEqual(result.draft.services, []);
+});
+
+test('发布检查只读取可信账号的公开快照，不信任传入服务方编号且零写入', async () => {
+  const db=mockDb({draft:{version:3,updated_at:1234,payload:validDraft},publication:{payload:validDraft,draft_version:2,publication_version:1}});
+  const result=await handleProviderDraft(db,{action:'getWorkspaceReview',providerId:'attacker'},{WX_OPENID:'openid-me'});
+  assert.equal(result.providerId,'provider_me');
+  assert.equal(result.draftVersion,3);
+  assert.equal(result.publishedDraftVersion,2);
+  assert.deepEqual(result.publication,validDraft);
+  assert.equal(db.writes.length,0);
+  await assert.rejects(handleProviderDraft(db,{action:'getWorkspaceReview'},{}));
 });
 
 test("版本不一致时拒绝覆盖", async () => {
@@ -82,4 +96,13 @@ test("草稿结构拒绝重复 ID、跨引用和超过五张图片", () => {
     ...validDraft,
     services: [validDraft.services[0], { ...validDraft.services[0], id: "service_2" }]
   }), (error) => error.code === "VALIDATION_ERROR");
+});
+
+
+test('service name review failure blocks saveDraft before any write', async () => {
+ for(const code of ['SERVICE_NAME_REJECTED','SERVICE_NAME_CHECK_UNAVAILABLE']){
+  const db=mockDb();let checked=false;
+  await assert.rejects(handleProviderDraft(db,{action:'saveDraft',expectedVersion:0,draft:validDraft},{WX_OPENID:'trusted'},1234,{reviewServiceNames:async(services,openid)=>{checked=true;assert.equal(openid,'trusted');assert.equal(services[0].name,validDraft.services[0].name);throw Object.assign(Error(code),{code});}}),{code});
+  assert.equal(checked,true);assert.equal(db.writes.length,0);
+ }
 });

@@ -1,0 +1,14 @@
+.home-preferences{padding:var(--am-space-6) var(--am-page-gutter) var(--am-nav-bottom-content)}
+.preferences-title{display:block;font-size:var(--am-type-page-title);font-weight:var(--am-weight-semibold);line-height:var(--am-line-page-title)}
+.preferences-copy{display:block;margin-top:var(--am-space-2);color:var(--am-color-text-secondary);font-size:var(--am-type-caption);line-height:var(--am-line-caption)}
+.preferences-list{margin-top:var(--am-space-6);display:flex;flex-direction:column;gap:var(--am-space-2)}
+.preferences-row{display:flex;align-items:center;gap:var(--am-space-2);padding:var(--am-space-3) var(--am-space-2);border:var(--am-border-control);border-radius:var(--am-radius-card);background:var(--am-color-surface)}
+.preferences-first{border-color:var(--am-color-brand);background:var(--am-color-selected-surface)}
+.preferences-icon{width:var(--am-avatar-detail-author);height:var(--am-avatar-detail-author);flex-shrink:0}
+.preferences-name{line-height:var(--am-line-label);min-height:calc(var(--am-touch-min) + var(--am-line-label));justify-content:center;flex:1;min-width:0;display:flex;flex-direction:column;font-size:var(--am-type-body);font-weight:var(--am-weight-semibold)}
+.preferences-default{color:var(--am-color-brand);font-size:var(--am-type-caption);font-weight:var(--am-weight-regular);line-height:var(--am-line-caption)}
+button.preferences-set{width:100%;max-width:100%;min-width:0;margin:var(--am-space-none);padding:var(--am-space-none);min-height:var(--am-touch-min);background:var(--am-color-transparent);color:var(--am-color-text-secondary);font-size:var(--am-type-caption);font-weight:var(--am-weight-regular);text-align:left}
+.preferences-row > button.preferences-move{width:var(--am-touch-min);min-width:var(--am-touch-min);max-width:var(--am-touch-min);min-height:var(--am-touch-min);margin:var(--am-space-none);padding:var(--am-space-none);flex-shrink:0;background:var(--am-color-transparent);color:var(--am-color-text);font-size:var(--am-type-body)}
+.preferences-row > button.preferences-move[data-am-disabled="true"]{color:var(--am-color-border)}
+.preferences-footer{position:fixed;left:0;right:0;bottom:0;padding:var(--am-space-3) var(--am-page-gutter) calc(var(--am-space-3) + env(safe-area-inset-bottom));background:var(--am-color-canvas);border-top:var(--am-border-control)}
+.preferences-error{display:block;color:var(--am-color-danger);margin-top:var(--am-space-3);font-size:var(--am-type-caption)}

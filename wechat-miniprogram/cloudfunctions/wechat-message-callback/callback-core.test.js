@@ -8,6 +8,15 @@ const {
   verifyPlainSignature
 } = require("./callback-core");
 
+test("a provider error cannot approve an image even when suggest says pass", () => {
+  for (const errcode of [1, -1, "invalid", null, false]) {
+    const result = normalizeMediaCheck({ Event: "wxa_media_check", trace_id: "trace", errcode, result: { suggest: "pass" } });
+    assert.equal(result.status, "ERROR");
+    assert.equal(result.assetStatus, "REJECTED");
+  }
+  assert.equal(normalizeMediaCheck({ Event: "wxa_media_check", trace_id: "trace", errcode: 0, result: { suggest: "pass" } }).status, "PASS");
+});
+
 test("plain handshake signature is sorted before sha1", () => {
   const signature = sha1Signature(["token123", "1714112445", "415670741"]);
   assert.equal(verifyPlainSignature("token123", "1714112445", "415670741", signature), true);
@@ -56,4 +65,12 @@ test("media check result maps pass and risky states", () => {
     trace_id: "trace-risky",
     result: { suggest: "risky", label: 20001 }
   }).assetStatus, "REJECTED");
+});
+
+test("unknown and inherited result names cannot become database verdicts", () => {
+  for (const suggest of ["__proto__", "constructor", "toString", "unknown", ""]) {
+    const result = normalizeMediaCheck({ Event: "wxa_media_check", trace_id: "trace-unknown", result: { suggest } });
+    assert.equal(result.status, "ERROR");
+    assert.equal(result.assetStatus, "REJECTED");
+  }
 });

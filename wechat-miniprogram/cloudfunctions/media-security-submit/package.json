@@ -4,10 +4,11 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "test": "node --test media-security-core.test.js wx-openapi-adapter.test.js"
+    "test": "node --test *.test.js"
   },
   "dependencies": {
     "@cloudbase/node-sdk": "3.18.3",
     "wx-server-sdk": "4.0.2"
-  }
+  },
+  "overrides": { "@cloudbase/node-sdk": { "axios": "0.33.0" } }
 }

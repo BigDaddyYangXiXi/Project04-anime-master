@@ -1,0 +1,9 @@
+.notice-document { padding: var(--am-detail-page-padding); }
+.document-title, .document-version, .draft-note, .section-title, .document-paragraph { display: block; }
+.document-title { font-size: var(--am-type-page-title); font-weight: var(--am-weight-semibold); }
+.document-version, .draft-note { color: var(--am-color-text-secondary); font-size: var(--am-type-caption); margin-top: var(--am-detail-section-gap); }
+.document-toc, .document-section { margin-top: var(--am-detail-section-gap); margin-bottom: var(--am-detail-section-gap); }
+.section-title { font-size: var(--am-type-body); font-weight: var(--am-weight-semibold); }
+page .document-paragraph { margin-top: var(--am-detail-section-gap); font-size: var(--am-type-body); font-weight: var(--am-weight-regular); line-height: var(--am-line-body); overflow-wrap: anywhere; }
+page button.toc-link { width: 100%; min-height: var(--am-touch-min); padding: var(--am-space-none); margin: var(--am-space-none); text-align: left; background: var(--am-color-transparent); color: var(--am-color-brand); font-size: var(--am-type-body); font-weight: var(--am-weight-regular); white-space: normal; }
+.toc-link::after { border: none; }

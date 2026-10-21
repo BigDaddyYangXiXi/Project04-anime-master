@@ -11,41 +11,54 @@ const {
 const { toPublicError } = require("./index");
 
 function mockDb({ existingAccountId = null, status = "ACTIVE", roles = ["PROVIDER", "BUYER"] } = {}) {
-  const writes = [];
-  const generatedId = `acct_${identityKey("app-1", "openid-1").slice(0, 32)}`;
-  let boundAccountId = existingAccountId;
-  return {
-    writes,
-    from(table) {
-      return {
-        upsert(value, options) {
-          writes.push({ table, value, options });
-          if (table === "wechat_identities") boundAccountId = value.account_id;
-          return Promise.resolve({ error: null });
-        },
-        select() {
-          return {
-            eq() {
-              if (table === "wechat_identities") {
-                return Promise.resolve({ data: boundAccountId ? [{ account_id: boundAccountId }] : [], error: null });
-              }
-              if (table === "accounts") {
-                return Promise.resolve({ data: [{ id: boundAccountId || generatedId, uid: "AM_PUBLIC", nickname: existingAccountId ? "既有用户" : "新用户", avatar_asset_id: null, status, version: "1" }], error: null });
-              }
-              return Promise.resolve({ data: roles.map((role) => ({ role })), error: null });
-            }
-          };
-        }
-      };
-    }
-  };
+ const {createDb}=require('./registration-test-db');
+ return createDb(existingAccountId?{accounts:[{id:existingAccountId,uid:'AM_PUBLIC',nickname:'既有用户',avatar_asset_id:null,status,version:'1'}],wechat_identities:[{account_id:existingAccountId,open_id:'openid-1'}],account_roles:roles.map(role=>({account_id:existingAccountId,role})),account_phone_identities:[{account_id:existingAccountId,phone_fingerprint:'f'.repeat(64)}]}:{});
 }
+const verifiedPhone={phone_fingerprint:'f'.repeat(64),phone_masked:'138****8000',country_code:'86'};
+
+test("会话返回本人草稿版本及公开状态，空与未公开不混淆", async () => {
+  const db = mockDb({ existingAccountId: "acct_existing" });
+  const context = { OPENID: "openid-1", APPID: "app-1" };
+  assert.deepEqual((await readSession(db, context)).storefrontState, { draftVersion: 0, hasPublication: false });
+  db.tables.provider_catalog_drafts.push({ provider_id: "other", version: 9 });
+  assert.equal((await readSession(db, context)).storefrontState.draftVersion, 0);
+  db.tables.provider_catalog_drafts.push({ provider_id: "acct_existing", version: "2", payload: "private-content" });
+  const draft = await readSession(db, context);
+  assert.deepEqual(draft.storefrontState, { draftVersion: 2, hasPublication: false });
+  assert.equal(JSON.stringify(draft).includes("private-content"), false);
+  db.tables.provider_catalog_publications.push({ provider_id: "acct_existing", publication_version: 1 });
+  assert.equal((await readSession(db, context)).storefrontState.hasPublication, true);
+  db.tables.provider_catalog_publications.length = 0;
+  db.tables.provider_profiles.push({ provider_id: "acct_existing", publish_status: "PUBLISHED" });
+  assert.equal((await readSession(db, context)).storefrontState.hasPublication, true);
+  assert.equal(db.writes.length, 0);
+});
+
+test("橱窗状态读取失败不伪装为空，也不阻断已注册登录", async () => {
+  const db = mockDb({ existingAccountId: "acct_existing" });
+  const from = db.from;
+  db.from = table => {
+    if (table === "provider_catalog_drafts") throw Error("unavailable");
+    return from(table);
+  };
+  const result = await readSession(db, { OPENID: "openid-1", APPID: "app-1" });
+  assert.equal(result.registered, true);
+  assert.equal(result.storefrontState, null);
+});
 
 test("未注册身份查询保持只读", async () => {
   const db = mockDb();
   const result = await readSession(db, { OPENID: "openid-1", APPID: "app-1" });
   assert.deepEqual(result, { registered: false });
   assert.equal(db.writes.length, 0);
+});
+
+test("旧协议或缺失版本不能注册，拒绝前不写入", async () => {
+  for (const noticeVersion of [undefined, "account-use-v1", "forged"]) {
+    const db = mockDb();
+    await assert.rejects(registerAccount(db, { OPENID: "openid-1", APPID: "app-1" }, { nickname: "合法昵称", acceptedNotice: true, noticeVersion }), { code: "ACCOUNT_NOTICE_OUTDATED" });
+    assert.equal(db.writes.length, 0);
+  }
 });
 
 test("未注册身份不能登录且不会静默建号", async () => {
@@ -61,14 +74,14 @@ test("注册建立账号、双角色、用途确认并最后绑定身份", async
   const db = mockDb();
   const result = await registerAccount(db, { OPENID: "openid-1", APPID: "app-1", UNIONID: "union-1" }, {
     nickname: "  桃桃老师  ",
-    acceptedNotice: true
-  }, 1234);
+    acceptedNotice: true, username: "taotao01", noticeVersion: NOTICE_VERSION
+  }, 1234, verifiedPhone);
 
   assert.equal(result.created, true);
   assert.equal(result.registered, true);
   assert.deepEqual(result.roles, ["BUYER", "PROVIDER"]);
   assert.deepEqual(db.writes.map((item) => item.table), [
-    "accounts", "account_roles", "account_registration_consents", "wechat_identities"
+    "accounts", "account_roles", "account_registration_consents", "account_phone_identities", "wechat_identities", "accounts"
   ]);
   assert.equal(db.writes[0].value.nickname, "桃桃老师");
   assert.equal(db.writes[2].value.notice_version, NOTICE_VERSION);
@@ -80,8 +93,8 @@ test("重复注册复用既有账号且不改写资料", async () => {
   const db = mockDb({ existingAccountId: "acct_existing" });
   const result = await registerAccount(db, { OPENID: "openid-1", APPID: "app-1" }, {
     nickname: "另一个昵称",
-    acceptedNotice: true
-  }, 5678);
+    acceptedNotice: true, username: "taotao01", noticeVersion: NOTICE_VERSION
+  }, 5678, verifiedPhone);
   assert.equal(result.created, false);
   assert.equal(result.account.id, "acct_existing");
   assert.equal(result.account.nickname, "既有用户");
@@ -91,9 +104,9 @@ test("重复注册复用既有账号且不改写资料", async () => {
 
 test("昵称和用途确认由服务端校验", async () => {
   assert.equal(normalizeNickname("  桃桃  "), "桃桃");
-  assert.equal(normalizeNickname("👨‍👩‍👧‍👦".repeat(20)), "👨‍👩‍👧‍👦".repeat(20));
+  assert.equal(normalizeNickname("👨‍👩‍👧‍👦".repeat(12)), "👨‍👩‍👧‍👦".repeat(12));
   assert.throws(() => normalizeNickname(""), (error) => error.code === "INVALID_NICKNAME");
-  assert.throws(() => normalizeNickname("超".repeat(21)), (error) => error.code === "INVALID_NICKNAME");
+  assert.throws(() => normalizeNickname("超".repeat(13)), (error) => error.code === "INVALID_NICKNAME");
   assert.throws(() => normalizeNickname({ nickname: "桃桃" }), (error) => error.code === "INVALID_NICKNAME");
   assert.throws(() => normalizeNickname("桃\n桃"), (error) => error.code === "INVALID_NICKNAME");
   await assert.rejects(

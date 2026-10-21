@@ -4,6 +4,7 @@ const path = require("node:path");
 const automator = require("miniprogram-automator");
 
 const envId = "quest-band-d1gem4bxt3fa17720";
+require("./assert-audit-environment")("wx57412ad07a806b70", envId);
 const outputPath = path.resolve(__dirname, "..", ".artifacts", "cloudbase-order-runtime.json");
 
 async function call(miniProgram, name, data) {
@@ -23,7 +24,7 @@ async function run() {
     assert.deepEqual(listed.data.orders, []);
 
     const rejected = await call(miniProgram, "order-api", {
-      action: "createOrder",
+      action: "createOrder", ndaRequired: false,
       providerId: account.data.account.id,
       serviceIds: ["service_qa"],
       city: "杭州", cityCode: "330100",
@@ -37,7 +38,7 @@ async function run() {
     assert.equal(rejected.error.code, "SELF_ORDER_NOT_ALLOWED");
 
     const invalidTime = await call(miniProgram, "order-api", {
-      action: "createOrder",
+      action: "createOrder", ndaRequired: false,
       providerId: account.data.account.id,
       serviceIds: ["service_qa"],
       city: "杭州", cityCode: "330100",

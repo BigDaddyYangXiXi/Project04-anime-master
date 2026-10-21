@@ -1,13 +1,22 @@
+const sheetKeyboard = require("../../utils/sheet-keyboard");
+const { nativeBrandColor } = require("../../data/design-theme");
+const { statusViewFor } = require("../../data/booking-status-view");
+const localPreview = require("../../utils/local-preview");
 const store = require("../../data/v063-store");
 const paymentGateway = require("../../data/payment-gateway");
 const presentation = require("../../data/order-presentation");
 const { stageLabels } = require("../../data/v063");
 const cloudOrders = require("../../services/cloud-orders");
 
-const STEP_TITLES = ["预约沟通发起", "完成预约沟通", "合作确立确认", "执行制作"];
+const STEP_TITLES = ["邀请回应", "合作沟通", "确认与付款", "进入执行"];
 
-function confirmAction(title, content, onConfirm) {
-  wx.showModal({ title, content, confirmColor: "#c6536b", success: ({ confirm }) => { if (confirm) onConfirm(); } });
+const confirmAction = require("../../utils/order-confirmation");
+
+function sessionGuard(page) {
+  const app = typeof getApp === "function" ? getApp() : null;
+  const owner = app?.globalData.account?.id, revision = app?.sessionRevision;
+  return () => !page.unloaded && (!app || (owner &&
+    app.globalData.account?.id === owner && app.sessionRevision === revision));
 }
 
 function stepFor(order) {
@@ -34,7 +43,10 @@ function agreementIssues(order) {
 }
 
 Page({
+  openReference: require("../../utils/order-reference-preview"),
+  ...sheetKeyboard,
   data: {
+    sheetKeyboardHeight: 0, sheetScrollTarget: "",
     order: null, statusTitle: "", supplement: "", canSubmitSupplement: false,
     replyMinutes: null, replySampleCount: 0, currentStep: 1, journeySteps: [], journeyTitle: "", journeyLead: "",
     isSupplement: false, isFailed: false, showJourney: false, isStepOne: false, isStepTwo: false,
@@ -42,19 +54,20 @@ Page({
     waitingProviderNda: false, canConfirmAgreement: false, agreementConfirmed: false,
     paymentStatus: "UNPAID", paying: false, paymentQuerying: false, paymentHint: "", totalPrice: 0,
     buyerIdentity: null, providerIdentity: null, schedule: { mode: "", lines: [] },
-    loading: false, loadError: "", actionPending: false
+    loading: false, loadError: "", actionPending: false,
+    panel: "", detailsOpen: false, agreementRead: false, statusView: {}, referencePrice: 0
   },
 
   onLoad(options) {
     this.orderId = options.id;
-    this.auditStage = options.audit === "1" ? options.stage : "";
-    this.auditPrefill = options.audit === "1" && options.prefill === "1";
-    this.auditFailure = options.audit === "1" ? options.failure : "";
-    this.auditStarted = options.audit === "1" && options.started === "1";
-    this.auditAgreement = options.audit === "1" && options.agreement === "1";
-    this.auditPaymentStatus = options.audit === "1" ? options.paymentStatus : "";
-    this.auditSegments = options.audit === "1" && options.segments === "1";
-    this.cloudMode = options.audit !== "1";
+    this.auditStage = localPreview.isAudit(options) ? options.stage : "";
+    this.auditPrefill = localPreview.isAudit(options) && options.prefill === "1";
+    this.auditFailure = localPreview.isAudit(options) ? options.failure : "";
+    this.auditStarted = localPreview.isAudit(options) && options.started === "1";
+    this.auditAgreement = localPreview.isAudit(options) && options.agreement === "1";
+    this.auditPaymentStatus = localPreview.isAudit(options) ? options.paymentStatus : "";
+    this.auditSegments = localPreview.isAudit(options) && options.segments === "1";
+    this.cloudMode = !localPreview.isAudit(options);
   },
   onShow() { this.loadOrder(); },
   async onPullDownRefresh() {
@@ -71,19 +84,21 @@ Page({
 
   async loadOrder() {
     if (this.cloudMode) {
+      const current = sessionGuard(this);
+      if (!current()) return;
       const request = this.loadRequest = (this.loadRequest || 0) + 1;
       const visibleOrder = this.data.order;
       this.setData({ loading: true, loadError: "" });
       try {
         const order = await cloudOrders.getOrder(this.orderId);
-        if (request !== this.loadRequest) return;
+        if (!current() || request !== this.loadRequest) return;
         this.renderOrder(order);
       } catch (error) {
-        if (request === this.loadRequest && this.data.order === visibleOrder) {
+        if (current() && request === this.loadRequest && this.data.order === visibleOrder) {
           this.setData({ order: null, loadError: this.cloudErrorMessage(error) });
         }
       } finally {
-        if (request === this.loadRequest) this.setData({ loading: false });
+        if (current() && request === this.loadRequest) this.setData({ loading: false });
       }
       return;
     }
@@ -126,7 +141,7 @@ Page({
     const showJourney = !isSupplement && !isFailed;
     const issues = currentStep === 3 ? agreementIssues(order) : [];
     const agreementConfirmed = Boolean(order.buyerAgreementConfirmedAt);
-    const totalPrice = (order.serviceItems || []).reduce((sum, item) => sum + Number(item.finalPrice || 0), 0) || Number(order.finalPrice || 0);
+    const totalPrice = Number(order.finalPrice ?? (order.serviceItems || []).reduce((sum, item) => sum + Number(item.finalPrice || 0), 0));
     const schedule = presentation.scheduleFor(order);
     let journeyLead = "现在无需重复操作，接下来由服务方评估是否愿意开始沟通。";
     if (currentStep === 1 && order.stage === "CONTACTING") journeyLead = "老师已接受预约，正在准备联系你；首次获取联系方式后将进入下一步。";
@@ -135,14 +150,17 @@ Page({
     if (currentStep === 4) journeyLead = "支付结果已经服务端确认，合作正式进入履约制作。";
     const supplement = this.auditPrefill ? "已补充冷调男性角色设定图。" : this.data.supplement;
     this.setData({
-      order, statusTitle: stageLabels[order.stage] || "预约状态", supplement,
+      statusView: statusViewFor(order, currentStep, agreementConfirmed),
+      statusIcon: ["PAYMENT_REVIEW", "VERIFYING"].includes(order.paymentStatus) ? "clock" : currentStep === 4 ? "check" : ["NDA_BUYER_PENDING", "NDA_PROVIDER_PENDING"].includes(order.stage) ? "lock" : currentStep === 3 ? "document" : currentStep === 2 || isFailed ? "message" : "clock",
+      referencePrice: Number(order.originalPrice ?? totalPrice),
+      order, statusTitle: ["PAYMENT_REVIEW", "VERIFYING"].includes(order.paymentStatus) ? "付款待核对" : order.paymentStatus === "PAID" && currentStep === 3 ? "付款已确认" : agreementConfirmed && currentStep === 3 ? "待付款" : stageLabels[order.stage] || "预约状态", supplement,
       canSubmitSupplement: Boolean(supplement.trim()), replyMinutes: replyMetric.averageResponseMinutes,
       replySampleCount: replyMetric.sampleCount, currentStep, journeySteps: buildJourney(currentStep),
       journeyTitle: STEP_TITLES[currentStep - 1], journeyLead, isSupplement, isFailed, showJourney,
       isStepOne: showJourney && currentStep === 1, isStepTwo: showJourney && currentStep === 2,
       isStepThree: showJourney && currentStep === 3, isStepFour: showJourney && currentStep === 4,
       agreementIssues: issues,
-      canSignNda: order.stage === "NDA_BUYER_PENDING" && issues.length === 1 && issues[0] === "保密协议尚未完成双方签署",
+      canSignNda: order.stage === "NDA_BUYER_PENDING" && order.ndaRequired === true && !order.buyerNdaSigned,
       waitingProviderNda: order.stage === "NDA_PROVIDER_PENDING",
       canConfirmAgreement: order.stage === "BUYER_FINAL_CONFIRM" && issues.length === 0 && !agreementConfirmed,
       agreementConfirmed, paymentStatus: order.paymentStatus || "UNPAID", totalPrice,
@@ -154,28 +172,40 @@ Page({
     return true;
   },
 
+  openPanel(event) { this.resetSheetKeyboard(); this.setData({ panel: event.currentTarget.dataset.panel, agreementRead: false }); },
+  closePanel() { if (!this.data.actionPending) { this.resetSheetKeyboard(); this.setData({ panel: "" }); } },
+  stopTap() {},
+  toggleDetails() { this.setData({ detailsOpen: !this.data.detailsOpen }); },
+  updateAgreementRead(event) { this.setData({ agreementRead: event.detail.value.includes("read") }); },
+  confirmReviewed() {
+    if (!this.data.agreementRead) return wx.showToast({ title: "请先核对并勾选合作信息", icon: "none" });
+    this.confirmAgreement();
+  },
+  refreshStatus() { return this.onPullDownRefresh(); },
+  copyCode() { wx.setClipboardData({ data: String(this.data.order.id) }); },
+  viewProvider() { wx.navigateTo({ url: "/pages/provider-detail/index?id=" + encodeURIComponent(this.data.order.providerId) }); },
   updateSupplement(event) { const supplement = event.detail.value; this.setData({ supplement, canSubmitSupplement: Boolean(supplement.trim()) }); },
   submitSupplement() {
     const value = this.data.supplement.trim();
     if (!value) return wx.showToast({ title: "请填写补充信息", icon: "none" });
     if (this.cloudMode) return this.runTransition("BUYER_SUPPLEMENTS", { detail: value }, () => {
-      this.setData({ supplement: "", canSubmitSupplement: false });
+      this.setData({ supplement: "", canSubmitSupplement: false, panel: "" });
     });
     store.applyEvent(this.orderId, "BUYER_SUPPLEMENTS", { requirement: `${this.data.order.requirement}\n补充：${value}` });
-    this.auditStage = ""; this.setData({ supplement: "", canSubmitSupplement: false }); this.loadOrder();
+    this.auditStage = ""; this.setData({ supplement: "", canSubmitSupplement: false, panel: "" }); this.loadOrder();
   },
   signNda() {
     if (this.auditStage || !this.data.canSignNda) return;
-    confirmAction("确认签署保密协议", "请确认已经阅读保密约定。当前原型只记录签署顺序，不生成法律电子签章。", () => {
+    confirmAction(this, "确认签署保密协议", "请确认已经阅读保密约定。当前原型只记录签署顺序，不生成法律电子签章。", () => {
       if (this.cloudMode) return this.runTransition("BUYER_SIGNS_NDA");
-      store.applyEvent(this.orderId, "BUYER_SIGNS_NDA", { buyerNdaSigned: true }); this.loadOrder();
+      store.applyEvent(this.orderId, "BUYER_SIGNS_NDA", { buyerNdaSigned: true }); this.setData({ panel: "" }); this.loadOrder();
     });
   },
   confirmAgreement() {
     if (this.auditStage || !this.data.canConfirmAgreement) return;
-    confirmAction("确认本次合作信息", `将按页面所列内容及合计 ￥${this.data.totalPrice} 进入支付。确认信息不会直接扣款。`, () => {
+    confirmAction(this, "确认本次合作信息", `将按页面所列内容及合计 ￥${this.data.totalPrice} 进入支付。确认信息不会直接扣款。`, () => {
       if (this.cloudMode) return this.runTransition("BUYER_CONFIRMS_AGREEMENT");
-      store.updateOrder(this.orderId, { buyerAgreementConfirmedAt: Date.now() }); this.loadOrder();
+      store.updateOrder(this.orderId, { buyerAgreementConfirmedAt: Date.now() }); this.setData({ panel: "" }); this.loadOrder();
     });
   },
   startPayment() {
@@ -187,42 +217,62 @@ Page({
       wx.showToast({ title: "支付结果确认中", icon: "none" });
     }).catch((error) => {
       this.setData({ paying: false });
-      if (error.code === "PAYMENT_NOT_CONFIGURED") return wx.showModal({ title: "支付服务尚未接通", content: "当前订单还没有服务端生成的微信支付参数。接通商户号、下单接口和支付回调后才可付款。", showCancel: false, confirmColor: "#c6536b" });
+      if (error.code === "PAYMENT_NOT_CONFIGURED") return wx.showModal({ title: "支付服务尚未接通", content: "当前订单还没有服务端生成的微信支付参数。接通商户号、下单接口和支付回调后才可付款。", showCancel: false, confirmColor: nativeBrandColor });
       if (error.code === "PAYMENT_CANCELLED") return wx.showToast({ title: "已取消支付，可稍后重试", icon: "none" });
       store.updateOrder(this.orderId, { paymentStatus: "FAILED" }); this.loadOrder();
       wx.showToast({ title: "支付未完成，请重试", icon: "none" });
     });
   },
   refreshCloudPayment() {
+    const current = sessionGuard(this);
+    if (!current()) return Promise.resolve();
     if (this.paymentRefreshPromise) return this.paymentRefreshPromise;
     if (this.data.paying || this.unloaded) return Promise.resolve();
     this.paymentRefreshPromise = (async () => {
       let queryStatus = 'UNAVAILABLE';
       this.setData({ paymentQuerying: true, paymentHint: '正在核对付款结果，请稍候' });
       try { queryStatus = (await cloudOrders.refreshPayment(this.orderId)).queryStatus; } catch (_) {}
-      if (this.unloaded) return;
+      if (!current()) return;
       await this.loadOrder();
-      if (this.unloaded) return;
+      if (!current()) return;
       if (this.data.order && !['PAID', 'PAYMENT_REVIEW'].includes(this.data.order.paymentStatus)) {
         if (queryStatus === 'UNAVAILABLE') this.setData({ paymentHint: '暂时无法核对付款结果，请稍后刷新；不要重复付款' });
         else if (queryStatus === 'THROTTLED') this.setData({ paymentHint: '付款结果仍在核对中，请稍后刷新' });
       }
-    })().finally(() => { this.paymentRefreshPromise = null; if (!this.unloaded) this.setData({ paymentQuerying: false }); });
+    })().finally(() => { this.paymentRefreshPromise = null; if (current()) this.setData({ paymentQuerying: false }); });
     return this.paymentRefreshPromise;
   },
   async startCloudPayment() {
+    const current = sessionGuard(this);
+    if (!current()) return;
     this.setData({ paying: true });
     let cashierReturned = false;
+    let creating = false;
     try {
       const order = await cloudOrders.getOrder(this.orderId);
-      if (this.unloaded || this.renderOrder(order) === false) return;
+      if (!current() || this.renderOrder(order) === false) return;
       if (order.viewerRole !== "BUYER" || order.stage !== "BUYER_FINAL_CONFIRM"
         || !order.buyerAgreementConfirmedAt || agreementIssues(order).length
         || !["UNPAID", "FAILED"].includes(order.paymentStatus)) return;
       let paymentError;
+      creating = true;
+      const prepared = await cloudOrders.createPayment(this.orderId, order.version);
+      if (!current()) return;
+      // A newer read may have arrived while the server was preparing the payment.
+      if (this.data.order.version !== order.version || ['PAID', 'PAYMENT_REVIEW'].includes(this.data.paymentStatus)) return;
+      if (prepared.status !== 'READY') {
+        await cloudOrders.refreshPayment(this.orderId).catch(() => null);
+        if (!current()) return;
+        await this.loadOrder();
+        if (current() && !['PAID', 'PAYMENT_REVIEW'].includes(this.data.paymentStatus)) {
+          this.setData({ paymentHint: '正在核对已有付款记录，请稍后刷新；不要重复付款' });
+        }
+        return;
+      }
       try {
-        await paymentGateway.requestOrderPayment(order);
+        await paymentGateway.requestOrderPayment({ paymentRequest: prepared.paymentRequest });
       } catch (error) {
+        if (!current()) return;
         if (error && error.code === "PAYMENT_NOT_CONFIGURED") {
           wx.showModal({ title: "支付服务尚未接通", content: "暂时无法付款，合作信息已保留。支付服务开通后可继续。", showCancel: false });
           return;
@@ -230,12 +280,12 @@ Page({
         paymentError = error;
       }
       cashierReturned = true;
-      if (this.unloaded) return;
+      if (!current()) return;
       let queryUnavailable = false;
       try { await cloudOrders.refreshPayment(this.orderId); } catch (_) { queryUnavailable = true; }
-      if (this.unloaded) return;
+      if (!current()) return;
       const latest = await cloudOrders.getOrder(this.orderId);
-      if (this.unloaded || this.renderOrder(latest) === false) return;
+      if (!current() || this.renderOrder(latest) === false) return;
       if (!["PAID", "VERIFYING", "PAYMENT_REVIEW"].includes(latest.paymentStatus)) {
         this.setData({ paymentHint: queryUnavailable ? '暂时无法核对付款结果，请稍后刷新；不要重复付款'
           : paymentError && paymentError.code === "PAYMENT_CANCELLED"
@@ -243,25 +293,36 @@ Page({
           : "尚未确认付款结果，请稍后下拉刷新核对" });
       }
     } catch (error) {
-      if (this.unloaded) return;
-      this.setData({ paymentHint: cashierReturned
+      if (!current()) return;
+      const messages = {
+        PAYMENT_PREPAY_NOT_ENABLED: '付款功能暂未开放，合作信息已保留',
+        PAYMENT_MERCHANT_NOT_READY: '服务方暂未具备收款条件，请稍后再试',
+        PAYMENT_STATE_CHANGED: '订单状态已变化，请刷新后重试',
+        VERSION_CONFLICT: '订单状态已变化，请刷新后重试',
+        AGREEMENT_NOT_CONFIRMED: '请先核对并确认合作信息',
+        PAYMENT_ALREADY_EXISTS: '已有付款记录，请下拉刷新核对；不要重复付款'
+      };
+      this.setData({ paymentHint: messages[error && error.code] || (cashierReturned || creating
         ? "暂时无法核对付款结果，请下拉刷新；不要重复付款"
-        : "暂时无法读取最新订单，请下拉刷新后重试" });
+        : "暂时无法读取最新订单，请下拉刷新后重试") });
     } finally {
-      if (!this.unloaded) this.setData({ paying: false });
+      if (current()) this.setData({ paying: false });
     }
   },
   retryBooking() { wx.navigateTo({ url: `/pages/booking/index?providerId=${this.data.order.providerId}&repeatOrderId=${this.orderId}` }); },
   retryLoad() { this.loadOrder(); },
   async runTransition(event, fields = {}, after) {
-    if (this.data.actionPending || !this.data.order) return;
+    const current = sessionGuard(this);
+    if (!current() || this.data.actionPending || !this.data.order) return;
     this.setData({ actionPending: true });
     try {
       const order = await cloudOrders.transitionOrder(this.orderId, this.data.order.version, event, fields);
+      if (!current()) return;
       if (after) after(order);
       this.renderOrder(order);
-      this.setData({ actionPending: false, loadError: "" });
+      this.setData({ panel: "", actionPending: false, loadError: "" });
     } catch (error) {
+      if (!current()) return;
       this.setData({ actionPending: false, loadError: this.cloudErrorMessage(error) });
       if (error && error.code === "VERSION_CONFLICT") this.loadOrder();
       else wx.showToast({ title: this.cloudErrorMessage(error), icon: "none" });

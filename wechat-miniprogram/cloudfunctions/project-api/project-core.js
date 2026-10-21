@@ -43,6 +43,8 @@ async function resolveBuyer(db, context) {
   if (!openId) fail("AUTH_CONTEXT_MISSING", "trusted identity is missing");
   const identity = rows(await db.from("wechat_identities").select("account_id").eq("open_id", openId), "read identity")[0];
   if (!identity) fail("ACCOUNT_NOT_FOUND", "account is not initialized");
+  const account = rows(await db.from("accounts").select("id").eq("id", identity.account_id).eq("status", "ACTIVE"), "read active account")[0];
+  if (!account) fail("ACCOUNT_NOT_FOUND", "account is not active");
   const roles = rows(await db.from("account_roles").select("role").eq("account_id", identity.account_id), "read roles");
   if (!roles.some((item) => item.role === "BUYER")) fail("BUYER_ROLE_REQUIRED", "buyer role is required");
   return identity.account_id;
@@ -142,8 +144,38 @@ async function linkOrder(db, event, buyerId, now, unlink = false) {
   return publicProject({ ...row, ...next });
 }
 
-async function handleProject(db, event = {}, context = {}, now = Date.now(), uuid = crypto.randomUUID) {
+async function getTargetImages(db, storage, event, buyerId) {
+  await readOwnedProject(db, event.projectId, buyerId);
+  if (!Array.isArray(event.assetIds) || event.assetIds.length > 6) fail("VALIDATION_ERROR", "assetIds is invalid");
+  const ids = event.assetIds.map(id => safeId(id, "assetId"));
+  if (new Set(ids).size !== ids.length) fail("VALIDATION_ERROR", "assetIds contains duplicates");
+  if (!ids.length) return { images: [] };
+  // Owned, not-yet-saved target images must also be previewable in the editor.
+  const assets = rows(await db.from("media_assets").select("id,storage_key,mime_type")
+    .in("id", ids).eq("owner_account_id", buyerId).eq("purpose", "PROJECT_TARGET").eq("status", "READY"), "read target images")
+    .filter(asset => ["image/jpeg", "image/png", "image/webp"].includes(asset.mime_type)
+      && String(asset.storage_key || "").startsWith("cloud://"));
+  if (!assets.length) return { images: ids.map(assetId => ({ assetId, url: null })) };
+  const result = await storage.getTempFileURL({ fileList: assets.map(asset => ({ fileID: asset.storage_key, maxAge: 300 })) });
+  const files = result && Array.isArray(result.fileList) ? result.fileList : [];
+  return { images: ids.map(assetId => {
+    const asset = assets.find(item => item.id === assetId);
+    const file = asset && files.find(item => item && item.fileID === asset.storage_key);
+    let url = null;
+    if (file && (!file.code || file.code === "SUCCESS")) {
+      const candidate = file.tempFileURL || file.download_url;
+      try {
+        const parsed = new URL(candidate);
+        if (parsed.protocol === "https:" && !parsed.username && !parsed.password) url = candidate;
+      } catch (_) { /* Unavailable files keep their slot so the owner can remove them. */ }
+    }
+    return { assetId, url };
+  }) };
+}
+
+async function handleProject(db, event = {}, context = {}, now = Date.now(), uuid = crypto.randomUUID, storage) {
   const buyerId = await resolveBuyer(db, context);
+  if (event.action === "getTargetImages") return getTargetImages(db, storage, event, buyerId);
   if (event.action === "listProjects") {
     const projects = rows(await db.from("project_aggregates").select("*").eq("buyer_id", buyerId), "list projects");
     return { projects: projects.sort((a, b) => b.updated_at - a.updated_at).map(publicProject) };

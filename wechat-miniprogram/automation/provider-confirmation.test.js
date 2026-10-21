@@ -13,7 +13,7 @@ const store = require("../miniprogram/data/v063-store");
 function pageForCommunication(ndaChoice) {
   const page = {
     cloudMode: true,
-    data: { readyConfirm: true, price: 680, timePlaceConfirmed: true, serviceScopeConfirmed: true, amountConfirmed: true, ndaChoice },
+    data: { order: { id: "communication-order", version: 3, stage: "CONTACTING" }, readyConfirm: true, price: 680, timePlaceConfirmed: true, serviceScopeConfirmed: true, amountConfirmed: true, ndaChoice },
     submissions: [],
     runTransition(event, fields) { this.submissions.push({ event, fields }); }
   };
@@ -25,6 +25,7 @@ test("provider page submits all confirmations for either NDA choice only after m
   for (const choice of ["yes", "no"]) {
     const page = pageForCommunication(choice);
     page.finishCommunication();
+    assert.match(modal.content, /确认成功后占用本次合作时段/);
     modal.success({ confirm: false });
     assert.deepEqual(page.submissions, []);
     page.finishCommunication();
@@ -33,6 +34,22 @@ test("provider page submits all confirmations for either NDA choice only after m
       ndaRequired: choice === "yes", timePlaceConfirmed: true, serviceScopeConfirmed: true, amountConfirmed: true
     } }]);
   }
+});
+
+test("slot conflict keeps the current order and reports a recoverable error", async (t) => {
+  const order = { id: "slot_order", version: 1, stage: "CONTACTING" };
+  const page = { orderId: order.id, data: { order, actionPending: false },
+    setData(patch) { Object.assign(this.data, patch); },
+    renderOrder() { assert.fail("a rejected confirmation must not render a confirmed order"); },
+    cloudErrorMessage: definition.cloudErrorMessage };
+  t.mock.method(cloudOrders, "transitionOrder", async () => {
+    const error = new Error("SCHEDULE_CONFLICT"); error.code = error.message; throw error;
+  });
+  await definition.runTransition.call(page, "PROVIDER_ENDS_COMMUNICATION", {});
+  assert.equal(page.data.order, order);
+  assert.equal(page.data.actionPending, false);
+  assert.match(page.data.loadError, /时段已有已确认的合作/);
+  assert.match(definition.cloudErrorMessage({ code: "SLOT_STORE_NOT_CONFIGURED" }), /暂不可用/);
 });
 
 test("provider page keeps incomplete communication out of submission and explains a server rejection", () => {

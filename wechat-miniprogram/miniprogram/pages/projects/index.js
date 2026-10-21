@@ -1,3 +1,4 @@
+const localPreview = require("../../utils/local-preview");
 const store = require("../../data/v063-store");
 const projectModel = require("../../data/project-model");
 const cloudProjects = require("../../services/cloud-projects");
@@ -30,12 +31,28 @@ Page({
   },
 
   onLoad(options) {
-    this.auditChanged = options.audit === "1" && options.changed === "1";
-    this.cloudMode = options.audit !== "1";
-    this.availabilityCloudMode = options.audit !== "1";
+    this.auditChanged = localPreview.isAudit(options) && options.changed === "1";
+    this.cloudMode = !localPreview.isAudit(options);
+    this.availabilityCloudMode = !localPreview.isAudit(options);
   },
 
   onShow() {
+    this.hidden = false;
+    this.setData({ actionPending: false });
+    if (this.cloudMode) {
+      const owner = getApp().globalData.account?.id;
+      if (this.viewOwner !== owner) {
+        this.viewOwner = owner;
+        this.viewGeneration = (this.viewGeneration || 0) + 1;
+        this.calendarRequest = (this.calendarRequest || 0) + 1;
+        this.createIdempotencyKey = "";
+        this.calendarOwner = null; this.calendarMonth = null;
+        this.projectsOwner = null;
+        this.setData({ projects: [], days: [], originalDays: [], draftDays: [], lockedDays: [],
+          originalDates: [], draftDates: [], lockedDates: [], availabilityVersion: 0,
+          changed: false, message: "", navigationError: "", loadError: "", calendarError: "" });
+      }
+    }
     const role = wx.getStorageSync("animeMasterRole") === "provider" ? "provider" : "buyer";
     this.syncNativeTabBar(role);
     this.setData({ role }, () => {
@@ -43,21 +60,33 @@ Page({
     });
   },
 
+  onHide() { this.hidden = true; this.viewGeneration = (this.viewGeneration || 0) + 1; this.calendarRequest = (this.calendarRequest || 0) + 1; },
+  onUnload() { this.unloaded = true; this.onHide(); },
+
   syncNativeTabBar(role) {
     if (!wx.setTabBarItem) return;
-    const homeIcon = role === "provider" ? "/assets/nav/workbench-tab.png" : "/assets/nav/market-tab.png";
-    const thirdIcon = role === "provider" ? "/assets/nav/calendar-tab.png" : "/assets/nav/project-tab.png";
-    wx.setTabBarItem({ index: 0, text: role === "provider" ? "工作台" : "找高手", iconPath: homeIcon, selectedIconPath: homeIcon });
-    wx.setTabBarItem({ index: 2, text: role === "provider" ? "档期" : "项目", iconPath: thirdIcon, selectedIconPath: thirdIcon });
+    const homeIcon = role === "provider" ? "/assets/nav/workbench-line.png" : "/assets/nav/market-line.png";
+    const thirdIcon = role === "provider" ? "/assets/nav/calendar-line.png" : "/assets/nav/project-line.png";
+    wx.setTabBarItem({ index: 0, text: role === "provider" ? "工作台" : "找高手", iconPath: homeIcon, selectedIconPath: homeIcon.replace(".png", "-active.png") });
+    wx.setTabBarItem({ index: 2, text: role === "provider" ? "档期" : "项目", iconPath: thirdIcon, selectedIconPath: thirdIcon.replace(".png", "-active.png") });
   },
 
   async loadProjects() {
+    if (this.unloaded || this.hidden) return;
     if (this.cloudMode) {
+      const owner = getApp().globalData.account?.id, generation = this.viewGeneration || 0;
+      const request = this.projectRequest = (this.projectRequest || 0) + 1;
+      const current = () => !this.unloaded && !this.hidden && generation === (this.viewGeneration || 0)
+        && request === this.projectRequest && owner === getApp().globalData.account?.id;
+      if (this.projectsOwner !== owner) this.setData({ projects: [] });
+      this.projectsOwner = owner;
       this.setData({ loading: true, loadError: "" });
       try {
         const [projects, orders] = await Promise.all([cloudProjects.listProjects(), cloudOrders.listOrders()]);
+        if (!current()) return;
         this.setData({ projects: projects.map((project) => decorate(project, orders)), loading: false });
       } catch (error) {
+        if (!current()) return;
         this.setData({ projects: [], loading: false, loadError: "项目读取失败，请稍后重试。" });
       }
       return;
@@ -70,19 +99,28 @@ Page({
   },
 
   async loadCalendar() {
+    if (this.unloaded || this.hidden || this.data.actionPending) return;
     if (this.availabilityCloudMode) {
+      const owner = getApp().globalData.account?.id;
+      const request = this.calendarRequest = (this.calendarRequest || 0) + 1;
       this.setData({ calendarLoading: true, calendarError: "", message: "" });
       try {
         const value = await cloudAvailability.getMine();
+        if (request !== this.calendarRequest || owner !== getApp().globalData.account?.id || this.data.actionPending) return;
         const month = calendarModel.monthFrom();
         const today = calendarModel.todayKey();
         const openDates = value.openDates.filter((date) => date >= today);
+        const preserveDraft = this.calendarOwner === owner && this.calendarMonth
+          && this.data.availabilityVersion === value.version
+          && JSON.stringify([...this.data.lockedDates].sort()) === JSON.stringify([...value.lockedDates].sort());
+        this.calendarOwner = owner;
         this.calendarMonth = month;
         this.setData({
-          availabilityVersion: value.version, originalDates: openDates, draftDates: [...openDates], lockedDates: value.lockedDates,
+          availabilityVersion: value.version, originalDates: openDates, draftDates: preserveDraft ? this.data.draftDates.filter(date => date >= today) : [...openDates], lockedDates: value.lockedDates,
           monthTitle: month.title, calendarLoading: false
         }, () => this.refreshCalendar());
       } catch (error) {
+        if (request !== this.calendarRequest || owner !== getApp().globalData.account?.id) return;
         this.setData({ days: [], calendarLoading: false, calendarError: "档期读取失败，请稍后重试。" });
       }
       return;
@@ -148,14 +186,19 @@ Page({
   },
 
   async save() {
-    if (!this.data.changed) return;
+    if (this.unloaded || this.hidden || !this.data.changed) return;
     if (this.availabilityCloudMode) {
       if (this.data.actionPending) return;
-      this.setData({ actionPending: true, message: "", calendarError: "" });
+      const owner = getApp().globalData.account?.id, generation = this.viewGeneration || 0;
+      const current = () => !this.unloaded && !this.hidden && generation === (this.viewGeneration || 0) && owner === getApp().globalData.account?.id;
+      this.calendarRequest = (this.calendarRequest || 0) + 1;
+      this.setData({ actionPending: true, calendarLoading: false, message: "", calendarError: "" });
       try {
         const value = await cloudAvailability.saveMine(this.data.availabilityVersion, [...this.data.draftDates].sort());
+        if (!current()) return;
         this.setData({ availabilityVersion: value.version, originalDates: value.openDates, draftDates: [...value.openDates], lockedDates: value.lockedDates, actionPending: false, message: "公开档期已保存并同步需求方详情" }, () => this.refreshCalendar());
       } catch (error) {
+        if (!current()) return;
         const message = error.code === "VERSION_CONFLICT" ? "档期已在其他页面更新，请重新进入后再修改。" : error.code === "LOCKED_DATE_MUTATION" ? "订单锁定日期不能修改，请刷新后重试。" : "档期保存失败，请稍后重试。";
         this.setData({ actionPending: false, calendarError: message });
       }
@@ -167,20 +210,29 @@ Page({
   },
 
   openProject(event) {
+    if (this.unloaded || this.hidden) return;
+    if (this.cloudMode && (!this.projectsOwner || this.projectsOwner !== getApp().globalData.account?.id)) {
+      this.setData({ projects: [], loadError: "账号已变化，请重新读取项目。" }); return;
+    }
     wx.navigateTo({ url: `/pages/project-detail/index?id=${event.currentTarget.dataset.id}` });
   },
 
   async createProject() {
+    if (this.unloaded || this.hidden) return;
     if (this.cloudMode) {
       if (this.data.actionPending) return;
+      const owner = getApp().globalData.account?.id, generation = this.viewGeneration || 0;
+      const current = () => !this.unloaded && !this.hidden && generation === (this.viewGeneration || 0) && owner === getApp().globalData.account?.id;
       this.createIdempotencyKey = this.createIdempotencyKey || cloudProjects.idempotencyKey();
       this.setData({ actionPending: true, navigationError: "" });
       try {
         const project = await cloudProjects.createProject(this.createIdempotencyKey);
+        if (!current()) return;
         this.createIdempotencyKey = "";
         this.setData({ actionPending: false });
         wx.navigateTo({ url: `/pages/brief/index?id=${project.id}&new=1` });
       } catch (error) {
+        if (!current()) return;
         this.setData({ actionPending: false, navigationError: "项目创建失败，请稍后重试。" });
       }
       return;

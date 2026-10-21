@@ -1,0 +1,9 @@
+<app-top-nav workspace="{{navWorkspace}}" title="{{title}}" show-back="{{true}}"/>
+<view class="mi-page mi-stack">
+  <text class="mi-muted">{{description}}</text>
+  <view wx:if="{{mode === 'reviews'}}" class="mi-tabs"><button hover-class="none" class="mi-tab {{filter === 'all' ? 'mi-tab-selected' : ''}}" data-filter="all" bindtap="filter">全部</button><button hover-class="none" class="mi-tab {{filter === 'pending' ? 'mi-tab-selected' : ''}}" data-filter="pending" bindtap="filter">待评价</button><button hover-class="none" class="mi-tab {{filter === 'done' ? 'mi-tab-selected' : ''}}" data-filter="done" bindtap="filter">已评价</button></view>
+  <text wx:if="{{loading}}" class="mi-muted">正在读取…</text>
+  <view wx:elif="{{error}}" class="mi-card mi-pad"><text class="mi-error">{{error}}</text><button hover-class="none" class="am-action am-action-secondary" bindtap="refresh">重新读取</button></view>
+  <view wx:elif="{{ready && !items.length}}" class="mi-card mi-pad"><text class="mi-title">暂无相关记录</text><text class="mi-muted">新的合作和进度会显示在这里。</text><button hover-class="none" class="am-action am-action-secondary" bindtap="openOrders">查看全部订单</button></view>
+  <view wx:for="{{items}}" wx:key="id" class="mi-card"><button hover-class="none" class="mi-row" data-id="{{item.id}}" bindtap="open"><view class="mi-row-copy mi-stack"><view class="mi-split"><text class="mi-muted mi-break">{{item.id}}</text><text class="mi-muted mi-accent">{{mode === 'reviews' ? item.reviewLabel : item.statusLabel}}</text></view><text class="mi-title">{{item.service || item.title || '合作订单'}}</text><text class="mi-muted">{{role === 'buyer' ? '服务方' : '需求方'}}：{{item.counterpart.nickname}}</text></view><image class="mi-chevron" src="/assets/me/chevron.svg"/></button></view>
+</view>

@@ -1,8 +1,10 @@
 const crypto = require('node:crypto');
 const { inTransaction } = require('./payment-store');
 const { queryPayment } = require('./wechat-query');
+const { recoverPrepay } = require('./payment-recovery');
 const COOLDOWN_MS = 15000;
-const LEASE_MS = 30000;
+// Includes the bounded query -> recovery query -> close -> final query sequence.
+const LEASE_MS = 60000;
 function fail(code) { const error = new Error(code); error.code = code; throw error; }
 function identity(caller) {
   const openid = caller && (caller.WX_OPENID || caller.OPENID);
@@ -40,12 +42,19 @@ async function refreshPayment(pool, event, caller, config, query = queryPayment,
   if (!Number.isSafeInteger(now) || now <= 0) fail('PAYMENT_INPUT_INVALID');
   const lease = await claim(pool, event.orderId, actor, now);
   if (!lease.paymentId) return lease;
+  return executeClaimedQuery(pool, lease, config, query, clock);
+}
+
+async function executeClaimedQuery(pool, lease, config, query = queryPayment, clock = Date.now) {
   try {
-    await query(pool, lease.paymentId, config, undefined, clock);
+    const result = await query(pool, lease.paymentId, config, undefined, clock);
+    if (result && result.status === 'CREATED' && result.channelStatus === 'NOTPAY') {
+      await recoverPrepay(pool, lease.paymentId, config, undefined, query, clock);
+    }
     return { queryStatus:'QUERIED' };
   } finally {
     // Only this lease may be released; an expired request must not release its successor.
     await pool.execute('UPDATE order_payments SET query_lease_until = 0, query_lease_token = NULL WHERE id = ? AND query_lease_token = ?', [lease.paymentId, lease.lease]);
   }
 }
-module.exports = { refreshPayment, COOLDOWN_MS, LEASE_MS };
+module.exports = { refreshPayment, executeClaimedQuery, COOLDOWN_MS, LEASE_MS };

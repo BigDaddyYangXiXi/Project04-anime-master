@@ -1,10 +1,7 @@
+const localPreview = require("../../utils/local-preview");
 const { providers, allWorks } = require("../../data/catalog");
 const { matchesFilters } = require("../../data/v063");
-const cloudCatalog = require("../../services/cloud-catalog");
-const { mapCloudCatalog } = require("../../data/cloud-public-catalog");
-const cloudAccount = require("../../services/cloud-account");
-const { serverFilters } = require("../../utils/discovery-query");
-const { setDiscoveryContext } = require("../../data/discovery-context");
+const { loadDiscoveryPage } = require("../../utils/discovery-pagination");
 
 const initialRecent = {
   妆娘: ["男角", "伤效妆", "古风"],
@@ -15,6 +12,7 @@ const initialRecent = {
 
 function buildWork(entry) {
   return Object.assign({}, entry, {
+    listKey: `${entry.provider.id}:${entry.id}`,
     priceText: `￥${entry.price}`,
     provider: Object.assign({}, entry.provider, { initial: entry.provider.name.slice(0, 1) })
   });
@@ -36,8 +34,15 @@ Page({
     catalogError: ""
   },
 
+  onNavigationLayout(event) {
+    this.setData({ navigationHeight: event.detail.totalHeight });
+  },
+
   onLoad(options) {
-    this.auditMode = options.audit === "1";
+    const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
+    const origin = pages.length > 1 ? pages[pages.length - 2] : null;
+    this.discoveryOrigin = origin && origin.route === 'pages/discover/index' ? origin : null;
+    this.auditMode = localPreview.isAudit(options);
     this.marketProviders = this.auditMode ? providers : [];
     this.marketWorks = this.auditMode ? allWorks() : [];
     const career = options.career ? decodeURIComponent(options.career) : "妆娘";
@@ -63,26 +68,25 @@ Page({
   },
 
   loadCloudCatalog() {
-    this.setData({ catalogLoading: true, catalogError: "" });
-    const cityReady = this.data.cityCode ? Promise.resolve({ cityCode: this.data.cityCode, cityName: this.data.city }) : cloudAccount.getDiscoveryPreference().then(({ preference }) => preference);
-    cityReady.then((region) => {
-      if (!region) { const error = new Error("city is required"); error.code = "CITY_REQUIRED"; throw error; }
-      this.setData({ city: region.cityName, cityCode: region.cityCode });
-      setDiscoveryContext({ city: region.cityName, cityCode: region.cityCode, date: this.data.date });
-      return cloudCatalog.listDiscovery(serverFilters(region.cityCode, this.data.career, this.data.date, this.data.searchQuery, this.data.selectedFilters));
-    }).then(({ providers: cloudProviders }) => {
-      const mapped = mapCloudCatalog(cloudProviders);
-      this.marketProviders = mapped.providers;
-      this.marketWorks = mapped.works;
-      this.setData({ catalogLoading: false, catalogError: "" }, () => this.refreshResults());
-    }).catch(() => {
-      this.marketProviders = [];
-      this.marketWorks = [];
-      this.setData({ catalogLoading: false, catalogError: "公开目录加载失败，请稍后重试" }, () => this.refreshResults());
-    });
+    return loadDiscoveryPage(this);
   },
 
-  refreshResults() {
+  loadMoreCatalog() {
+    if (this.auditMode || this.data.role === "provider") return Promise.resolve();
+    return loadDiscoveryPage(this, true);
+  },
+
+  onReachBottom() {
+    return this.loadMoreCatalog();
+  },
+
+  onUnload() {
+    this.catalogRequestId = (this.catalogRequestId || 0) + 1;
+    if (this.discoveryOrigin && this.discoveryOrigin.data.role === 'buyer') this.discoveryOrigin.clearSearchFilters();
+    this.discoveryOrigin = null;
+  },
+
+  refreshResults(onRendered) {
     const { career, city, searchQuery, selectedFilters } = this.data;
     const keyword = searchQuery.trim().toLowerCase();
     const providerIds = this.marketProviders
@@ -99,7 +103,7 @@ Page({
         return !this.auditMode || (!keyword || text.includes(keyword)) && matchesFilters(career, selectedFilters, work.provider.tags.concat(work.tags), work.price);
       })
       .map(buildWork);
-    this.setData({ results });
+    this.setData({ results }, onRendered);
   },
 
   openSearch() {

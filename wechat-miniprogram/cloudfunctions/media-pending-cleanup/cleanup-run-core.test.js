@@ -46,9 +46,30 @@ test("cleanup result stays successful when only audit persistence fails", async 
 test("records a failed cleanup and rejects user invocation before running", async () => {
   const database = db();
   await assert.rejects(() => runCleanupJob(database, {}, {}, {}, clock(1000, 1100), uuid, {
-    cleanupExpiredMedia: async () => { const error = new Error("boom"); error.code = "CLEANUP_FAILED"; throw error; }
-  }), (error) => error.code === "CLEANUP_FAILED");
+    cleanupExpiredMedia: async () => { const error = new Error("boom"); error.code = "DATABASE_OPERATION_FAILED"; throw error; }
+  }), (error) => error.code === "DATABASE_OPERATION_FAILED");
   assert.equal(database.runs[0].status, "FAILED");
-  assert.equal(database.runs[0].error_code, "CLEANUP_FAILED");
+  assert.equal(database.runs[0].error_code, "DATABASE_OPERATION_FAILED");
   await assert.rejects(() => runCleanupJob(db(), {}, { WX_OPENID: "user" }), (error) => error.code === "CALLER_NOT_ALLOWED");
+});
+
+test("deferred ready reclamation is persisted as partial, not successful deletion", async () => {
+  const database = db();
+  const deferred = { ...ready, deferred: 2 };
+  const result = await runCleanupJob(database, {}, {}, {}, clock(1000, 1100), uuid, {
+    cleanupExpiredMedia: async () => pending,
+    cleanupReadyOrphans: async () => deferred
+  });
+  assert.equal(result.audit.status, "PARTIAL");
+  assert.equal(database.runs[0].status, "PARTIAL");
+  assert.equal(JSON.parse(database.runs[0].ready_orphan_summary).deferred, 2);
+});
+
+test("unknown cleanup errors are redacted in persisted audit rows", async () => {
+  const database = db(); const failure = new Error('sensitive-message'); failure.code = 'sensitive-upstream';
+  await assert.rejects(() => runCleanupJob(database, {}, {}, {}, clock(1000, 1100), uuid, {
+    cleanupExpiredMedia: async () => { throw failure; }
+  }), error => error === failure);
+  assert.equal(database.runs[0].error_code, 'UNEXPECTED');
+  assert.doesNotMatch(JSON.stringify(database.runs), /sensitive-/);
 });

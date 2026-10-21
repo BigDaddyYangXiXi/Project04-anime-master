@@ -4,9 +4,10 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "test": "node --test cleanup-core.test.js ready-orphan-core.test.js cleanup-run-core.test.js"
+    "test": "node --test *.test.js"
   },
   "dependencies": {
     "@cloudbase/node-sdk": "3.18.3"
-  }
+  },
+  "overrides": { "@cloudbase/node-sdk": { "axios": "0.33.0" } }
 }

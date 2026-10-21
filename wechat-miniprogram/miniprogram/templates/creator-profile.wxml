@@ -1,0 +1,17 @@
+<template name="creator-profile">
+  <view class="creator-profile">
+    <view class="creator-person">
+      <image wx:if="{{creator.avatar}}" class="creator-avatar" src="{{creator.avatar}}" mode="aspectFill"/><view wx:else class="creator-avatar">{{creator.initial}}</view>
+      <view class="creator-identity"><view class="creator-name"><text>{{creator.name}}</text><text class="creator-status">{{creator.accepting ? '接单中' : '暂停接单'}}</text></view><text class="creator-caption">{{creator.career}} · {{creator.location || '未设置地区'}}<text wx:if="{{creator.verificationText}}"> · {{creator.verificationText}}</text></text></view>
+      <button aria-disabled="{{socialPending || socialLoadError}}" hover-class="none" wx:if="{{showFollow}}" data-am-disabled="{{socialPending || socialLoadError}}" class="follow-button {{followed ? 'active' : ''}}" bindtap="{{(socialPending || socialLoadError) ? '' : 'toggleFollow'}}" aria-label="{{socialLoadError || socialPending ? '关注状态待同步' : followed ? '取消关注创作者' : '关注创作者'}}"><text>{{socialLoadError || socialPending ? '待同步' : followed ? '已关注' : '关注'}}</text></button>
+    </view>
+    <view class="creator-statistics"><view><text>{{creator.ordersText}}</text><text>次合作完成</text></view><view role="button" bindtap="openReviews"><text>{{creator.ratingText}}</text><text>{{creator.reviewCount}} 条评价 ›</text></view><view><text>{{creator.replyText}}</text><text>平均回复</text></view></view>
+    <text class="creator-bio">{{creator.bio || '暂未填写个人简介'}}</text><view class="creator-tags"><text wx:for="{{creator.tags}}" wx:key="*this">{{item}}</text></view>
+
+  </view>
+</template>
+
+<template name="creator-preferences">
+    <view role="button" class="creator-link" bindtap="togglePreferences"><text>合作偏好与沟通时间</text><text>{{preferencesOpen ? '收起' : '展开'}}</text></view>
+    <view wx:if="{{preferencesOpen}}" class="creator-preferences"><text>擅长：{{creator.specialties || '暂未填写'}}</text><text>不承接：{{creator.declines || '暂未填写'}}</text><text>通常沟通时间：{{creator.contactHours || '暂未填写'}}</text></view>
+</template>

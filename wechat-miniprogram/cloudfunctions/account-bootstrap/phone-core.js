@@ -1,5 +1,5 @@
 const crypto = require("node:crypto");
-const { loginAccount, registerAccount, trustedIdentity } = require("./identity-core");
+const { identityKey, loginAccount, registerAccount, trustedIdentity } = require("./identity-core");
 
 function fail(code, message) {
   const error = new Error(message);
@@ -29,14 +29,6 @@ async function readPhoneIdentity(db, fingerprint) {
   const result = assertResult(
     await db.from("account_phone_identities").select("account_id,phone_masked").eq("phone_fingerprint", fingerprint),
     "read phone identity"
-  );
-  return result.data && result.data[0] || null;
-}
-
-async function readPhoneIdentityByAccount(db, accountId) {
-  const result = assertResult(
-    await db.from("account_phone_identities").select("account_id,phone_fingerprint,phone_masked").eq("account_id", accountId),
-    "read account phone identity"
   );
   return result.data && result.data[0] || null;
 }
@@ -71,24 +63,15 @@ async function loginByPhone(db, context, phoneInfo, key, now = Date.now()) {
 
 async function registerByPhone(db, context, input, phoneInfo, key, now = Date.now()) {
   const fingerprint = phoneFingerprint(phoneInfo.phoneNumber, key);
-  if (await readPhoneIdentity(db, fingerprint)) fail("PHONE_ALREADY_REGISTERED", "phone already belongs to an account");
-  const session = await registerAccount(db, context, input, now);
-  assertResult(await db.from("account_phone_identities").upsert({
-    account_id: session.account.id,
-    phone_fingerprint: fingerprint,
-    phone_masked: maskPhone(phoneInfo.phoneNumber),
-    country_code: String(phoneInfo.countryCode || ""),
-    verification_method: "REALTIME",
-    verified_at: now,
-    created_at: now,
-    updated_at: now
-  }, { ignoreDuplicates: true }), "bind phone identity");
-  const confirmed = await readPhoneIdentity(db, fingerprint);
-  if (!confirmed || confirmed.account_id !== session.account.id) {
-    if (confirmed) fail("PHONE_ALREADY_REGISTERED", "phone already belongs to another account");
-    if (await readPhoneIdentityByAccount(db, session.account.id)) fail("ACCOUNT_PHONE_ALREADY_BOUND", "account already has another phone identity");
-    fail("DATABASE_OPERATION_FAILED", "phone identity binding was not committed");
-  }
+  if (!/^[0-9]{1,4}$/.test(String(phoneInfo.countryCode || ''))) fail('PHONE_VERIFICATION_FAILED', 'verified country code missing');
+  const identity = trustedIdentity(context);
+  const linked = await readWechatIdentity(db, identity.openId);
+  const phoneOwner = await readPhoneIdentity(db, fingerprint);
+  const ownId = linked?.account_id || `acct_${identityKey(identity.appId, identity.openId).slice(0, 32)}`;
+  if (phoneOwner && phoneOwner.account_id !== ownId) fail("PHONE_ALREADY_REGISTERED", "phone already belongs to an account");
+  const session = await registerAccount(db, context, input, now, {
+    phone_fingerprint: fingerprint, phone_masked: maskPhone(phoneInfo.phoneNumber), country_code: String(phoneInfo.countryCode || '')
+  });
   return { ...session, phoneMasked: maskPhone(phoneInfo.phoneNumber) };
 }
 

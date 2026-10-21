@@ -69,7 +69,8 @@ function normalizeMediaCheck(message) {
 
   const suggest = String(message.result && message.result.suggest || "").toLowerCase();
   const statusBySuggest = { pass: "PASS", review: "REVIEW", risky: "RISKY" };
-  const status = statusBySuggest[suggest] || "ERROR";
+  const successful = message.errcode === undefined || message.errcode === 0;
+  const status = successful && Object.hasOwn(statusBySuggest, suggest) ? statusBySuggest[suggest] : "ERROR";
   const rawLabel = message.result && message.result.label;
   const label = Number.isFinite(Number(rawLabel)) ? Number(rawLabel) : null;
   return {

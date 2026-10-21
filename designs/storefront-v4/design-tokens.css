@@ -1,0 +1,28 @@
+/* Generated from project design-system/tokens.json; 375px design uses rpx / 2. */
+.phone{
+  --am-color-canvas:#171514;
+  --am-color-surface:#211d1b;
+  --am-color-text:#f6eee8;
+  --am-color-text-secondary:#b9aaa0;
+  --am-color-border:#443a34;
+  --am-color-brand:#ff946b;
+  --am-color-control-surface:#302a26;
+  --am-color-price:#ffb66e;
+  --am-type-page-title:22px;
+  --am-type-section-title:17px;
+  --am-type-body:15px;
+  --am-type-label:14px;
+  --am-type-caption:13px;
+  --am-line-page-title:30px;
+  --am-line-section-title:22px;
+  --am-line-body:22px;
+  --am-line-label:20px;
+  --am-line-caption:18px;
+  --am-space-1:4px;
+  --am-space-2:8px;
+  --am-space-3:12px;
+  --am-space-4:16px;
+  --am-space-6:24px;
+  --am-radius-control:10px;
+  --am-touch-min:44px;
+}

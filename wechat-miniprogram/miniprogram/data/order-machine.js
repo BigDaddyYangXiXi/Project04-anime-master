@@ -13,9 +13,13 @@ const allowed = {
   DECLINED: {}
 };
 
-function transitionOrder(stage, event, ndaRequired) {
+function transitionOrder(stage, event, ndaRequired, order = {}) {
+  if (["REQUESTED", "SUPPLEMENTED"].includes(stage) && event === "PROVIDER_INTERESTED" && ndaRequired
+    && !(order.buyerNdaSigned && order.providerNdaSigned)) return "NDA_BUYER_PENDING";
+  if (stage === "NDA_PROVIDER_PENDING" && event === "PROVIDER_SIGNS_NDA" && order.ndaFlowVersion === 2
+    && !order.communicationDone) return "CONTACTING";
   if (stage === "CONTACTING" && event === "PROVIDER_ENDS_COMMUNICATION") {
-    return ndaRequired ? "NDA_BUYER_PENDING" : "BUYER_FINAL_CONFIRM";
+    return ndaRequired && !(order.buyerNdaSigned && order.providerNdaSigned) ? "NDA_BUYER_PENDING" : "BUYER_FINAL_CONFIRM";
   }
   const next = allowed[stage] && allowed[stage][event];
   if (!next) throw new Error(`Illegal order transition: ${stage} -> ${event}`);

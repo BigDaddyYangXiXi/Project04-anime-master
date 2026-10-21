@@ -1,68 +1,71 @@
-const store = require("../../data/v063-store");
-const LOCKED_STAGES = ["IN_PRODUCTION", "REVISION_REQUESTED", "DELIVERY_PENDING"];
-
+const availability = require('../../services/cloud-availability');
+const catalog = require('../../services/cloud-catalog');
+const calendar = require('../../data/calendar-model');
 Page({
-  data: {
-    weekdays: ["一", "二", "三", "四", "五", "六", "日"],
-    days: [], originalDays: [], draftDays: [], lockedDays: [], changed: false, message: ""
+  data: { weekdays: ['一','二','三','四','五','六','日'], days: [], originalDates: [], draftDates: [], lockedDates: [],
+    monthTitle: '', monthOffset: 0, version: 0, accepting: true, originalAccepting: true, changed: false, loading: false, saving: false, error: '', message: '' },
+  onLoad() { this.month = calendar.monthFrom(); this.refresh(); },
+  onShow() { this.hidden = false; this.load(); },
+  onHide() { this.hidden = true; this.request = (this.request || 0) + 1; },
+  onUnload() { this.unloaded = true; this.onHide(); },
+  async load() {
+    if (this.data.saving) return;
+    const owner = getApp().globalData.account?.id, request = this.request = (this.request || 0) + 1;
+    const current = () => !this.unloaded && !this.hidden && this.request === request && owner === getApp().globalData.account?.id;
+    if (this.owner !== owner) { this.owner = owner; this.setData({ originalDates: [], draftDates: [], lockedDates: [], version: 0, changed: false, days: [] }); }
+    this.setData({ loading: true, error: '' });
+    try {
+      const [value, draft] = await Promise.all([availability.getMine(), catalog.getDraft()]);
+      if (!current()) return;
+      const accepting = typeof value.accepting === 'boolean' ? value.accepting : draft.clientDraft.profile.accepting !== false;
+      const preserve = this.data.changed && this.data.version === value.version;
+      this.setData({ loading: false, version: value.version, originalDates: value.openDates, lockedDates: value.lockedDates, originalAccepting: accepting,
+        ...(preserve ? {} : { draftDates: [...value.openDates], accepting }) });
+      this.refresh();
+    } catch (_) { if (current()) this.setData({ loading: false, error: '档期未能读取，已编辑内容保留，请重试。' }); }
   },
-
-  onLoad(options) {
-    this.auditChanged = options.audit === "1" && options.changed === "1";
-    if (options.audit === "1") return;
-    this.redirecting = true;
-    wx.setStorageSync("animeMasterRole", "provider");
-    wx.switchTab({ url: "/pages/projects/index" });
-  },
-
-  onShow() {
-    if (this.redirecting) return;
-    const originalDays = store.getAvailableDays();
-    const lockedDays = store.getOrders()
-      .filter((order) => order.providerId === store.CURRENT_PROVIDER_ID && LOCKED_STAGES.includes(order.stage))
-      .map((order) => Number((order.time.match(/2026[/-]08[/-](\d{2})/) || [])[1]))
-      .filter(Boolean);
-    const draftDays = [...originalDays];
-    if (this.auditChanged && !lockedDays.includes(17) && !draftDays.includes(17)) draftDays.push(17);
-    this.setData({ originalDays, lockedDays, draftDays, message: "" }, () => this.refresh());
-  },
-
   refresh() {
-    const sortedOriginal = [...this.data.originalDays].sort((a, b) => a - b);
-    const sortedDraft = [...this.data.draftDays].sort((a, b) => a - b);
-    this.setData({
-      changed: JSON.stringify(sortedOriginal) !== JSON.stringify(sortedDraft),
-      days: Array.from({ length: 42 }, (_, index) => {
-        const value = index - 4;
-        const valid = value > 0 && value <= 31;
-        return {
-          key: index,
-          value: valid ? value : "",
-          valid,
-          open: valid && this.data.draftDays.includes(value),
-          locked: valid && this.data.lockedDays.includes(value)
-        };
-      })
-    });
+    this.setData({ monthTitle: this.month.title,
+      changed: JSON.stringify([...this.data.originalDates].sort()) !== JSON.stringify([...this.data.draftDates].sort()) || this.data.accepting !== this.data.originalAccepting,
+      days: calendar.buildMonth({ ...this.month, openDates: this.data.draftDates, lockedDates: this.data.lockedDates }) });
   },
-
+  changeMonth(event) {
+    const offset = this.data.monthOffset + Number(event.currentTarget.dataset.step);
+    if (this.data.saving || offset < 0 || offset > 11) return;
+    const date = new Date(); date.setDate(1); date.setMonth(date.getMonth() + offset);
+    this.month = calendar.monthFrom(null, date); this.setData({ monthOffset: offset }); this.refresh();
+  },
   toggle(event) {
-    const value = Number(event.currentTarget.dataset.day);
-    if (!value || this.data.lockedDays.includes(value)) return;
-    const draftDays = this.data.draftDays.includes(value)
-      ? this.data.draftDays.filter((day) => day !== value)
-      : this.data.draftDays.concat(value);
-    this.setData({ draftDays, message: "" }, () => this.refresh());
+    const date = event.currentTarget.dataset.date;
+    if (this.data.saving || this.data.loading || !date || date < calendar.todayKey() || this.data.lockedDates.includes(date)) return;
+    const draftDates = this.data.draftDates.includes(date) ? this.data.draftDates.filter(item => item !== date) : [...this.data.draftDates, date];
+    this.setData({ draftDates, message: '' }); this.refresh();
   },
-
-  reset() {
-    this.setData({ draftDays: [...this.data.originalDays], message: "" }, () => this.refresh());
+  changeAccepting(event) { if (!this.data.saving && !this.data.loading) { this.setData({ accepting: event.detail.value }); this.refresh(); } },
+  reset() { if (!this.data.saving) { this.setData({ draftDates: [...this.data.originalDates], accepting: this.data.originalAccepting, message: '' }); this.refresh(); } },
+  back() {
+    if (this.data.saving) return;
+    if (!this.data.changed) return wx.navigateBack();
+    const owner = this.owner;
+    wx.showActionSheet({ itemList: ['保存并返回', '继续编辑', '放弃修改并返回'], success: async ({tapIndex}) => {
+      if (this.unloaded || this.data.saving || owner !== getApp().globalData.account?.id) return;
+      if (tapIndex === 2) return wx.navigateBack();
+      if (tapIndex === 0) { await this.save(); if (!this.unloaded && !this.data.changed && owner === getApp().globalData.account?.id) wx.navigateBack(); }
+    } });
   },
-
-  save() {
-    if (!this.data.changed) return;
-    const days = [...this.data.draftDays].sort((a, b) => a - b);
-    store.saveAvailableDays(days);
-    this.setData({ originalDays: days, message: "公开档期已保存并同步需求方详情" }, () => this.refresh());
+  async save() {
+    if (this.unloaded || this.hidden || this.data.loading || this.data.saving || !this.data.changed) return;
+    const owner = this.owner, request = this.request = (this.request || 0) + 1;
+    const current = () => !this.unloaded && !this.hidden && request === this.request && owner === getApp().globalData.account?.id;
+    this.setData({ saving: true, error: '' });
+    try {
+      const dates = this.data.draftDates.filter(date => date >= calendar.todayKey()).sort();
+      const result = await availability.saveMine(this.data.version, dates, this.data.accepting);
+      if (!current()) return;
+      this.setData({ version: result.version, originalDates: result.openDates, draftDates: [...result.openDates], lockedDates: result.lockedDates,
+        accepting: result.accepting, originalAccepting: result.accepting, message: '已保存并生效，已有订单不受影响。' });
+      catalog.clearStorefrontState(); this.refresh();
+    } catch (error) { if (current()) this.setData({ error: error.code === 'VERSION_CONFLICT' ? '档期已在其他页面修改，请重新读取后核对。' : '保存失败，修改已保留，请重试。' }); }
+    finally { if (!this.unloaded) this.setData({ saving: false }); }
   }
 });

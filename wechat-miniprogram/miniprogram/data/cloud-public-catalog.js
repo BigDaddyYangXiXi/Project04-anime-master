@@ -17,12 +17,12 @@ function mapCloudCatalog(sourceProviders) {
       title: work.title,
       subtitle: work.subtitle,
       tone: work.tone || "coral",
-      price: Number(work.priceFen || 0) / 100,
+      price: work.priceFen == null ? null : Number(work.priceFen) / 100,
       description: work.description,
       tags: work.tags || [],
       referenceCount: work.referenceCount || 0,
       imagePreviews: work.imageUrls || [],
-      imageCount: (work.imageUrls || []).length
+      imageCount: (work.imageFileIds || work.imageUrls || []).length
     }));
     return {
       id: source.id,
@@ -30,6 +30,8 @@ function mapCloudCatalog(sourceProviders) {
       name: source.nickname,
       handle: `@${source.uid}`,
       avatar: source.avatarUrl || "",
+      bannerImage: source.bannerImage || "",
+      accepting: source.accepting !== false,
       career: source.career,
       city: source.city,
       cityCode: source.cityCode || "",

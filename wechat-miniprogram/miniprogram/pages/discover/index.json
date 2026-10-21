@@ -1,8 +1,9 @@
 {
-  "navigationBarTitleText": "动漫高手",
+  "navigationBarTitleText": "万匠屋",
   "usingComponents": {
     "work-card": "../../components/work-card/index",
     "availability-strip": "../../components/availability-strip/index",
-    "rating-stars": "../../components/rating-stars/index"
-  }
+    "first-use-consent": "/components/first-use-consent/index"
+  },
+  "backgroundColorContent": "#171514"
 }

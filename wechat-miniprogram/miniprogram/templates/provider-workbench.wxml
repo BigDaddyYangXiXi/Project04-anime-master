@@ -1,0 +1,32 @@
+<template name="provider-workbench">
+  <view class="dashboard-head">
+    <image wx:if="{{profile.avatar}}" class="avatar-large avatar-image" src="{{profile.avatar}}" mode="aspectFill"/><view wx:else class="avatar-large">{{profileInitial}}</view>
+    <view class="dashboard-copy"><text class="am-identity-full dashboard-title">{{profile.nickname || '工作台'}}</text><text class="dashboard-subtitle">{{providerCareer}} {{providerVisibilityText}}</text></view>
+  </view>
+  <view wx:if="{{dashboardError}}" class="am-workbench-empty"><text>{{dashboardError}}</text><button hover-class="none" class="am-action am-action-secondary" bindtap="retryDashboard">重新加载</button></view>
+  <block wx:elif="{{dashboardLoading && !metrics.length}}"></block>
+  <block wx:else>
+    <view wx:if="{{storefrontPublished === false && !priorityOrders.length}}" class="am-workbench-setup">
+      <text class="am-workbench-title">让客户了解你的服务</text><text class="am-workbench-copy">橱窗尚未公开。分项准备资料、服务和作品，预览确认后再公开。</text>
+      <button hover-class="none" class="am-action am-action-primary" bindtap="openProviderProfile">搭建橱窗</button>
+    </view>
+    <view class="am-workbench-section">
+      <view class="am-workbench-heading"><text class="am-workbench-title">需要你处理</text><button hover-class="none" class="am-workbench-link" bindtap="openProviderOrders">全部订单 ›</button></view>
+      <view wx:if="{{priorityOrders.length}}" class="priority-list">
+        <button hover-class="none" wx:for="{{priorityOrders}}" wx:key="id" class="attention-card" data-id="{{item.id}}" bindtap="openPriority" aria-label="处理{{item.buyer}}的{{item.service}}">
+          <view class="attention-main"><view class="attention-primary"><text class="status-dot">{{item.statusLabel}}</text><text class="attention-title">{{item.buyer}} · {{item.service}}</text></view><view class="attention-secondary"><text class="attention-meta">{{item.city}} · {{item.time}}</text></view></view><view class="attention-chevron" aria-hidden="true"></view>
+        </button>
+        <button hover-class="none" wx:if="{{remainingPriority > 0}}" class="priority-more" bindtap="openProviderOrders">查看其余 {{remainingPriority}} 条待办 ›</button>
+      </view>
+      <view wx:else class="am-workbench-empty"><text>暂时没有需要处理的事项</text><text class="am-workbench-copy">新预约、待签约和修改任务会显示在这里。</text></view>
+      <view class="am-workbench-flows"><button hover-class="none" wx:for="{{metrics}}" wx:key="flow" data-flow="{{item.flow}}" bindtap="openFlow"><text>{{item.label}}</text><text>{{item.count}} ›</text></button></view>
+    </view>
+  </block>
+  <view class="am-workbench-section">
+    <text class="am-workbench-title">经营橱窗</text>
+    <button hover-class="none" class="am-creator-management-row" bindtap="openProviderProfile"><view><text>管理橱窗</text><text>资料、服务、作品与公开发布</text></view><text>管理 ›</text></button>
+    <button hover-class="none" class="am-creator-management-row" bindtap="openProviderWork"><view><text>上传作品</text><text>添加图片，编辑内容，保存作品草稿</text></view><text>新建 ›</text></button>
+    <button hover-class="none" class="am-creator-management-row" bindtap="openProviderCalendar"><view><text>公开档期</text><text>管理可预约日期与已有订单安排</text></view><text>查看 ›</text></button>
+    <button hover-class="none" class="am-creator-management-row" bindtap="openProviderReviews"><view><text>合作评价</text><text>查看已完成订单的评价与回复</text></view><text>查看 ›</text></button>
+  </view>
+</template>

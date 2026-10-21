@@ -62,3 +62,15 @@ assert.strictEqual(component.data.active, "dashboard", "跳转失败必须恢复
 assert.strictEqual(component.data.switching, false, "跳转失败必须解除重复点击锁");
 
 process.stdout.write("Navigation role isolation audit passed\n");
+
+switchShouldFail=false;
+for(const workspace of ['provider','buyer']){
+  for(const sharedRoute of ['pages/order-refund/index','pages/provider-detail/index']){
+    route=sharedRoute;storedRole=workspace==='provider'?'buyer':'provider';
+    const shared=create();shared.data.workspace=workspace;shared.syncNavigation();
+    assert.strictEqual(shared.data.role,workspace,'共享页面必须沿用页面身份而非陈旧缓存');
+    if(sharedRoute==='pages/order-refund/index')assert.strictEqual(shared.data.active,'orders');
+    shared.openRoot({currentTarget:{dataset:{url:'/pages/projects/index'}}});
+    assert.strictEqual(storedRole,workspace,'返回项目或档期根页前也必须保留当前身份');
+  }
+}

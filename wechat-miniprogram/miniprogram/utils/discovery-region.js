@@ -29,4 +29,10 @@ function locationPreference(preference, maximumAgeMs, now = Date.now()) {
   return Number.isSafeInteger(preference.locatedAt) && now - preference.locatedAt <= maximumAgeMs ? preference : null;
 }
 
-module.exports = { canonicalCityCode, locationPreference, normalizeCityName, pickerRegion };
+function regionLabel(region) {
+  const city = normalizeCityName(region.cityName).replace(/市$/, "");
+  const district = normalizeCityName(region.districtName);
+  return district && !["市辖区", "县"].includes(district) ? city + "·" + district : city;
+}
+
+module.exports = { regionLabel, canonicalCityCode, locationPreference, normalizeCityName, pickerRegion };

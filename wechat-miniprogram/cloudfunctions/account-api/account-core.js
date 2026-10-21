@@ -1,3 +1,5 @@
+const intents = require("./content-intents");
+const { nicknameKey } = require('./account-names');
 function fail(code, message) { const error = new Error(message); error.code = code; throw error; }
 function rows(result, operation) { if (result && result.error) fail("DATABASE_OPERATION_FAILED", `${operation} failed`); return result && result.data || []; }
 function dbVersion(value) { const result = Number(value); if (!Number.isSafeInteger(result) || result < 1) fail("DATABASE_OPERATION_FAILED", "account version is invalid"); return result; }
@@ -7,7 +9,7 @@ function nicknameValue(value) {
   const nickname = value.trim();
   const segmenter = typeof Intl.Segmenter === "function" ? new Intl.Segmenter("zh-CN", { granularity: "grapheme" }) : null;
   const length = segmenter ? Array.from(segmenter.segment(nickname)).length : Array.from(nickname).length;
-  if (!length || length > 20 || /[\u0000-\u001f\u007f]/.test(nickname)) fail("VALIDATION_ERROR", "nickname is invalid");
+  if (!length || length > 12 || /[\u0000-\u001f\u007f\u200b\u202a-\u202e\u2066-\u2069\ufeff]/.test(nickname) || nickname.length > 144) fail("VALIDATION_ERROR", "nickname is invalid");
   return nickname;
 }
 function avatarId(value) {
@@ -45,7 +47,7 @@ async function accountId(db, context) {
   return identity.account_id;
 }
 async function readAccount(db, id) {
-  const account = rows(await db.from("accounts").select("id,uid,nickname,avatar_asset_id,status,version,updated_at").eq("id", id).eq("status", "ACTIVE"), "read account")[0];
+  const account = rows(await db.from("accounts").select("id,uid,nickname,username,avatar_asset_id,status,version,updated_at" + (intents.enabled() ? ",pending_content_intent_id" : "")).eq("id", id).eq("status", "ACTIVE"), "read account")[0];
   if (!account) fail("ACCOUNT_NOT_FOUND", "account was not found");
   return { ...account, version: dbVersion(account.version), updated_at: dbTime(account.updated_at) };
 }
@@ -55,20 +57,43 @@ async function publicAccount(db, account) {
     const asset = rows(await db.from("media_assets").select("storage_key").eq("id", account.avatar_asset_id).eq("owner_account_id", account.id).eq("purpose", "AVATAR").eq("status", "READY"), "read avatar")[0];
     avatarFileId = asset && asset.storage_key || null;
   }
-  return { id: account.id, uid: account.uid, nickname: account.nickname, avatarAssetId: account.avatar_asset_id || null, avatarFileId, version: account.version, updatedAt: account.updated_at };
+  return { ...(intents.enabled() ? { deferredAvatar: true, contentIntent: await intents.status(db, account.id, account.pending_content_intent_id) } : {}), id: account.id, uid: account.uid, nickname: account.nickname, username: account.username || "", avatarAssetId: account.avatar_asset_id || null, avatarFileId, version: account.version, updatedAt: account.updated_at };
 }
-async function updateMine(db, event, id, now) {
+async function updateMine(db, event, id, now, dependencies, context) {
   const account = await readAccount(db, id);
   if (!Number.isSafeInteger(event.expectedVersion) || event.expectedVersion !== account.version) fail("VERSION_CONFLICT", "account version changed");
   const nickname = nicknameValue(event.nickname);
   const nextAvatarId = avatarId(event.avatarAssetId);
+  let pendingAvatar = false;
   if (nextAvatarId) {
-    const asset = rows(await db.from("media_assets").select("id").eq("id", nextAvatarId).eq("owner_account_id", id).eq("purpose", "AVATAR").eq("status", "READY"), "read new avatar")[0];
-    if (!asset) fail("AVATAR_NOT_READY", "avatar is not ready or owned by account");
+    const asset = rows(await db.from("media_assets").select("id,status").eq("id", nextAvatarId).eq("owner_account_id", id).eq("purpose", "AVATAR"), "read new avatar")[0];
+    pendingAvatar = Boolean(intents.enabled() && event.allowDeferred === true && asset?.status === "PENDING");
+    if (!asset || (asset.status !== "READY" && !pendingAvatar)) fail("AVATAR_NOT_READY", "avatar is not ready or owned by account");
   }
-  const next = { nickname, avatar_asset_id: nextAvatarId, version: account.version + 1, updated_at: now };
-  const updated = rows(await db.from("accounts").update(next).eq("id", id).eq("version", account.version).select("id"), "update account");
+  const next = { nickname, nickname_key: nicknameKey(nickname), avatar_asset_id: nextAvatarId, version: account.version + 1, updated_at: now };
+  const checkNickname = async () => {
+    const matches = rows(await db.from('accounts').select('id').eq('nickname_key', next.nickname_key), 'check nickname');
+    if (matches.some(row => row.id !== id)) fail('NICKNAME_TAKEN', 'nickname already in use');
+  };
+  await checkNickname();
+  if (nickname !== account.nickname) {
+    if (typeof dependencies.reviewNickname !== "function") fail("NICKNAME_CHECK_UNAVAILABLE", "nickname reviewer is unavailable");
+    await dependencies.reviewNickname(nickname, context.WX_OPENID || context.OPENID);
+  }
+  let intentId = null;
+  if (intents.enabled()) {
+    next.pending_content_intent_id = null;
+    if (pendingAvatar) {
+      intentId = await intents.stage(db, id, "AVATAR", next.version, { assets: [{ id: nextAvatarId, purpose: "AVATAR" }] }, now);
+      next.avatar_asset_id = account.avatar_asset_id;
+      next.pending_content_intent_id = intentId;
+    }
+  }
+  const result = await db.from("accounts").update(next).eq("id", id).eq("version", account.version).select("id");
+  if (result?.error) await checkNickname();
+  const updated = rows(result, "update account");
   if (!updated.length) fail("VERSION_CONFLICT", "account version changed");
+  if (intentId) await intents.activate(db, intentId, now).catch(() => null);
   return publicAccount(db, { ...account, ...next });
 }
 function publicPreference(row) {
@@ -83,8 +108,8 @@ async function readPreference(db, id) {
   const row = rows(await db.from("account_discovery_preferences").select("province_name,city_name,district_name,city_code,source,located_at,version,updated_at").eq("account_id", id), "read discovery preference")[0];
   return publicPreference(row);
 }
-async function savePreference(db, id, event, now) {
-  const current = await readPreference(db, id);
+async function savePreference(db, id, event, now, current) {
+  if (current === undefined) current = await readPreference(db, id);
   const expectedVersion = Number(event.expectedVersion || 0);
   if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0 || expectedVersion !== (current ? current.version : 0)) fail("VERSION_CONFLICT", "discovery preference version changed");
   const region = regionValue(event.region, event.source);
@@ -104,15 +129,18 @@ async function savePreference(db, id, event, now) {
 async function handleAccount(db, event = {}, context = {}, now = Date.now(), dependencies = {}) {
   const id = await accountId(db, context);
   if (event.action === "getMine") return publicAccount(db, await readAccount(db, id));
-  if (event.action === "updateMine") return updateMine(db, event, id, now);
+  if (event.action === "updateMine") return updateMine(db, event, id, now, dependencies, context);
   if (event.action === "getDiscoveryPreference") return { preference: await readPreference(db, id) };
   if (event.action === "saveDiscoveryPreference") return { preference: await savePreference(db, id, event, now) };
   if (event.action === "resolveDiscoveryLocation") {
     const latitude = Number(event.latitude); const longitude = Number(event.longitude);
     if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) fail("VALIDATION_ERROR", "location is invalid");
     if (typeof dependencies.resolveRegion !== "function") fail("LOCATION_SERVICE_NOT_CONFIGURED", "location resolver is unavailable");
-    const region = regionValue(await dependencies.resolveRegion(latitude, longitude), "LOCATED");
-    return { preference: await savePreference(db, id, { expectedVersion: event.expectedVersion, region, source: "LOCATED" }, now) };
+    const [resolved, current] = await Promise.all([
+      dependencies.resolveRegion(latitude, longitude), readPreference(db, id)
+    ]);
+    const region = regionValue(resolved, "LOCATED");
+    return { preference: await savePreference(db, id, { expectedVersion: event.expectedVersion, region, source: "LOCATED" }, now, current) };
   }
   fail("INVALID_ACTION", "action is not supported");
 }

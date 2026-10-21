@@ -15,10 +15,12 @@ assert.ok(app.pages.length > 0, "必须存在可审计页面");
 
 app.pages.forEach((route) => {
   const page = route.split("/")[1];
-  const wxml = read(`${route}.wxml`).trimStart();
+  const wxml = read(`${route}.wxml`).replace(/<import\b[^>]*\/>/g, "").trimStart();
   assert.ok(wxml.startsWith("<app-top-nav "), `${page} 顶部导航必须是页面首组件`);
-  const rootPage = buyerRoots.has(page) || providerRoots.has(page);
-  assert.ok(wxml.startsWith(`<app-top-nav`) && wxml.split("\n")[0].includes(`show-back="{{${rootPage ? "false" : "true"}}}"`), `${page} 根页／子页返回状态错误`);
+  const rootPage = page === "auth" || buyerRoots.has(page) || providerRoots.has(page);
+  const showBack = wxml.split("\n")[0].match(/show-back="\{\{(.*?)\}\}"/);
+  // app-top-nav defaults showBack to true; omitting it on a child is valid.
+  assert.strictEqual(showBack ? showBack[1] : "true", rootPage ? "false" : "true", `${page} 根页／子页返回状态错误`);
   if (page.startsWith("provider-") && page !== "provider-detail" && page !== "provider-schedule") {
     assert.ok(wxml.split("\n")[0].includes('workspace="provider"'), `${page} 必须限制在服务方返回栈`);
   }

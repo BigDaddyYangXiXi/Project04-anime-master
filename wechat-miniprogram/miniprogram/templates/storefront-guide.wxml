@@ -1,0 +1,1 @@
+<template name="storefront-guide"><view class="storefront-guide" aria-label="填写提示"><image src="/assets/icons/storefront-hint.svg"/><view><text>{{message}}</text><text wx:if="{{detail}}" class="storefront-guide-detail">{{detail}}</text></view></view></template>

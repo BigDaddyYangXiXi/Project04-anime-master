@@ -1,1 +1,4 @@
-{ "navigationBarTitleText": "评价管理" }
+{
+  "navigationBarTitleText": "评价管理",
+  "backgroundColorContent": "#171514"
+}

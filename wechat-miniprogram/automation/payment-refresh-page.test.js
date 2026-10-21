@@ -2,6 +2,16 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const service = require('../miniprogram/services/cloud-orders');
 const gateway = require('../miniprogram/data/payment-gateway');
+function connectedService() {
+  const sandbox={module:{exports:{}},wx:global.wx,require(name){
+    if(name==='../config/cloudbase')return {enabled:true,env:'test-environment'};
+    if(name==='../utils/local-preview')return {assertCloudAllowed(){}};
+    if(name==='../utils/cloud-call')return require('../miniprogram/utils/cloud-call');
+    throw new Error('unexpected dependency');
+  }};
+  require('node:vm').runInNewContext(require('node:fs').readFileSync(require.resolve('../miniprogram/services/cloud-orders'),'utf8'),sandbox);
+  return sandbox.module.exports;
+}
 let definition; global.Page=value=>{definition=value;};
 global.wx={showModal(){},stopPullDownRefresh(){}};
 require('../miniprogram/pages/booking-status/index');delete global.Page;
@@ -46,9 +56,52 @@ test('ordinary page reads remain read-only; only eligible pull-down refresh call
   await p.onPullDownRefresh();assert.equal(query.mock.callCount(),1);
 });
 test('client query sends only action and order id and validates the response status',async()=>{
+  const service=connectedService();
   let sent;global.wx.cloud={callFunction:async request=>{sent=request;return {result:{ok:true,data:{queryStatus:'THROTTLED'}}};}};
   await service.refreshPayment('order_1');
-  assert.deepEqual(sent,{name:'payment-api',data:{action:'refreshPayment',orderId:'order_1'}});
+  assert.deepEqual(JSON.parse(JSON.stringify(sent)),{name:'payment-api',data:{action:'refreshPayment',orderId:'order_1'}});
   global.wx.cloud.callFunction=async()=>({result:{ok:true,data:{queryStatus:'PAID'}}});
   await assert.rejects(service.refreshPayment('order_1'));
+});
+
+test('client creation sends stable order/version key and rejects unknown server states',async()=>{
+  const service=connectedService();
+  const sent=[];
+  global.wx.cloud={callFunction:async request=>{sent.push(request);return {result:{ok:true,data:{status:'QUERY_REQUIRED'}}};}};
+  await service.createPayment('order_1',3);await service.createPayment('order_1',3);
+  assert.deepEqual(sent[0],sent[1]);
+  assert.deepEqual(JSON.parse(JSON.stringify(sent[0])),{name:'payment-api',data:{action:'createPayment',orderId:'order_1',expectedVersion:3,requestKey:'payment-order_1-version-3'}});
+  global.wx.cloud.callFunction=async()=>({result:{ok:true,data:{status:'invented'}}});
+  await assert.rejects(service.createPayment('order_1',3));
+});
+
+global.getApp=()=>null;
+test('query, order read and transition discard old-session success and failure',async t=>{
+ for(const action of ['refreshCloudPayment','loadOrder','runTransition'])for(const failed of [false,true])for(const renewed of [false,true]){
+  const app={globalData:{account:{id:'buyer-a'}},sessionRevision:1};t.mock.method(global,'getApp',()=>app);
+  let resolve,reject,after=0;const waiting=new Promise((yes,no)=>{resolve=yes;reject=no;});
+  const method=action==='refreshCloudPayment'?'refreshPayment':action==='loadOrder'?'getOrder':'transitionOrder';
+  const stub=t.mock.method(service,method,()=>waiting);
+  let read;
+  if(action!=='loadOrder')read=t.mock.method(service,'getOrder',async()=>{assert.fail('old session must not read follow-up order');});
+  const p=page(),pending=action==='runTransition'?p.runTransition('BUYER_CONFIRM',{},()=>after++):p[action]();
+  if(renewed)app.sessionRevision++;else app.globalData.account={id:'buyer-b'};
+  p.setData=()=>assert.fail('old session must not update page');
+  if(failed)reject(Object.assign(Error('changed'),{code:'VERSION_CONFLICT'}));
+  else resolve(action==='refreshCloudPayment'?{queryStatus:'QUERIED'}:order({version:2}));
+  await pending;assert.equal(after,0);stub.mock.restore();if(read)read.mock.restore();
+ }
+});
+
+test('current verified session still reads, transitions and invokes its completion once',async t=>{
+ const app={globalData:{account:{id:'buyer-a'}},sessionRevision:1};t.mock.method(global,'getApp',()=>app);
+ t.mock.method(service,'getOrder',async()=>order({version:2}));
+ t.mock.method(service,'transitionOrder',async()=>order({version:3,stage:'IN_PRODUCTION',paymentStatus:'PAID'}));
+ const p=page();await p.loadOrder();assert.equal(p.data.order.version,2);
+ let after=0;await p.runTransition('TEST',{},()=>after++);
+ assert.equal(after,1);assert.equal(p.data.order.version,3);assert.equal(p.data.actionPending,false);
+ app.globalData.account=null;
+ const read=t.mock.method(service,'getOrder',async()=>assert.fail('no authenticated session'));
+ await p.loadOrder();await p.refreshCloudPayment();await p.runTransition('TEST');await p.startCloudPayment();
+ assert.equal(read.mock.callCount(),0);
 });

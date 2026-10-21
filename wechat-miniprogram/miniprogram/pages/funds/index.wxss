@@ -1,11 +1,20 @@
-.funds-shell{padding:28rpx}
-.balance-card{padding:34rpx;border:1rpx solid #f0d7d1;border-radius:38rpx;background:linear-gradient(145deg,#fffaf6,#fff0ea)}
-.balance-label,.balance-value,.balance-copy{display:block}.balance-label{color:#8a6e68;font-size:23rpx;font-weight:700}.balance-value{margin-top:8rpx;color:#2b2523;font-size:48rpx;font-weight:800;line-height:1.25}.balance-copy{margin-top:18rpx;color:#766964;font-size:23rpx;line-height:36rpx}
-.records,.integrity-note{margin-top:24rpx;padding:28rpx;border:1rpx solid #eee3df;border-radius:34rpx;background:#fff}
-.records-heading{display:flex;align-items:center;justify-content:space-between;gap:16rpx;flex-wrap:wrap}.section-title{font-size:28rpx;font-weight:800}.records-heading>text:last-child{color:#766964;font-size:20rpx}
-.records-copy{display:block;margin:14rpx 0 20rpx;color:#766964;font-size:22rpx;line-height:34rpx}
-.record-row{display:flex;width:100%;min-height:110rpx;align-items:center;gap:18rpx;padding:22rpx 0;border-top:1rpx solid #eee3df;border-radius:0;background:transparent;text-align:left;box-shadow:none}.record-row::after{border:0}
-.record-main{min-width:0;flex:1}.record-main text{display:block}.record-main>text:first-child{font-size:25rpx;font-weight:700}.order-id{margin-top:6rpx;font-size:21rpx;color:#766964;overflow-wrap:anywhere;word-break:break-all}.record-time{margin-top:6rpx;color:#8a7b75;font-size:20rpx}
-.record-amount{max-width:42%;font-size:25rpx;font-weight:800;color:#2b2523;overflow-wrap:anywhere;word-break:break-all}.record-amount.review{color:#bd624f}.chevron{flex:none;width:12rpx;height:12rpx;border-top:3rpx solid #b8aaa5;border-right:3rpx solid #b8aaa5;transform:rotate(45deg)}
-.records-empty{padding:34rpx 0}.records-empty text{display:block;font-size:24rpx;line-height:38rpx}.records-empty text:last-child{color:#766964;font-size:22rpx}.records-end{display:block;margin-top:18rpx;text-align:center;color:#8a7b75;font-size:21rpx}.error-copy{color:#bd624f}
-.integrity-note{background:#fff8f4}.integrity-note text{display:block}.integrity-note>text:first-child{color:#c6536b;font-size:24rpx;font-weight:800}.integrity-note>text:nth-child(2){margin-top:8rpx;color:#766964;font-size:23rpx;line-height:36rpx}.secondary-block{margin-top:22rpx;min-height:88rpx;box-shadow:none}
+.funds-shell { padding: var(--am-detail-page-padding)}
+.balance-card { padding: var(--am-detail-card-padding); border: var(--am-work-rule); border-radius: var(--am-radius-control);background: var(--am-color-surface); margin-bottom: var(--am-detail-section-gap);}
+.balance-label,.balance-value,.balance-copy{display: block}.balance-label{color: var(--am-color-text-secondary);font-size: var(--am-type-caption);font-weight: var(--am-weight-semibold)}.balance-value{margin-top: var(--am-space-1);color: var(--am-color-text);font-size: 48rpx;font-weight: var(--am-weight-semibold);line-height: 1.25}.balance-copy{margin-top: 18rpx;color: var(--am-color-text-secondary);font-size: var(--am-type-caption);line-height: var(--am-line-caption)}
+.records,.integrity-note{margin-top: var(--am-space-3);padding: 28rpx;border: 1rpx solid var(--am-color-border);border-radius: 34rpx;background: var(--am-color-surface)}
+.records-heading{display: flex;align-items: center;justify-content: space-between;gap: var(--am-space-2);flex-wrap: wrap}.section-title{font-size: var(--am-type-body);font-weight: var(--am-weight-semibold)}.records-heading>text:last-child{color: var(--am-color-text-secondary);font-size: var(--am-type-caption)}
+.records-copy{display: block;margin: 14rpx 0 20rpx;color: var(--am-color-text-secondary);font-size: var(--am-type-micro);line-height: 34rpx}
+.record-row{display: flex;width: 100%;min-height: 110rpx;align-items: center;gap: 18rpx;padding: 22rpx 0;border-top: 1rpx solid var(--am-color-border);border-radius: 0;background: transparent;text-align: left;box-shadow: none}.record-row::after{border: 0}
+.record-main{min-width: 0;flex: 1}.record-main text{display: block}.record-main>text:first-child{font-size: 25rpx;font-weight: var(--am-weight-semibold)}.order-id{margin-top: 6rpx;font-size: var(--am-type-caption);color: var(--am-color-text-secondary);overflow-wrap: anywhere;word-break: break-all}.record-time{margin-top: 6rpx;color: var(--am-color-text-secondary);font-size: var(--am-type-caption)}
+.record-amount{max-width: 42%;font-size: 25rpx;font-weight: var(--am-weight-semibold);color: var(--am-color-text);overflow-wrap: anywhere;word-break: break-all}.record-amount.review{color: var(--am-color-text-secondary)}.chevron{flex: none;width: 12rpx;height: 12rpx;border-top: 3rpx solid var(--am-color-border);border-right: 3rpx solid var(--am-color-border);transform: rotate(45deg)}
+.records-empty{padding: 34rpx 0}.records-empty text{display: block;font-size: var(--am-type-caption);line-height: 38rpx}.records-empty text:last-child{color: var(--am-color-text-secondary);font-size: var(--am-type-micro)}.records-end{display: block;margin-top: 18rpx;text-align: center;color: var(--am-color-text-secondary);font-size: var(--am-type-caption)}.error-copy{color: var(--am-color-danger)}
+.integrity-note{background: var(--am-color-control-surface)}.integrity-note text{display: block}.integrity-note>text:first-child{color: var(--am-color-brand);font-size: var(--am-type-caption);font-weight: var(--am-weight-semibold)}.integrity-note>text:nth-child(2){margin-top: var(--am-space-1);color: var(--am-color-text-secondary);font-size: var(--am-type-caption);line-height: var(--am-line-caption)}.secondary-block{margin-top: 22rpx;}
+@import "../../styles/money.wxss";
+text.am-money.record-amount.review { color: var(--am-color-text-secondary); }
+.income-column { display: flex; flex-direction: column; align-items: flex-end; gap: var(--am-space-1); max-width: 45%; }
+.income-column .record-amount { max-width: 100%; }
+.income-label { color: var(--am-color-text-secondary); font-size: var(--am-type-micro); line-height: var(--am-line-caption); }
+.funds-shell button.record-row { width: 100%; margin: var(--am-space-none); }
+.buyer-funds .record-row:first-child { border-top: var(--am-border-none); }
+.buyer-funds .record-main > text:first-child { font-size: var(--am-type-body); line-height: var(--am-line-body); }
+.buyer-funds .order-id { font-size: var(--am-type-micro); line-height: var(--am-line-caption); }

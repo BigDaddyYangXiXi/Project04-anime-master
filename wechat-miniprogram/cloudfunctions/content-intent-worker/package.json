@@ -1,0 +1,10 @@
+{
+  "name": "anime-master-content-intent-worker",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "dependencies": {
+    "@types/node": "20.19.0",
+    "mysql2": "3.24.3"
+  }
+}

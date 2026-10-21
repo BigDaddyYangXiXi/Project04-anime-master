@@ -17,10 +17,16 @@ Component({
       value: null,
       observer(work) {
         const images = work && Array.isArray(work.imagePreviews) ? work.imagePreviews : [];
-        const tags = work && Array.isArray(work.tags) ? work.tags.slice(0, 2) : [];
-        this.setData({ coverImage: images[0] || "", displayTags: tags });
+        const count = work && work.referenceCount;
+        const ownerId = work && (work.providerId || (work.provider && work.provider.id));
+        this.setData({
+          workIdParam: encodeURIComponent(work && work.id || ""),
+          workOwnerQuery: ownerId ? `&providerId=${encodeURIComponent(ownerId)}` : "",
+          coverImage: images[0] || (work && work.coverImage) || "",
+          referenceText: Number.isInteger(count) && count >= 0 ? `被参考 ${count} 次` : ""
+        });
       }
     }
   },
-  data: { coverImage: "", displayTags: [] }
+  data: { coverImage: "", referenceText: "", workIdParam: "", workOwnerQuery: "" }
 });

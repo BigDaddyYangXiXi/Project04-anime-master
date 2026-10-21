@@ -1,10 +1,9 @@
 const crypto = require("node:crypto");
 
-const ENV_ID = "quest-band-d1gem4bxt3fa17720";
 // WeChat mediaCheckAsync only accepts a single file up to 10 MB.
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_DELIVERY_BYTES = 20 * 1024 * 1024;
-const PURPOSES = new Set(["AVATAR", "NOTICE_IMAGE", "WORK_IMAGE", "PROJECT_REFERENCE", "PROJECT_TARGET", "ORDER_DELIVERY"]);
+const PURPOSES = new Set(["AVATAR", "NOTICE_IMAGE", "PROVIDER_BANNER", "WORK_IMAGE", "PROJECT_REFERENCE", "PROJECT_TARGET", "ORDER_DELIVERY", "SUPPORT_IMAGE"]);
 const MIME_EXTENSIONS = new Map([
   ["image/jpeg", "jpg"],
   ["image/png", "png"],
@@ -14,11 +13,12 @@ const MIME_EXTENSIONS = new Map([
   ["application/x-zip-compressed", "zip"],
   ["text/plain", "txt"]
 ]);
-const IMAGE_PURPOSES = new Set(["AVATAR", "NOTICE_IMAGE", "WORK_IMAGE", "PROJECT_REFERENCE", "PROJECT_TARGET"]);
+const IMAGE_PURPOSES = new Set(["AVATAR", "NOTICE_IMAGE", "PROVIDER_BANNER", "WORK_IMAGE", "PROJECT_REFERENCE", "PROJECT_TARGET", "SUPPORT_IMAGE"]);
 
-function fail(code, message) {
+function fail(code, message, reason) {
   const error = new Error(message);
   error.code = code;
+  if (reason) error.reason = reason;
   throw error;
 }
 
@@ -42,7 +42,10 @@ function assetId(value) {
   return normalized;
 }
 
-function validateFileId(fileId, cloudPath) {
+function validateFileId(fileId, cloudPath, envId) {
+  if (typeof envId !== "string" || !/^[a-zA-Z0-9_-]+$/.test(envId)) {
+    fail("MEDIA_ENV_NOT_CONFIGURED", "trusted runtime environment is missing");
+  }
   const normalized = boundedText(fileId, "fileId", 1024, true);
   let decoded;
   try {
@@ -50,7 +53,8 @@ function validateFileId(fileId, cloudPath) {
   } catch {
     fail("FILE_ID_MISMATCH", "fileId encoding is invalid");
   }
-  if (!decoded.startsWith(`cloud://${ENV_ID}.`) || !decoded.endsWith(`/${cloudPath}`)) {
+  const parts = /^cloud:\/\/([^/.]+)\.([^/]+)\/(.+)$/.exec(decoded);
+  if (!parts || parts[1] !== envId || parts[3] !== cloudPath) {
     fail("FILE_ID_MISMATCH", "fileId does not match the issued upload path");
   }
   return normalized;
@@ -64,6 +68,8 @@ async function resolveAccount(db, context) {
     "read identity"
   );
   if (!identities[0]) fail("ACCOUNT_NOT_FOUND", "account is not initialized");
+  const account = rows(await db.from("accounts").select("id").eq("id", identities[0].account_id).eq("status", "ACTIVE"), "read active account")[0];
+  if (!account) fail("ACCOUNT_NOT_FOUND", "account is not active");
   return identities[0].account_id;
 }
 
@@ -155,18 +161,21 @@ async function prepareUpload(db, event, accountId, now, uuid = crypto.randomUUID
   };
 }
 
-async function commitUpload(db, storage, event, accountId, now) {
+async function commitUpload(db, storage, event, accountId, now, envId) {
   const id = assetId(event.assetId);
   const asset = await readOwnedAsset(db, id, accountId);
   if (!asset || asset.status === "DELETED") fail("MEDIA_NOT_FOUND", "media asset was not found");
   if (asset.committed_at && asset.storage_key.startsWith("cloud://")) {
-    return { assetId: id, status: "PENDING_SECURITY_REVIEW", mimeType: asset.mime_type, sizeBytes: asset.size_bytes };
+    if (!["PENDING", "READY", "REJECTED"].includes(asset.status)) fail("MEDIA_STATE_INVALID", "media asset cannot be committed");
+    return { assetId: id, fileId: asset.storage_key, status: asset.status === "PENDING" ? "PENDING_SECURITY_REVIEW" : asset.status, mimeType: asset.mime_type, sizeBytes: asset.size_bytes };
   }
   if (asset.status !== "PENDING") fail("MEDIA_STATE_INVALID", "media asset cannot be committed");
 
-  const fileId = validateFileId(event.fileId, asset.storage_key);
+  const fileId = validateFileId(event.fileId, asset.storage_key, envId);
   const infoResult = await storage.getFileInfo({ fileList: [fileId] });
-  const info = infoResult && infoResult.fileList && infoResult.fileList[0];
+  const matches = infoResult && Array.isArray(infoResult.fileList)
+    ? infoResult.fileList.filter(item => item && item.fileID === fileId) : [];
+  const info = matches.length === 1 ? matches[0] : null;
   if (!info || info.code !== "SUCCESS") fail("MEDIA_FILE_MISSING", "uploaded file was not found");
   const mime = boundedText(info.mime || info.contentType, "uploaded mime", 128).toLowerCase();
   const size = Number(info.size);
@@ -198,27 +207,47 @@ async function commitUpload(db, storage, event, accountId, now) {
   return { assetId: id, fileId, status: nextStatus || "PENDING_SECURITY_REVIEW", mimeType: mime, sizeBytes: size };
 }
 
-async function cancelUpload(db, storage, event, accountId, now) {
+async function cancelUpload(db, storage, event, accountId, now, envId) {
   const id = assetId(event.assetId);
   const asset = await readOwnedAsset(db, id, accountId);
   if (!asset) fail("MEDIA_NOT_FOUND", "media asset was not found");
   if (asset.status === "DELETED") return { assetId: id, status: "DELETED" };
-  if (asset.purpose === "ORDER_DELIVERY" && new Set(["READY", "ORPHAN_CANDIDATE"]).has(asset.status)) {
-    fail("MEDIA_STATE_INVALID", "committed delivery media is managed by reference-aware cleanup");
+  if (!["PENDING", "REJECTED"].includes(asset.status)) {
+    fail("MEDIA_STATE_INVALID", "usable media is managed by reference-aware cleanup");
   }
 
   let fileId = asset.storage_key.startsWith("cloud://") ? asset.storage_key : null;
-  if (!fileId && event.fileId) fileId = validateFileId(event.fileId, asset.storage_key);
+  if (!fileId && event.fileId) fileId = validateFileId(event.fileId, asset.storage_key, envId);
+  // Make the asset unusable before touching storage. A concurrent commit/review
+  // must not turn a file being deleted into READY. REJECTED also permits retry.
+  let claim = db.from("media_assets").update({ status: "REJECTED", deleted_at: now })
+    .eq("id", id).eq("owner_account_id", accountId).eq("status", asset.status).eq("storage_key", asset.storage_key);
+  claim = asset.committed_at == null ? claim.is("committed_at", null) : claim.eq("committed_at", asset.committed_at);
+  if (!rows(await claim.select("id"), "claim media cancellation").length) fail("MEDIA_STATE_CONFLICT", "media asset changed during cancellation");
+  if (!fileId) {
+    const metadata = await storage.getUploadMetadata({ cloudPath: asset.storage_key });
+    if (metadata && metadata.code) fail("MEDIA_DELETE_FAILED", "storage metadata could not be resolved", "METADATA_REJECTED");
+    fileId = validateFileId(metadata && metadata.data && metadata.data.fileId, asset.storage_key, envId);
+  }
   if (fileId) {
     const deleted = await storage.deleteFile({ fileList: [fileId] });
     const item = deleted && deleted.fileList && deleted.fileList[0];
-    if (!item || (item.code && item.code !== "SUCCESS")) fail("MEDIA_DELETE_FAILED", "uploaded file could not be deleted");
+    if (!item || item.code !== "SUCCESS" || item.fileID !== fileId) {
+      const reason = !item ? "MISSING_RECEIPT" : item.fileID !== fileId ? "RECEIPT_FILE_MISMATCH"
+        : item.code === "STORAGE_FILE_NONEXIST" ? "STORAGE_NONEXIST" : "STORAGE_REJECTED";
+      fail("MEDIA_DELETE_FAILED", "uploaded file could not be deleted", reason);
+    }
   }
 
-  rows(await db.from("media_assets")
+  const updated = rows(await db.from("media_assets")
     .update({ status: "DELETED", deleted_at: now })
     .eq("id", id)
-    .eq("owner_account_id", accountId), "mark media asset deleted");
+    .eq("owner_account_id", accountId)
+    .eq("status", "REJECTED").select("id"), "mark media asset deleted");
+  if (!updated.length) {
+    const current = await readOwnedAsset(db, id, accountId);
+    if (!current || current.status !== "DELETED") fail("MEDIA_STATE_CONFLICT", "media asset changed during cancellation");
+  }
   return { assetId: id, status: "DELETED" };
 }
 
@@ -228,10 +257,12 @@ async function handleMediaUpload(db, storage, event = {}, context = {}, now = Da
     fail("INVALID_ACTION", "action is not supported");
   }
   const accountId = await resolveAccount(db, context);
+  // Context comes from the server SDK, never from the request payload.
+  const envId = context.TCB_ENV || context.SCF_NAMESPACE;
   if (action === "prepareUpload") return prepareUpload(db, event, accountId, now, uuid);
-  if (action === "commitUpload") return commitUpload(db, storage, event, accountId, now);
+  if (action === "commitUpload") return commitUpload(db, storage, event, accountId, now, envId);
   if (action === "getOwnedMedia") return getOwnedMedia(db, event, accountId);
-  return cancelUpload(db, storage, event, accountId, now);
+  return cancelUpload(db, storage, event, accountId, now, envId);
 }
 
-module.exports = { ENV_ID, MAX_DELIVERY_BYTES, MAX_IMAGE_BYTES, getOwnedMedia, handleMediaUpload, validateFileId };
+module.exports = { MAX_DELIVERY_BYTES, MAX_IMAGE_BYTES, getOwnedMedia, handleMediaUpload, validateFileId };

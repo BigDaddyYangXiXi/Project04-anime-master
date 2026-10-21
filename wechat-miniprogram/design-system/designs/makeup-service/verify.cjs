@@ -1,0 +1,22 @@
+const {chromium}=require('C:/Users/Administrator/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict'),path=require('path'),fs=require('fs');
+(async()=>{const browser=await chromium.launch({headless:true,channel:'msedge'});try{
+const page=await browser.newPage({viewport:{width:1400,height:1050},deviceScaleFactor:1});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+await page.goto('http://127.0.0.1:9446',{waitUntil:'domcontentloaded'});await page.waitForTimeout(1000);
+await page.screenshot({path:path.join(__dirname,'overview.png'),fullPage:true});
+await page.locator('[data-pkg="0"]').click();assert.match(await page.locator('#footer').innerText(),/268/);
+await page.locator('#book').click();await page.locator('#next').click();assert.match(await page.locator('#error').innerText(),/日期/);
+await page.locator('#date').fill('2026-10-01');await page.locator('[data-time="08:00"]').click();assert.match(await page.locator('#end').innerText(),/09:30/);
+assert.equal(await page.locator('[data-time="13:00"]').isDisabled(),true);
+await page.locator('#method').selectOption('visit');await page.locator('#next').click();assert.match(await page.locator('#error').innerText(),/地点/);
+await page.locator('#address').fill('余杭区 · 展会场地（测试）');assert.equal(await page.locator('#sheetprice').innerText(),'¥308');
+await page.locator('.phone').screenshot({path:path.join(__dirname,'selection.png')});
+await page.locator('#next').click();await page.locator('#submit').click();assert.match(await page.locator('#confirmerror').innerText(),/核对/);
+await page.locator('.phone').screenshot({path:path.join(__dirname,'confirmation.png')});
+await page.locator('#agree').check();await page.locator('#submit').click();assert.match(await page.locator('#overlay').innerText(),/没有创建订单/);await page.locator('#done').click();
+await page.locator('[data-pkg="2"]').click();assert.match(await page.locator('#footer').innerText(),/468/);
+await page.locator('#follow').click();assert.equal(await page.locator('#follow').innerText(),'已关注');
+await page.setViewportSize({width:375,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+await page.locator('.phone').screenshot({path:path.join(__dirname,'mobile.png')});
+assert.deepEqual(errors,[]);fs.writeFileSync(path.join(__dirname,'verification.json'),JSON.stringify({at:new Date().toISOString(),errors,checks:['套餐与金额联动','缺日期提示','不可选时段','完成时间','上门地址校验','上门费用合计','确认勾选','演示完成','关注切换','375px无横向溢出']},null,2));console.log('PASS: interactive prototype checks and screenshots');
+}finally{await browser.close()}})().catch(e=>{console.error(e);process.exitCode=1});

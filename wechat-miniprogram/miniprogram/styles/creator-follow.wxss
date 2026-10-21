@@ -1,0 +1,4 @@
+.follow-button { display: flex; width: var(--am-follow-width); min-width: var(--am-follow-width); max-width: var(--am-follow-width); min-height: var(--am-follow-height); flex: 0 0 var(--am-follow-width); align-items: center; justify-content: center; margin: var(--am-space-none); padding: var(--am-space-none); border: var(--am-border-control); border-radius: var(--am-radius-pill); color: var(--am-color-brand); background: var(--am-color-canvas); font-size: var(--am-type-label); font-weight: var(--am-weight-medium); }
+.follow-button.active { border-color: var(--am-color-transparent); color: var(--am-color-text-secondary); background: var(--am-color-control-surface); }
+.follow-button:active { opacity: var(--am-opacity-pressed); }
+.follow-button[data-am-disabled="true"] { opacity: var(--am-opacity-disabled); }

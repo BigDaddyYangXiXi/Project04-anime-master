@@ -1,0 +1,10 @@
+-- Local draft only. Production migration and grants are not authorized.
+ALTER TABLE fund_journals
+  MODIFY event_type ENUM('PAYMENT_CONFIRMED','REFUND_SUCCEEDED','PAYMENT_REVIEW_RECEIVED','FINANCE_NET_APPROVED') NOT NULL,
+  DROP CHECK journal_event_check,
+  ADD CONSTRAINT journal_event_check CHECK (
+    (event_type IN ('PAYMENT_CONFIRMED','PAYMENT_REVIEW_RECEIVED','FINANCE_NET_APPROVED') AND refund_id IS NULL AND reverses_journal_id IS NULL)
+    OR (event_type='REFUND_SUCCEEDED' AND refund_id IS NOT NULL AND reverses_journal_id IS NOT NULL));
+ALTER TABLE fund_postings
+  MODIFY account ENUM('CHANNEL_RECEIVABLE','PLATFORM_PENDING','PROVIDER_PENDING','REVIEW_SUSPENSE',
+    'INCOME_TAX_PAYABLE','VAT_PAYABLE','SURCHARGE_PAYABLE','PROVIDER_NET') NOT NULL;

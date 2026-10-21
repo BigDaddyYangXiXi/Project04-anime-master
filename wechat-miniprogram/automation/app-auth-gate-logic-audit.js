@@ -12,13 +12,22 @@ global.wx = {
   removeStorageSync(key) { storage.delete(key); }
 };
 const nativeSetTimeout = global.setTimeout;
+// This gate audit exercises a connected build, independent of the source preview switch.
+const configPath = require.resolve("../miniprogram/config/cloudbase");
+require(configPath);
+require.cache[configPath].exports = { enabled: true, env: "local-fixture" };
 require("../miniprogram/app.js");
 
+const authPath = require.resolve('../miniprogram/services/cloud-auth');
+require(authPath);
+require.cache[authPath].exports = { getSession: async () => ({ registered: false }) };
+(async () => {
 global.setTimeout = (callback) => { callback(); return 1; };
 appDefinition.onLaunch.call(appDefinition, {
   path: "pages/provider-detail/index",
   query: { id: "1", from: "分享" }
 });
+await appDefinition.sessionReady;
 global.setTimeout = nativeSetTimeout;
 assert.equal(relaunchedTo, "/pages/auth/index");
 assert.equal(appDefinition.globalData.pendingRoute, "/pages/provider-detail/index?id=1&from=%E5%88%86%E4%BA%AB");
@@ -39,3 +48,5 @@ appDefinition.clearServerSession.call(appDefinition);
 assert.equal(storage.has("animeMasterServerAccount"), false);
 
 console.log("App authentication cold/warm deep-link gate and return-route audit passed");
+
+})().catch(error => { console.error(error); process.exitCode = 1; });

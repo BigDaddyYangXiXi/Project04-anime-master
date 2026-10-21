@@ -1,0 +1,15 @@
+@import "../../styles/design-tokens.wxss";
+@import "../../styles/actions.wxss";
+.first-use-mask{position:fixed;inset:0;z-index:1000;background:var(--am-booking-scrim);display:flex;align-items:center;justify-content:center;padding:var(--am-space-4)}
+.first-use-card{width:100%;box-sizing:border-box;padding:var(--am-space-6) var(--am-space-4) var(--am-space-3);border:var(--am-border-control);border-radius:var(--am-radius-card);background:var(--am-color-surface);color:var(--am-color-text)}
+.first-use-title{display:block;font-size:var(--am-type-section-title);font-weight:var(--am-weight-semibold);line-height:var(--am-line-section-title)}
+.first-use-copy{display:block;margin-top:var(--am-space-2);margin-bottom:var(--am-space-4);font-size:var(--am-type-caption);line-height:var(--am-line-caption);color:var(--am-color-text-secondary)}
+.first-use-item{padding:var(--am-space-3) var(--am-space-none);border-top:var(--am-border-control)}
+.first-use-item text{display:block;font-size:var(--am-type-label);line-height:var(--am-line-label)}
+.first-use-item text+text{font-size:var(--am-type-caption);color:var(--am-color-text-secondary)}
+.first-use-links{display:flex;gap:var(--am-space-3);margin-bottom:var(--am-space-3)}
+.first-use-links button,.first-use-manual{padding:var(--am-space-none);margin:var(--am-space-none);min-height:var(--am-touch-min);border:var(--am-border-none);background:var(--am-color-transparent);color:var(--am-color-text-secondary);font-size:var(--am-type-caption)}
+.first-use-links button{color:var(--am-color-brand)}
+.first-use-manual{width:100%;margin-top:var(--am-space-2)}
+.first-use-error{display:block;margin-bottom:var(--am-space-3);color:var(--am-color-danger);font-size:var(--am-type-caption);line-height:var(--am-line-caption)}
+button::after{border:var(--am-border-none)}

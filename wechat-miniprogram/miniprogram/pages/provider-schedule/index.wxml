@@ -1,18 +1,20 @@
 <app-top-nav class="app-navigation" title="公开档期" workspace="{{navWorkspace}}" show-back="{{true}}"/>
-<view wx:if="{{loading}}" class="empty-page"><text class="empty-page-title">正在读取服务者档期</text></view>
-<view wx:elif="{{provider}}" class="schedule-shell">
-  <view class="page-intro"><text>{{provider.name}} · {{provider.career}}</text><text>{{monthTitle}}</text><text>与服务方日历使用同一月历：公开可约可以选择，满客不可选择，未公开仍可发起预约等待确认。</text></view>
+<block wx:if="{{loading}}"></block>
+<view wx:elif="{{provider}}" class="schedule-shell {{providerPreview ? 'storefront-calendar-editor' : ''}}">
+  <text wx:if="{{providerPreview}}" class="storefront-state-band">已保存并生效的档期 · 仅查看</text><view wx:if="{{!providerPreview}}" class="page-intro"><text>{{provider.name}} · {{provider.career}}</text><text>{{monthTitle}}</text><text>{{providerPreview ? '查看已保存并生效的档期。未公开表示尚未说明是否有空；已有订单占用的日期不可预约。' : '公开可约可以选择，满客不可选择，未公开仍可发起预约等待确认。'}}</text></view>
+  <view wx:if="{{providerPreview}}" class="storefront-month-heading"><button class="am-action am-action-secondary" data-step="-1" disabled="{{!monthOffset || loading}}" bindtap="changePreviewMonth">‹</button><text>{{monthTitle}}</text><button class="am-action am-action-secondary" data-step="1" disabled="{{monthOffset === 11 || loading}}" bindtap="changePreviewMonth">›</button></view>
   <view class="calendar-card">
     <view class="week-row"><text wx:for="{{weekdays}}" wx:key="*this">{{item}}</text></view>
     <view class="calendar-grid">
-      <button wx:for="{{days}}" wx:key="key" disabled="{{!item.selectable}}" class="{{!item.valid ? 'placeholder' : item.past ? 'past' : item.state}} {{item.selected ? 'selected' : ''}}" data-day="{{item.value}}" data-date="{{item.date}}" bindtap="chooseDate">
-        <text>{{item.value}}</text><text wx:if="{{item.valid && !item.past}}">{{item.label}}</text>
+      <button aria-disabled="{{!item.selectable}}" hover-class="none" wx:for="{{days}}" wx:key="key" data-am-disabled="{{!item.selectable}}" class="{{!item.valid ? 'placeholder' : item.past ? 'past' : item.state}} {{!providerPreview && item.selected ? 'selected' : ''}}" data-day="{{item.value}}" data-date="{{item.date}}" bindtap="{{(!item.selectable) ? '' : 'chooseDate'}}">
+        <text>{{item.value}}</text><text wx:if="{{item.valid && !item.past}}">{{providerPreview && item.locked ? '已锁' : item.label}}</text>
       </button>
     </view>
-    <view class="calendar-legend"><view><view class="calendar-dot open"></view><text>公开可约</text></view><view><view class="calendar-dot full"></view><text>满客</text></view><view><view class="calendar-dot unknown"></view><text>未公开</text></view></view>
+    <view class="calendar-legend"><view><view class="calendar-dot open"></view><text>公开可约</text></view><view><view class="calendar-dot full"></view><text>{{providerPreview ? '已锁' : '满客'}}</text></view><view><view class="calendar-dot unknown"></view><text>未公开</text></view></view>
   </view>
-  <view class="selection-note"><text>当前选择</text><text>{{selectedText}}</text></view>
-  <button class="primary-block" disabled="{{!selectedDay || selectedFull}}" bindtap="startBooking">{{bookingText}}</button>
+  <view wx:if="{{!providerPreview}}" class="selection-note"><text>当前选择</text><text>{{selectedText}}</text></view>
+  <button wx:if="{{!providerPreview}}" aria-disabled="{{!canBook}}" hover-class="none" class="primary-block am-action am-action-primary am-action-block" data-am-disabled="{{!canBook}}" bindtap="{{(!canBook) ? '' : 'startBooking'}}">{{bookingText}}</button>
+  <button wx:else class="primary-block am-action am-action-primary am-action-block" bindtap="returnToPreview">返回主页预览</button>
 </view>
-<view wx:else class="empty-page"><text class="empty-page-title">{{loadError || '没有找到服务者档期'}}</text></view>
-<main-bottom-nav/>
+<view wx:else class="empty-page"><text class="empty-page-title">{{loadError || '没有找到服务者档期'}}</text><button wx:if="{{loadError}}" hover-class="none" class="am-action am-action-secondary" bindtap="retryLoad">重新读取档期</button></view>
+<main-bottom-nav wx:if="{{!providerPreview}}"/>

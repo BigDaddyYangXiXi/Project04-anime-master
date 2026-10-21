@@ -1,0 +1,33 @@
+<app-top-nav title="{{canApply ? '退款申请与记录' : '退款记录'}}" workspace="{{navWorkspace}}" show-back="{{true}}"/>
+<view class="refund-shell am-editor-form">
+  <block wx:if="{{ready}}">
+    <view wx:if="{{loadError}}" class="refund-section"><text class="field-error">{{loadError}}</text><button hover-class="none" class="am-action am-action-secondary am-action-block" bindtap="load">重新核对订单</button></view>
+    <view class="refund-section"><text class="refund-title">{{order.service}}</text><text class="refund-copy">实付金额</text><text class="am-money">￥{{totalText}}</text></view>
+    <view wx:if="{{order.stage === 'COMPLETED'}}" class="refund-section">
+      <text class="refund-title">交易已完成</text>
+      <text class="refund-copy">不支持单方反悔或无理由退款。特殊争议可提交问题反馈，请注明订单编号并保留交付与沟通证据。反馈不代表退款获批或平台垫付。</text>
+      <text class="refund-copy" selectable>订单编号：{{order.id}}</text>
+      <button hover-class="none" class="am-action am-action-secondary am-action-block" open-type="feedback">特殊争议反馈</button>
+    </view>
+    <view wx:if="{{canApply}}" class="form-stack refund-section">
+      <text class="refund-title">{{draftState === 'ACKNOWLEDGED' ? '申请已提交' : '申请退款'}}</text>
+      <label><text>退款金额（元）</text><input class="am-input" type="digit" value="{{amount}}" bindinput="inputAmount" disabled="{{busy || draftState === 'UNKNOWN' || draftState === 'ACKNOWLEDGED'}}" placeholder="请输入退款金额"/></label>
+      <label><text>退款原因</text><textarea class="am-textarea" value="{{reason}}" bindinput="inputReason" maxlength="80" auto-height disabled="{{busy || draftState === 'UNKNOWN' || draftState === 'ACKNOWLEDGED'}}" placeholder="请简要说明退款原因"/></label>
+      <text class="refund-copy">请说明退款理由。提交后进入审核，不代表自动退款；处理期间相关款项暂停结算。</text>
+      <text wx:if="{{draftState === 'UNKNOWN'}}" class="refund-copy">上次申请结果尚未确认，核对时会沿用原申请。</text>
+      <text wx:if="{{error}}" class="field-error">{{error}}</text>
+      <button aria-disabled="{{busy}}" hover-class="none" wx:if="{{draftState !== 'ACKNOWLEDGED'}}" class="am-action am-action-primary am-action-block" bindtap="{{(busy) ? '' : 'submit'}}" data-am-disabled="{{busy}}" loading="{{busy}}">{{draftState === 'UNKNOWN' ? '核对原申请' : '提交退款申请'}}</button>
+      <button aria-disabled="{{busy}}" hover-class="none" wx:else class="am-action am-action-secondary am-action-block" bindtap="{{(busy) ? '' : 'startNext'}}" data-am-disabled="{{busy}}">申请另一笔退款</button>
+    </view>
+    <view class="refund-section">
+      <text class="refund-title">退款记录</text>
+      <text wx:if="{{historyError}}" class="field-error">{{historyError}}</text>
+      <view wx:for="{{records}}" wx:key="refundId" class="refund-row"><text>{{item.statusText}}</text><text class="am-money am-money-inline">￥{{item.amountText}}</text></view>
+      <text wx:if="{{historyReady && !records.length && !historyError}}" class="refund-copy">暂无退款记录</text>
+      <button hover-class="none" class="am-action am-action-secondary am-action-block" bindtap="refreshRecords">刷新退款记录</button>
+      <button hover-class="none" wx:if="{{nextCursor}}" class="am-action am-action-secondary am-action-block" bindtap="moreRecords">查看更多</button>
+    </view>
+  </block>
+  <view wx:elif="{{error}}" class="refund-section"><text class="field-error">{{error}}</text><button hover-class="none" class="am-action am-action-secondary am-action-block" bindtap="load">重试</button></view>
+</view>
+<main-bottom-nav workspace="{{navWorkspace}}"/>

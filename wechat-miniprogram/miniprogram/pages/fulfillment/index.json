@@ -1,1 +1,8 @@
-{"navigationBarTitleText":"交付验收","usingComponents":{"brand-success-card":"/components/brand-success-card/index"}}
+{
+  "navigationBarTitleText": "交付验收",
+  "usingComponents": {
+    "brand-success-card": "/components/brand-success-card/index",
+    "order-subscription": "/components/order-subscription/index"
+  },
+  "backgroundColorContent": "#171514"
+}

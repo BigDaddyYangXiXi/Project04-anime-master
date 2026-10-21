@@ -1,0 +1,10 @@
+@import "../../styles/editor-form.wxss";
+@import "../../styles/money.wxss";
+.refund-shell { padding: var(--am-detail-nav-page-padding); }
+.refund-section { display: flex; flex-direction: column; gap: var(--am-space-3); margin-bottom: var(--am-detail-section-gap); }
+.refund-title { font-size: var(--am-type-body); font-weight: var(--am-weight-semibold); color: var(--am-color-text); }
+.refund-copy { font-size: var(--am-type-caption); color: var(--am-color-text-secondary); line-height: var(--am-line-caption); }
+.form-stack label { display: flex; flex-direction: column; }
+.refund-shell .am-input,.refund-shell .am-textarea { box-sizing: border-box; width: 100%; padding: var(--am-space-3); }
+.refund-shell .am-input { height: var(--am-touch-min); padding-top: var(--am-space-none); padding-bottom: var(--am-space-none); }
+.refund-row { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--am-space-2); padding: var(--am-space-3) var(--am-space-none); border-bottom: var(--am-work-rule); }

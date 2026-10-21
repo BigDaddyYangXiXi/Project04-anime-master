@@ -1,6 +1,12 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { canonicalCityCode, locationPreference, pickerRegion } = require("./discovery-region");
+const { canonicalCityCode, locationPreference, pickerRegion, regionLabel } = require("./discovery-region");
+
+test("地区展示保留已选区，不伪造缺失地区", () => {
+  assert.equal(regionLabel({ cityName: "杭州市", districtName: "余杭区" }), "杭州·余杭区");
+  assert.equal(regionLabel({ cityName: "杭州市", districtName: "" }), "杭州");
+  assert.equal(regionLabel({ cityName: "北京市", districtName: "市辖区" }), "北京");
+});
 
 test("reads city and code from the native region picker", () => {
   assert.deepEqual(pickerRegion({ value: ["上海市", "上海市", "徐汇区"], code: ["310000", "310000", "310104"] }), {

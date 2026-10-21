@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "广场偏好",
+  "usingComponents": {
+    "app-top-nav": "/components/app-top-nav/index"
+  },
+  "backgroundColorContent": "#171514"
+}

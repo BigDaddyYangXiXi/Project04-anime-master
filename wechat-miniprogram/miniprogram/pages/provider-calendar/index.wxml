@@ -1,16 +1,13 @@
-<app-top-nav class="app-navigation" title="档期管理" workspace="provider" show-back="{{false}}"/>
-<view class="calendar-shell">
-  <view class="page-intro"><text>公开档期用于筛选</text><text>2026 年 8 月</text><text>点击日期切换公开状态；执行中订单会锁定对应日期。</text></view>
+<app-top-nav class="app-navigation" title="档期与接单" workspace="provider" show-back="{{true}}" custom-back="{{true}}" bindback="back"/>
+<view class="calendar-shell storefront-calendar-editor"><text class="storefront-state-band">档期与接单状态 · 保存后立即生效</text>
+  <view class="accepting-row"><view><text>开放接单</text><text>关闭后暂停新预约，已有订单照常进行。</text></view><switch checked="{{accepting}}" disabled="{{saving || loading}}" bindchange="changeAccepting"/></view>
+  <view class="month-heading"><button class="am-action am-action-secondary" data-step="-1" disabled="{{monthOffset === 0 || saving}}" bindtap="changeMonth">‹</button><text>{{monthTitle}}</text><button class="am-action am-action-secondary" data-step="1" disabled="{{monthOffset === 11 || saving}}" bindtap="changeMonth">›</button></view>
+
+  <view wx:if="{{error}}" class="calendar-error"><text>{{error}}</text><button class="am-action am-action-secondary" disabled="{{saving}}" bindtap="load">重新读取</button></view>
   <view class="calendar-card">
     <view class="week-row"><text wx:for="{{weekdays}}" wx:key="*this">{{item}}</text></view>
-    <view class="calendar-grid">
-      <button wx:for="{{days}}" wx:key="key" disabled="{{!item.valid || item.locked}}" class="{{!item.valid ? 'placeholder' : item.locked ? 'locked' : item.open ? 'open' : 'unknown'}}" data-day="{{item.value}}" bindtap="toggle">
-        <text>{{item.value}}</text><text wx:if="{{item.open}}">可约</text><text wx:if="{{item.locked}}">已锁</text>
-      </button>
-    </view>
-    <view class="calendar-legend"><view><view class="calendar-dot open"></view><text>公开可约</text></view><view><view class="calendar-dot unknown"></view><text>未公开</text></view><view><view class="calendar-dot locked"></view><text>订单锁定</text></view></view>
+    <view class="calendar-grid"><button wx:for="{{days}}" wx:key="key" class="{{!item.valid ? 'placeholder' : item.past ? 'past' : item.locked ? 'locked' : item.open ? 'open' : 'unknown'}}" disabled="{{!item.selectable || saving || loading}}" data-date="{{item.date}}" bindtap="toggle"><text>{{item.value}}</text><text wx:if="{{item.valid && !item.past}}">{{item.locked ? '已锁' : item.open ? '可约' : '未公开'}}</text></button></view>
   </view>
-  <view class="two-actions"><button class="secondary-button" disabled="{{!changed}}" bindtap="reset">撤销修改</button><button class="primary-button" disabled="{{!changed}}" bindtap="save">保存档期</button></view>
-  <text wx:if="{{message}}" class="message">{{message}}</text>
+  <text class="calendar-help">可约：明确开放　未公开：需确认　已锁：订单占用</text><view class="storefront-progress"><text>未公开日期，不代表不接单</text><text class="calendar-help">需求方仍可发起预约，等待你确认。点击日期可改为明确可约；订单锁定日期不可修改。</text></view><text wx:if="{{message}}" class="calendar-help">{{message}}</text>
+  <view class="calendar-footer"><button class="am-action am-action-secondary" disabled="{{!changed || saving}}" bindtap="reset">撤销修改</button><button class="am-action am-action-primary" disabled="{{!changed || saving || loading}}" bindtap="save">{{saving ? '正在保存' : '保存并生效'}}</button></view>
 </view>
-<main-bottom-nav/>

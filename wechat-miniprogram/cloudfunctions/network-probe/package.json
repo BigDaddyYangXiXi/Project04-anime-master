@@ -1,0 +1,7 @@
+{
+  "name": "anime-master-network-probe",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "dependencies": { "@cloudbase/node-sdk": "3.18.3" }
+}

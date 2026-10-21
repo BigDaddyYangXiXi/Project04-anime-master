@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const automator = require("miniprogram-automator");
 
 const envId = "quest-band-d1gem4bxt3fa17720";
+require("./assert-audit-environment")("wx57412ad07a806b70", envId);
 const wsEndpoint = process.env.WECHAT_AUTO_WS || "ws://127.0.0.1:9422";
 
 async function run() {
